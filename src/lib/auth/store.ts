@@ -35,6 +35,15 @@ export function createAuthStore(filename = process.env.DATABASE_URL ?? "./papert
     update(id: string, tokenEnc: string | null) {
       db.update(users).set({ tokenEnc }).where(eq(users.id, id)).run();
     },
+    remove(id: string) {
+      // Remove the identity as well as credentials so a later reconnect gets a new
+      // user id and cannot resurrect a previously issued session cookie.
+      db.transaction(tx => {
+        tx.update(users).set({ tokenEnc: null }).where(eq(users.id, id)).run();
+        tx.delete(audit).where(eq(audit.subjectId, id)).run();
+        tx.delete(users).where(eq(users.id, id)).run();
+      });
+    },
     audit(action: string, subjectId: string | null, meta: Record<string, unknown> = {}) {
       db.insert(audit).values({ id: randomUUID(), at: new Date(), actor: "system",
         action, subjectId, metaJson: JSON.stringify(meta) }).run();

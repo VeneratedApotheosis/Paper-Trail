@@ -192,16 +192,19 @@ export function setRevokeOAuthHook(hook: RevokeOAuthHook | null): void {
 
 /**
  * Purges all user data: ledger, drafts, review queue, extraction cache, exclusions and the audit log, keeping
- * only the single "delete" audit record. Calls the OAuth revoke hook first when one is registered.
+ * only the single "delete" audit record. Uses a per-request revoker when supplied, otherwise the registered hook.
  */
-export async function deleteAll(clock: () => Date = () => new Date()): Promise<DeleteAllResult> {
+export async function deleteAll(
+  clock: () => Date = () => new Date(),
+  revokeOAuth: RevokeOAuthHook | null = data().revokeOAuth,
+): Promise<DeleteAllResult> {
   const store = data();
   let revokedToken = false;
   let revokeNote = "no OAuth token connected";
-  if (store.revokeOAuth) {
+  if (revokeOAuth) {
     try {
-      revokedToken = await store.revokeOAuth();
-      revokeNote = revokedToken ? "OAuth token revoked" : "no OAuth token to revoke";
+      revokedToken = await revokeOAuth();
+      revokeNote = revokedToken ? "OAuth token revoked" : "OAuth revocation not confirmed";
     } catch (error) {
       revokeNote = `OAuth revoke failed (${error instanceof Error ? error.name : "error"})`;
     }

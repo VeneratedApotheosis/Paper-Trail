@@ -154,7 +154,7 @@ describe("delete-all + audit routes", () => {
     await loadDemo();
     expect((await json<AuditResponse>(await audit.GET())).entries.length).toBeGreaterThan(2);
 
-    const response = await deleteAllRoute.POST();
+    const response = await deleteAllRoute.POST(new Request("http://localhost/api/delete-all", { method: "POST" }));
     const body = await json<DeleteAllResponse>(response);
     expect(body).toMatchObject({ deleted: true, ok: true, revokedToken: false });
     expect(Number.isNaN(Date.parse(body.at))).toBe(false);
