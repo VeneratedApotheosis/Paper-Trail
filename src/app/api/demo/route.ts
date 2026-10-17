@@ -1,3 +1,4 @@
+import { withAccountStore } from "@/lib/gmail/context";
 import { buildPipelineRunResponse } from "@/lib/api/ledger";
 import { jsonError } from "@/lib/api/http";
 import type { PipelineRunResponse, ResetDemoResponse } from "@/lib/api/types";
@@ -8,7 +9,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** Loads the synthetic seed inbox through the shared pipeline (offline). */
-export async function POST(): Promise<Response> {
+async function handlePOST(_request: Request): Promise<Response> {
+  void _request;
   const result = await loadSeedDemo({ audit: appendAudit, excludedMerchants: getExcludedMerchants() });
   setPipelineResult("demo", result.asOf, result);
   const body: PipelineRunResponse = buildPipelineRunResponse();
@@ -16,7 +18,8 @@ export async function POST(): Promise<Response> {
 }
 
 /** Clears demo data from the ledger (audit log kept). Refuses to clear non-demo data. */
-export async function DELETE(): Promise<Response> {
+async function handleDELETE(_request: Request): Promise<Response> {
+  void _request;
   const { mode } = getState();
   if (mode !== "demo" && mode !== "empty") {
     return jsonError(409, `Current data comes from ${mode}, not demo mode; use POST /api/delete-all instead`);
@@ -28,3 +31,7 @@ export async function DELETE(): Promise<Response> {
   const body: ResetDemoResponse = { mode: getState().mode };
   return Response.json(body);
 }
+
+export const POST = withAccountStore(handlePOST);
+
+export const DELETE = withAccountStore(handleDELETE);

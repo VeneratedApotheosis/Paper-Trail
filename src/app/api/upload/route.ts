@@ -1,3 +1,4 @@
+import { withAccountStore } from "@/lib/gmail/context";
 import type { RawEmail } from "@/lib/contracts";
 import { buildPipelineRunResponse } from "@/lib/api/ledger";
 import { jsonError } from "@/lib/api/http";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 const ALLOWED_EXTENSION = /\.(eml|mbox)$/i;
 
 /** Multipart form with one or more .eml / .mbox files (any field name), max 5 MB in total. */
-export async function POST(request: Request): Promise<Response> {
+async function handlePOST(request: Request): Promise<Response> {
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
   if (declaredLength > MAX_UPLOAD_BYTES * 1.1) return jsonError(413, "Upload exceeds the 5 MB limit");
 
@@ -61,3 +62,5 @@ export async function POST(request: Request): Promise<Response> {
   const body: UploadResponse = { ...buildPipelineRunResponse(), files: fileSummaries, parseErrors };
   return Response.json(body);
 }
+
+export const POST = withAccountStore(handlePOST);

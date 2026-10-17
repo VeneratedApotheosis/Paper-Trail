@@ -1,3 +1,4 @@
+import { withAccountStore } from "@/lib/gmail/context";
 import { z } from "zod";
 import {
   applyClaimEdits,
@@ -53,7 +54,7 @@ async function findingIdFrom({ params }: ClaimParams): Promise<string | undefine
 }
 
 /** The stored draft for a finding, or a freshly generated template draft (stored). */
-export async function GET(_request: Request, context: ClaimParams): Promise<Response> {
+async function handleGET(_request: Request, context: ClaimParams): Promise<Response> {
   const findingId = await findingIdFrom(context);
   if (!findingId) return jsonError(400, "Invalid finding id");
   const claim = getClaimContext(findingId);
@@ -70,7 +71,7 @@ export async function GET(_request: Request, context: ClaimParams): Promise<Resp
 }
 
 /** Regenerates the draft from the template (discarding user edits and approval); optional LLM rephrase. */
-export async function POST(request: Request, context: ClaimParams): Promise<Response> {
+async function handlePOST(request: Request, context: ClaimParams): Promise<Response> {
   const findingId = await findingIdFrom(context);
   if (!findingId) return jsonError(400, "Invalid finding id");
   const parsed = await readRegenerateBody(request);
@@ -92,7 +93,7 @@ export async function POST(request: Request, context: ClaimParams): Promise<Resp
 }
 
 /** Saves the user's subject/body/recipient; the draft is marked edited and any earlier approval is cleared. */
-export async function PUT(request: Request, context: ClaimParams): Promise<Response> {
+async function handlePUT(request: Request, context: ClaimParams): Promise<Response> {
   const findingId = await findingIdFrom(context);
   if (!findingId) return jsonError(400, "Invalid finding id");
   const parsed = await readJsonBody(request, EditBodySchema);
@@ -110,3 +111,9 @@ export async function PUT(request: Request, context: ClaimParams): Promise<Respo
   const body: ClaimResponse = { draft, ...claim };
   return Response.json(body);
 }
+
+export const GET = withAccountStore(handleGET);
+
+export const POST = withAccountStore(handlePOST);
+
+export const PUT = withAccountStore(handlePUT);

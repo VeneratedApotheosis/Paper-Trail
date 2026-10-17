@@ -1,3 +1,4 @@
+import { withAccountStore } from "@/lib/gmail/context";
 import { NextRequest, NextResponse } from "next/server";
 import type { DeleteAllResponse } from "@/lib/api/types";
 import { deleteAll } from "@/lib/store";
@@ -10,7 +11,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** Per-request authorization: never register a user's credentials globally. */
-export async function POST(request: Request): Promise<Response> {
+async function handlePOST(request: Request): Promise<Response> {
   const req = new NextRequest(request);
   const headers = { "Cache-Control": "no-store" };
   const origin = req.headers.get("origin");
@@ -42,3 +43,5 @@ export async function POST(request: Request): Promise<Response> {
   response.cookies.set(TRANSACTION_COOKIE, "", { httpOnly: true, secure, sameSite: "lax", path: "/api/auth", maxAge: 0 });
   return response;
 }
+
+export const POST = withAccountStore(handlePOST);

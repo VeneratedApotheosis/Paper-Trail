@@ -1,3 +1,4 @@
+import { withAccountStore } from "@/lib/gmail/context";
 import { z } from "zod";
 import { getClaimContext, getStoredClaimDraft } from "@/lib/api/claims";
 import { decodeId, jsonError } from "@/lib/api/http";
@@ -14,7 +15,7 @@ const FindingIdSchema = z.string().min(1).max(300);
  * Records the user's explicit approval of the stored draft and returns the copy / mailto hand-off.
  * Never sends anything (AGENTS.md rule 2). The audit entry names the draft and finding, never the body text.
  */
-export async function POST(
+async function handlePOST(
   _request: Request,
   { params }: { params: Promise<{ findingId: string }> },
 ): Promise<Response> {
@@ -38,3 +39,5 @@ export async function POST(
   const body: ClaimApproveResponse = { draft, mailtoUrl: mailtoUrl(draft), clipboardText: clipboardText(draft) };
   return Response.json(body);
 }
+
+export const POST = withAccountStore(handlePOST);

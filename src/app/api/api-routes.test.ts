@@ -51,13 +51,13 @@ function uploadRequest(files: Array<{ name: string; content: string }>): Request
 }
 
 async function loadDemo(): Promise<PipelineRunResponse> {
-  const response = await demo.POST();
+  const response = await demo.POST(new Request("http://localhost/api/demo", { method: "POST" }));
   expect(response.status).toBe(200);
   return json<PipelineRunResponse>(response);
 }
 
 async function getLedger(): Promise<LedgerResponse> {
-  return json<LedgerResponse>(await ledger.GET());
+  return json<LedgerResponse>(await ledger.GET(new Request("http://localhost/api/ledger", { method: "GET" })));
 }
 
 beforeEach(() => resetStore());
@@ -87,10 +87,10 @@ describe("demo + ledger routes", () => {
 
   it("DELETE /api/demo clears demo data but keeps the audit log", async () => {
     await loadDemo();
-    const response = await demo.DELETE();
+    const response = await demo.DELETE(new Request("http://localhost/api/demo", { method: "DELETE" }));
     expect(await json(response)).toEqual({ mode: "empty" });
     expect((await getLedger()).orders).toEqual([]);
-    const entries = (await json<AuditResponse>(await audit.GET())).entries;
+    const entries = (await json<AuditResponse>(await audit.GET(new Request("http://localhost/api/audit", { method: "GET" })))).entries;
     expect(entries[0]).toMatchObject({ type: "delete", detail: "Demo data cleared from the ledger" });
   });
 });
@@ -152,7 +152,7 @@ describe("merchant exclude route", () => {
 describe("delete-all + audit routes", () => {
   it("purges everything and leaves a single delete audit record", async () => {
     await loadDemo();
-    expect((await json<AuditResponse>(await audit.GET())).entries.length).toBeGreaterThan(2);
+    expect((await json<AuditResponse>(await audit.GET(new Request("http://localhost/api/audit", { method: "GET" })))).entries.length).toBeGreaterThan(2);
 
     const response = await deleteAllRoute.POST(new Request("http://localhost/api/delete-all", { method: "POST" }));
     const body = await json<DeleteAllResponse>(response);
@@ -162,14 +162,14 @@ describe("delete-all + audit routes", () => {
 
     const after = await getLedger();
     expect(after).toMatchObject({ mode: "empty", orders: [], findings: [] });
-    const entries = (await json<AuditResponse>(await audit.GET())).entries;
+    const entries = (await json<AuditResponse>(await audit.GET(new Request("http://localhost/api/audit", { method: "GET" })))).entries;
     expect(entries).toHaveLength(1);
     expect(entries[0].type).toBe("delete");
   });
 
   it("audit entries never contain email bodies", async () => {
     await loadDemo();
-    const serialized = JSON.stringify((await json<AuditResponse>(await audit.GET())).entries);
+    const serialized = JSON.stringify((await json<AuditResponse>(await audit.GET(new Request("http://localhost/api/audit", { method: "GET" })))).entries);
     for (const email of seedInbox.emails) {
       for (const line of email.text.split("\n").map((value) => value.trim()).filter((value) => value.length >= 25)) {
         expect(serialized.includes(line), line).toBe(false);

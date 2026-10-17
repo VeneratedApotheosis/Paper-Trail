@@ -1,3 +1,4 @@
+import { withAccountStore } from "@/lib/gmail/context";
 import { z } from "zod";
 import { decodeId, jsonError } from "@/lib/api/http";
 import type { OrderResponse } from "@/lib/api/types";
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 const IdSchema = z.string().min(1).max(300);
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
+async function handleGET(_request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
   const parsed = IdSchema.safeParse(decodeId((await params).id));
   if (!parsed.success) return jsonError(400, "Invalid order id");
   const order = getOrder(parsed.data);
@@ -16,3 +17,5 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const body: OrderResponse = { order, findings: getFindingsForOrder(order.id) };
   return Response.json(body);
 }
+
+export const GET = withAccountStore(handleGET);

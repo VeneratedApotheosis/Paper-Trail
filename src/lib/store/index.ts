@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { Finding, FindingStatus, NormalizedOrder } from "@/lib/contracts";
 import { createMemoryCache, type ExtractionCache } from "@/lib/ingestion";
 import {
@@ -59,7 +60,26 @@ export interface DeleteAllResult {
 }
 
 const STORE_KEY = Symbol.for("papertrail.store");
-type GlobalWithStore = typeof globalThis & { [STORE_KEY]?: StoreData };
+const SCOPES_KEY = Symbol.for("papertrail.store.scopes");
+const CONTEXT_KEY = Symbol.for("papertrail.store.context");
+type GlobalWithStore = typeof globalThis & {
+  [STORE_KEY]?: StoreData;
+  [SCOPES_KEY]?: Map<string, StoreData>;
+  [CONTEXT_KEY]?: AsyncLocalStorage<string>;
+};
+const holder = globalThis as GlobalWithStore;
+const context = holder[CONTEXT_KEY] ??= new AsyncLocalStorage<string>();
+const scopes = holder[SCOPES_KEY] ??= new Map<string, StoreData>();
+
+/** Authenticated HTTP handlers run in an isolated account store. Anonymous demo stays separate. */
+export function withStoreScope<T>(userId: string, task: () => T): T {
+  return context.run(userId, task);
+}
+function replaceData(value: StoreData) {
+  const scope = context.getStore();
+  if (scope) scopes.set(scope, value);
+  else holder[STORE_KEY] = value;
+}
 
 function emptyData(): StoreData {
   return {
@@ -79,13 +99,18 @@ function emptyData(): StoreData {
 }
 
 function data(): StoreData {
-  const holder = globalThis as GlobalWithStore;
+  const scope = context.getStore();
+  if (scope) {
+    let store = scopes.get(scope);
+    if (!store) { store = emptyData(); scopes.set(scope, store); }
+    return store;
+  }
   return (holder[STORE_KEY] ??= emptyData());
 }
 
 /** Drops all store data, including the audit log and the OAuth hook. Tests only. */
 export function resetStore(): void {
-  (globalThis as GlobalWithStore)[STORE_KEY] = emptyData();
+  replaceData(emptyData());
 }
 
 function visibleOrders(store: StoreData): NormalizedOrder[] {
@@ -232,7 +257,7 @@ export async function deleteAll(
   const at = clock().toISOString();
   const fresh = emptyData();
   fresh.revokeOAuth = store.revokeOAuth;
-  (globalThis as GlobalWithStore)[STORE_KEY] = fresh;
+  replaceData(fresh);
   appendAudit({
     at,
     type: "delete",

@@ -32,8 +32,8 @@ const bodyRequest = (method: string, body?: unknown) =>
 const getRequest = () => new Request("http://localhost/api/claims/x");
 
 async function loadDemoLedger(): Promise<LedgerResponse> {
-  expect((await demo.POST()).status).toBe(200);
-  return json<LedgerResponse>(await ledger.GET());
+  expect((await demo.POST(new Request("http://localhost/api/demo", { method: "POST" }))).status).toBe(200);
+  return json<LedgerResponse>(await ledger.GET(new Request("http://localhost/api/ledger", { method: "GET" })));
 }
 
 /** Seed refund_overdue finding for Northwind order NW-48213 (expected refund $111.24). */
@@ -213,7 +213,7 @@ describe("POST /api/claims/:findingId (regenerate)", () => {
     expect(body.draft.body.startsWith("Hi Northwind Outfitters")).toBe(true);
     expect(body.draft.body).toContain("$111.24");
 
-    const entries = (await json<AuditResponse>(await audit.GET())).entries;
+    const entries = (await json<AuditResponse>(await audit.GET(new Request("http://localhost/api/audit", { method: "GET" })))).entries;
     expect(entries[0]).toMatchObject({ type: "llm_call", model: "claude-test" });
     expect(entries[0].detail).toContain(finding.id);
     expect(JSON.stringify(entries)).not.toContain(key);
@@ -237,7 +237,7 @@ describe("POST /api/claims/:findingId/approve", () => {
     expect(findingBody.finding.status).toBe("drafted");
     expect((await json<ClaimResponse>(await getClaim(finding.id))).draft.approvedAt).toBe(body.draft.approvedAt);
 
-    const entries = (await json<AuditResponse>(await audit.GET())).entries;
+    const entries = (await json<AuditResponse>(await audit.GET(new Request("http://localhost/api/audit", { method: "GET" })))).entries;
     const approval = entries[0];
     expect(approval.type).toBe("approval");
     expect(approval.detail).toContain(finding.id);
