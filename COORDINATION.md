@@ -13,30 +13,42 @@ Repo: `VeneratedApotheosis/Paper-Trail`
 
 | Person | GitHub | Owns |
 |---|---|---|
-| **Kenan** | `VeneratedApotheosis` | Repo owner, final say on scope. Backend via orchestrated `kenan-pi-*` agents (section 5) |
-| **Alex** | `ptatoo` | **All frontend/design** (hands off, see below) + issue #1 scaffold. **Redesigning the UI in Paper**: current pages will be replaced |
+| **Kenan** | `VeneratedApotheosis` | Repo owner, final say on scope. **Data + routing:** thin pages, middleware, hooks, backend. Orchestrated `kenan-pi-*` agents (section 5) |
+| **Alex** | `ptatoo` | **How it looks:** design system, styles, visual components and views (Paper) |
 | ~~Ethan Lowe~~ | `ethanwlowe7-cmyk` | **No longer on the project.** Any claim by him is stale and may be taken over immediately (comment that it's stale, then claim) |
-| **Chelsea** | `chelsearwang` | Gmail OAuth (#2 done, **#3**): `src/app/api/auth/**`, `src/lib/auth/**`, DB init. Other backend work claimed per issue |
+| **Chelsea** | `chelsearwang` | **Auth, Gmail, DB:** `src/lib/auth/**`, `src/app/api/auth/**`, Gmail sync, `src/db/**`; session helper used by guards |
 
-### Alex owns frontend/design: everyone else stays out
-**Alex (`ptatoo`) and the agents Alex runs own all frontend and design work. Nobody else edits it.**
+### The frontend is split by file (decided 2026-10-17)
+**Alex = how it looks. Kenan = where data comes from and where users go. Chelsea = auth, Gmail, DB.**
+Every file has exactly one owner. Never edit, refactor, reformat, or "fix" a file you don't own, even if a build error
+points there: tell the owner (issue comment + tag).
 
-| Alex owns (hands off) | Everyone else |
-|---|---|
-| Issues **#9, #10, #11, #16, #24, #25, #26** | Ingestion, backend, rules, infra, QA issues |
-| UI parts of **#12** (trust page) and **#17** (claim drafts), `/eval` page of #21 | Backend halves have their own issues: **#31** (audit, delete-all, exclude), **#32** (claim drafts); #21 backend |
-| Issue **#1** (scaffold), claimed by Alex | Wait for #1 to land before starting app code |
-| `src/app/**/page.tsx`, `src/app/**/layout.tsx`, `src/components/**` | `src/app/api/**`, `src/lib/**`, `src/db/**` |
-| `src/styles/**`, `tailwind.config.*`, `public/**`, Paper files | `seed/**`, `scripts/**`, `e2e/**` |
+| Owner | Label | Files |
+|---|---|---|
+| **Alex** | `ui-design` | `tailwind.config.*`, `src/app/globals.css`, `src/styles/**`, `public/**`, Paper files, `docs/design-system.md`, `src/components/**` (visual components + views in `src/components/views/**`), `src/lib/format.ts` |
+| **Kenan** | `ui-wiring`, `backend` | `src/app/**/page.tsx`, `loading.tsx`, `error.tsx`, `not-found.tsx`, route groups/redirects, `middleware.ts`, `src/hooks/**`, `src/app/layout.tsx` (providers/metadata/mode only; renders Alex's `<AppShell>`), `src/lib/{api,store,pipeline,demo,claims,rules,ingestion,orders,prices,eval,llm,contracts}/**`, `src/app/api/**` except auth/gmail/review, `src/app/api/debug/**`, legacy `src/lib/types.ts` + `src/lib/view.ts` (being moved into contracts/backend), `seed/**`, `scripts/**`, `tools/**`, `e2e/**` |
+| **Chelsea** | `backend` | `src/lib/auth/**`, `src/app/api/auth/**`, `src/lib/gmail/**`, `src/app/api/gmail/**`, `src/lib/review/**`, `src/app/api/review/**`, `src/db/**` |
 
-Rules for everyone who isn't Alex or one of his agents:
-1. **Never edit, refactor, reformat, or "fix" files Alex owns**, even if a build error points there. Tell Alex instead.
-2. **Never claim, relabel, reassign, or close Alex's issues.** Commenting a question or contract change is fine.
-3. The contract between UI and backend is the **shared Zod schemas/types and API routes**. If you change one the UI
-   uses, comment the exact change on Alex's issue and tag `@ptatoo`. Don't update his code to match.
-4. Need a UI change? Open a new issue labeled `frontend` and leave it for Alex.
-5. **Backend never depends on page files.** The UI reads data only through `@/lib/api/client` (typed JSON API,
-   see `docs/api.md`) and the shapes in `@/lib/contracts`, so Alex's Paper redesign can replace any page freely.
+**Shared contracts:** `src/lib/contracts/**` is Kenan's, but everyone builds on it: post an `INTERFACE` comment and wait
+for an OK from Kenan before changing it. Changes to another owner's files (e.g. store scoping in `src/lib/store`) need the
+same: INTERFACE on that owner's issue + OK, not only a #28 post.
+
+Rules:
+1. **Views are props-only.** Nothing in `src/components/**` may `fetch` or import `@/lib/api`, `@/lib/store`,
+   `@/lib/mock`, `@/lib/auth`, or do routing/redirect logic. Props are typed with `@/lib/contracts` (NormalizedOrder,
+   Finding, OwedSummary, Draft, ...); user actions are callbacks (`onApprove`, `onExclude`, `onLoadDemo`, ...).
+2. **Pages are thin.** `page.tsx` gets data (server-side helpers or `src/hooks/**` on `@/lib/api/client`) and renders a
+   view with props. No styling, no new markup beyond composing views. Business logic (owed total, order status,
+   rounding, needs-review) lives in the backend, not in views.
+3. **Per page, in order:** (1) Alex's agent moves the page's markup into `src/components/views/<Name>View.tsx`
+   (`ui-design` issue, DONE with SHA), then (2) Kenan's agent wires `page.tsx` to real data (`ui-wiring` issue,
+   blocked until step 1 is done). Never both on the same page at the same time.
+4. **Design previews** use sample props in `src/components/**/fixtures/`, never in pages. `src/lib/mock/**`,
+   `src/lib/types.ts` and `src/lib/view.ts` are legacy and are retired as pages get wired.
+5. **Auth guards and demo-vs-Gmail mode** live in `middleware.ts` / page wrappers (Kenan), using Chelsea's session helper.
+6. Need a visual change? Open a `ui-design` issue for Alex. Need data or a route? Open a `ui-wiring` issue for Kenan.
+   Changing a schema, type, API, or view props others use: post an `INTERFACE` comment and tag the owner first.
+7. Claim, relabel, reassign, or close only issues in your own area (or ones you opened). Commenting anywhere is fine.
 
 ---
 
@@ -70,7 +82,7 @@ This is encouraged, especially when coordinating with other people's agents. Rul
 
 | State | How it looks on GitHub | Meaning |
 |---|---|---|
-| **Available** | open, **no assignee**, no `blocked` label | Anyone (except on Alex's issues) may claim it |
+| **Available** | open, **no assignee**, no `blocked` label | Anyone whose area it is (section 0: `ui-design` = Alex, `ui-wiring` = Kenan) may claim it |
 | **In progress** | open, **assigned**, has a `CLAIMED` comment | Someone is on it. Don't touch it |
 | **Blocked** | open, `blocked` label | Waiting on another issue/external thing (see latest comment) |
 | **Done** | **closed**, with a `DONE` handoff comment | Finished. Code is on `main` |
@@ -109,7 +121,7 @@ If you already have an open claim with your agent ID, **continue that work** bef
 2. Check it's **yours to take**:
    - **unassigned** and no active `CLAIMED` comment. Read **every** comment: a claim can exist as a comment
      without an assignee (e.g. the claimer lacked assign permission). A comment-only claim still counts.
-   - **not Alex's** (section 0), unless you are Alex or Alex's agent
+   - **in your area** (section 0 file ownership; `ui-design` = Alex, `ui-wiring` = Kenan), or opened for you
    - **unblocked**: every issue under "Dependencies" is closed
 3. Claim it, both steps:
    ```powershell
@@ -161,7 +173,7 @@ gh issue edit <N> --remove-label blocked
 `DONE by kenan / kenan-pi-4 (reviewed + pushed by kenan-pi-1)`. Workers never post or push on their own.
 
 **Stale claims:** a claim with no comment or commit for **4+ hours** may be taken over. Comment on the issue tagging the
-owner, wait ~15 minutes, then claim with `CLAIMED (takeover) by ...`. Never take over Alex's issues; ask Alex.
+owner, wait ~15 minutes, then claim with `CLAIMED (takeover) by ...`. Never take over an issue in someone else's area (section 0); ask its owner.
 
 **Scope creep:** don't expand an issue. File a new issue (Task template) and link it.
 **Spec unclear:** comment the question, tag the owner or `@VeneratedApotheosis`, and don't guess on product rules.
@@ -250,7 +262,7 @@ The `wip/*` branch is local only. Never push it as its own branch.
 - After resolving a conflict in a cherry-pick/rebase, check the commit message survived (`git log -1 --format=%B`)
   **before** pushing. Pushed history is never rewritten, so a lost message can only be corrected in an issue comment.
 - Agents: **don't resolve conflicts in files outside your issue by guessing.** Stop and comment on the issue.
-- Conflict in an Alex-owned file: keep Alex's version and tell him.
+- Conflict in a file you don't own: keep the owner's version and tell them.
 
 ### Short-lived branches
 Humans may use a short-lived branch only for risky changes (schema rewrite, big refactor): finish and merge within the hour.
@@ -277,7 +289,8 @@ Format: `#<issue> <imperative summary>`, under ~72 chars, present tense.
 | `src/db/schema/*` | One file per domain, set up in #1 from `deepdive_S14.md` §3. Changing a column others use: post `INTERFACE` first. |
 | Shared types / Zod schemas | One canonical location; import, never copy. Changes: post `INTERFACE` on dependent issues. |
 | `package.json` / lockfile | Announce on the Coordination issue before adding a dependency. Lockfile conflict: take `main`'s version, re-run `npm install`. |
-| UI files, `tailwind.config`, design tokens | **Alex owns these (section 0).** Open a `frontend` issue to request changes. |
+| Styles, tokens, `src/components/**` (views) | **Alex (section 0).** Open a `ui-design` issue to request changes. |
+| `src/app/**/page.tsx`, `middleware.ts`, `src/hooks/**` | **Kenan (section 0).** Open a `ui-wiring` issue to request data/routing changes. |
 | `.env.example` | Append only; placeholder values only. (`LLM_API_KEY` was replaced by `ANTHROPIC_API_KEY` + `LLM_MODEL` in #7.) |
 | `src/app/api/auth/**`, `src/lib/auth/**`, DB client/init | **Chelsea (#3).** Others don't touch; delete-all calls her revoke function through a hook. |
 | `src/app/api/claims/**`, `src/lib/claims/**` | #32 (claim drafts backend). |

@@ -27,7 +27,8 @@ Next route handlers for the API · Playwright for e2e. Do not add a new framewor
 ## Commands
 ```
 npm ci              # ~1-3 min; Node 22 LTS recommended (Node 25 works but may compile better-sqlite3)
-npm run dev         # localhost:3000
+npm run dev         # localhost:3000: the real app (the demo must work here)
+npm run demo        # dev QA tool: next dev + tools/playground + preloaded demo (not the product UI)
 npm run lint        # `next lint` prints a deprecation notice; it still works
 npm run typecheck
 npm test            # vitest (src/** and scripts/** tests)
@@ -39,8 +40,10 @@ npx playwright test # e2e (issue #22)
 
 ## Layout
 ```
-src/app/            # pages (Alex; being redesigned in Paper) + src/app/api/** JSON route handlers (backend)
-src/components/     # UI components (Alex)
+src/app/            # page.tsx = thin data/routing wrappers (Kenan) + src/app/api/** JSON route handlers (backend)
+src/components/     # visual components + views, props only (Alex); views in src/components/views/
+src/hooks/          # client data hooks on @/lib/api/client (Kenan)
+middleware.ts       # route guards / demo-vs-Gmail mode (Kenan, using Chelsea's session helper)
 src/db/schema/      # one Drizzle schema file per domain (users, orders, findings, audit)
 src/lib/contracts/  # canonical Zod schemas/types: RawEmail, Extraction, NormalizedOrder, Finding, seed formats
 src/lib/ingestion/  # prefilter, redact, classify, extract (+ prompt), cache
@@ -52,7 +55,8 @@ src/lib/claims/     # claim draft generation (#32)
 src/lib/eval/       # eval metrics + CI gate (#21)
 src/lib/store/, src/lib/api/, src/lib/demo/   # in-memory store, typed API client, demo loader (#4/#31)
 src/lib/auth/       # Gmail OAuth (Chelsea, #3)
-src/lib/types.ts, view.ts, format.ts, mock/   # UI view helpers + mocks (Alex)
+src/lib/format.ts   # display formatting (Alex)
+src/lib/types.ts, view.ts, mock/   # legacy UI types/helpers/mocks: retired by the frontend split (see Ownership)
 src/lib/rules/      # R1–R4, pure functions, injectable clock
 seed/               # synthetic inbox, gold labels, expected findings, price feed, templates
 scripts/            # seed generator + eval writer (run via vitest)
@@ -73,20 +77,35 @@ e2e/                # Playwright specs
 ## Team
 | Person | GitHub | Owns |
 |---|---|---|
-| Kenan | `VeneratedApotheosis` | Repo owner, scope decisions; backend via orchestrated `kenan-pi-*` agents |
-| Alex | `ptatoo` | All frontend/design + #1 scaffold. Redesigning the UI in Paper (current pages will be replaced) |
+| Kenan | `VeneratedApotheosis` | Repo owner, scope decisions. **Data + routing:** pages (thin wrappers), middleware, hooks, backend (via `kenan-pi-*` agents) |
+| Alex | `ptatoo` | **How it looks:** design system, styles, visual components and views (Paper) |
 | ~~Ethan Lowe~~ | `ethanwlowe7-cmyk` | **No longer on the project.** All his claims are stale; don't wait on them |
-| Chelsea | `chelsearwang` | Gmail OAuth (#3): `src/app/api/auth/**`, `src/lib/auth/**`, DB init; other backend per issue |
+| Chelsea | `chelsearwang` | Auth, Gmail, DB: `src/lib/auth/**`, `src/app/api/auth/**`, Gmail sync, `src/db/**`; session helper for guards |
 
-## Ownership: don't touch Alex's work
-**Alex (`ptatoo`) and his agents own all frontend/design work.** Unless you are Alex or one of his agents:
-- Do not edit `src/app/**/page.tsx`, `src/app/**/layout.tsx`, `src/components/**`, `src/styles/**`,
-  `tailwind.config.*`, `public/**`, or Paper files. That applies even to fixing a build error there.
-- Do not claim, relabel, reassign, or close issues **#1, #9, #10, #11, #16, #24, #25, #26**, or the UI parts of
-  **#12**, **#17**, and the `/eval` page of #21. Backend halves have their own issues (**#31**, **#32**).
-- Backend code never depends on page files; the UI reads data through `@/lib/api/client` + `@/lib/contracts`.
-- If you change a schema, type, or API the UI uses, post an `INTERFACE` comment on Alex's issue and tag `@ptatoo`.
-- Need a UI change? Open a new `frontend` issue for Alex.
+## Ownership: the frontend is split by file (decided 2026-10-17)
+**Alex = how it looks. Kenan = where data comes from and where users go. Chelsea = auth, Gmail, DB.**
+Every file has exactly one owner; never edit a file you don't own, even to fix a build error. Tell the owner.
+
+| Owner | Files |
+|---|---|
+| **Alex** (`ui-design`) | `tailwind.config.*`, `src/app/globals.css`, `src/styles/**`, `public/**`, Paper files, `docs/design-system.md`, `src/components/**` (visual components + `src/components/views/**`), `src/lib/format.ts` |
+| **Kenan** (`ui-wiring` + backend) | `src/app/**/page.tsx`, `loading.tsx`, `error.tsx`, `not-found.tsx`, route groups/redirects, `middleware.ts`, `src/hooks/**`, `src/app/layout.tsx` (providers/metadata/mode only; renders Alex's `<AppShell>`), `src/lib/{api,store,pipeline,demo,claims,rules,ingestion,orders,prices,eval,llm,contracts}/**`, `src/app/api/**` except auth/gmail/review, legacy `src/lib/types.ts` + `view.ts` (moving into contracts/backend), `tools/**`, `seed/**`, `scripts/**`, `e2e/**` |
+| **Chelsea** | `src/lib/auth/**`, `src/app/api/auth/**`, `src/lib/gmail/**`, `src/app/api/gmail/**`, `src/lib/review/**`, `src/app/api/review/**`, `src/db/**` |
+
+`src/lib/contracts/**` is shared ground: post an `INTERFACE` comment and get Kenan's OK before changing it. Editing another
+owner's file (even a small scoping change) needs an INTERFACE comment on their issue and their OK first.
+
+Rules:
+- **Views are props-only.** Nothing in `src/components/**` may `fetch` or import `@/lib/api`, `@/lib/store`, `@/lib/mock`,
+  `@/lib/auth`, or do routing/redirect logic. Props are typed with `@/lib/contracts`; user actions are callbacks.
+- **Pages are thin.** `page.tsx` fetches data (server helpers or `src/hooks/**`) and renders a view with props. No styling,
+  no new markup beyond composing views. Business logic (owed total, status, rounding) lives in the backend.
+- **Per page, in order:** (1) Alex's agent moves the markup into `src/components/views/<Name>View.tsx` (`ui-design` issue,
+  DONE), then (2) Kenan's agent wires `page.tsx` to real data (`ui-wiring` issue). Never both on one page at once.
+- **Design previews** use sample props in `src/components/**/fixtures/`, never in pages. `src/lib/mock/**` goes away once
+  every page is wired.
+- Need a visual change? Open a `ui-design` issue for Alex. Need data or a route? Open a `ui-wiring` issue for Kenan.
+- Changing a schema, type, API, or view props others use: post an `INTERFACE` comment and tag the owner.
 Full rules: COORDINATION.md section 0.
 
 ## Code conventions
@@ -95,8 +114,7 @@ Full rules: COORDINATION.md section 0.
 - Shared types and Zod schemas live in one place and are imported, not copied.
 - Small files, small functions, descriptive names. Match existing style before inventing new patterns.
 - Add or update tests for any logic you change (rules, matcher, redaction, extraction parsing).
-- UI follows the "calm editorial ledger" direction (scope_features §9): warm off-white, ink-black, tabular figures;
-  vermilion = owed, amber = deadline, green = saved. No purple gradients / generic AI look.
+- Visual direction: follow `docs/design-system.md` (Alex); it supersedes the older "calm editorial ledger" notes.
 
 ## Security
 - **Never read, print, log, or commit** `.env*` (except `.env.example`), OAuth tokens, API keys, or `.pi/mcp.json` / `.mcp.json`.
@@ -114,7 +132,7 @@ GitHub Issues is the **only** live status board. Never coordinate through repo f
 1. **Session start: read the board** (COORDINATION.md section 3). Find your own open claims first
    (`gh issue list --assignee @me`, search your agent ID). Then see who holds what, what's available, blocked or
    closed, and the latest comments on the pinned **Coordination channel, issue #28** (`gh issue view 28 --comments`).
-2. **Claim on GitHub before doing any work.** The issue must be unassigned, unblocked, and not Alex's. Assign yourself
+2. **Claim on GitHub before doing any work.** The issue must be unassigned, unblocked, and in your area (Ownership table). Assign yourself
    **and** post `CLAIMED by <person> / <agent-id>` with plan, files and ETA. Read **every** comment first: a
    comment-only claim (no assignee) still counts. Re-check after claiming: the earliest claim wins.
    **No claim = no work.** One active issue per agent. Claims by departed members (Team table) are stale.
