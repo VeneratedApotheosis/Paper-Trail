@@ -34,6 +34,7 @@ const config: Config = {
         shadowlight: "#f3f7fc",
       },
       fontFamily: {
+        // Display serif = Spectral (see src/app/layout.tsx).
         serif: ["var(--font-display)", "Georgia", "serif"],
         sans: ["var(--font-ui)", "system-ui", "sans-serif"],
       },

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Fraunces, Hanken_Grotesk } from "next/font/google";
+import { Spectral, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
 
-// Display serif for headings and the money figures (soft, editorial).
-const display = Fraunces({
+// Display serif for headings and the money figures (calm, bookish — Spectral).
+const display = Spectral({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   style: ["normal", "italic"],

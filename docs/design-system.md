@@ -29,7 +29,7 @@ Use the utilities, not ad-hoc shadows:
 - Tailwind `shadow-soft` / `shadow-soft-lg` / `shadow-inset` are also available.
 
 ## Typography
-- **Fraunces** (serif, `font-serif`): money figures, headings, wordmark.
+- **Spectral** (serif, `font-serif`): money figures, headings, wordmark.
 - **Hanken Grotesk** (sans, `font-sans`): UI/body, with global tabular figures.
 - `.eyebrow` for small-caps section labels.
 - Scale in `tailwind.config.ts`; radii are large (`rounded-lg` = 22px, `rounded-xl` = 28px).
