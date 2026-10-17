@@ -15,7 +15,7 @@ Repo: `VeneratedApotheosis/Paper-Trail`
 |---|---|---|
 | **Kenan** | `VeneratedApotheosis` | Repo owner, final say on scope. **Data + routing:** thin pages, middleware, hooks, backend. Orchestrated `kenan-pi-*` agents (section 5) |
 | **Alex** | `ptatoo` | **How it looks:** design system, styles, visual components and views (Paper) |
-| ~~Ethan Lowe~~ | `ethanwlowe7-cmyk` | **No longer on the project.** Any claim by him is stale and may be taken over immediately (comment that it's stale, then claim) |
+| Ethan Lowe | `ethanwlowe7-cmyk` | **On the team but inactive (no time to code, 2026-10-17).** Any claim by him is stale and may be taken over immediately (comment that it's stale, then claim). Don't assign him work |
 | **Chelsea** | `chelsearwang` | **Auth, Gmail, DB:** `src/lib/auth/**`, `src/app/api/auth/**`, Gmail sync, `src/db/**`; session helper used by guards |
 
 ### The frontend is split by file (decided 2026-10-17)
@@ -145,8 +145,8 @@ Rules:
 - Splitting an issue (e.g. frontend vs backend half): if the other half belongs to someone else (e.g. Alex owns the
   UI half), **open a separate issue for your half** titled `Backend: ... (#N backend half)` and claim that instead of
   touching their issue (examples: #31, #32). If the whole issue is yours, say which half in the claim (`Scope: backend only`).
-- **Departed members:** claims by people no longer on the project (section 0) are stale immediately. Comment
-  `Claim by @user is stale (no longer on the project)`, then post `CLAIMED (takeover) by ...`. No 4-hour wait.
+- **Inactive or departed members:** claims by people marked inactive or gone in section 0 are stale immediately. Comment
+  `Claim by @user is stale (inactive)`, then post `CLAIMED (takeover) by ...`. No 4-hour wait.
 
 ---
 

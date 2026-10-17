@@ -79,7 +79,7 @@ e2e/                # Playwright specs
 |---|---|---|
 | Kenan | `VeneratedApotheosis` | Repo owner, scope decisions. **Data + routing:** pages (thin wrappers), middleware, hooks, backend (via `kenan-pi-*` agents) |
 | Alex | `ptatoo` | **How it looks:** design system, styles, visual components and views (Paper) |
-| ~~Ethan Lowe~~ | `ethanwlowe7-cmyk` | **No longer on the project.** All his claims are stale; don't wait on them |
+| Ethan Lowe | `ethanwlowe7-cmyk` | **On the team but inactive (no time to code, 2026-10-17).** All his claims are stale; don't wait on them or assign him work |
 | Chelsea | `chelsearwang` | Auth, Gmail, DB: `src/lib/auth/**`, `src/app/api/auth/**`, Gmail sync, `src/db/**`; session helper for guards |
 
 ## Ownership: the frontend is split by file (decided 2026-10-17)
@@ -135,7 +135,7 @@ GitHub Issues is the **only** live status board. Never coordinate through repo f
 2. **Claim on GitHub before doing any work.** The issue must be unassigned, unblocked, and in your area (Ownership table). Assign yourself
    **and** post `CLAIMED by <person> / <agent-id>` with plan, files and ETA. Read **every** comment first: a
    comment-only claim (no assignee) still counts. Re-check after claiming: the earliest claim wins.
-   **No claim = no work.** One active issue per agent. Claims by departed members (Team table) are stale.
+   **No claim = no work.** One active issue per agent. Claims by inactive members (Team table) are stale.
    If the other half of an issue belongs to someone else, open a separate `Backend: ... (#N backend half)` issue.
 3. **Keep it updated:** `PROGRESS` every ~2h, `DECISION`, `INTERFACE` (tag dependents), `BLOCKED` + label,
    `UNCLAIMED` + unassign if you stop. COORDINATION.md section 5.
