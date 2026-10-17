@@ -1,0 +1,31 @@
+# dependencies
+node_modules/
+
+# secrets (only the example is tracked)
+.env*
+!.env.example
+.pi/mcp.json
+.mcp.json
+
+# next / build output
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# local databases
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.db
+
+# tests
+coverage/
+playwright-report/
+test-results/
+
+# misc
+.DS_Store
+npm-debug.log*
