@@ -1,0 +1,175 @@
+{
+  "asOf": "2026-10-17T19:00:00Z",
+  "findings": [
+    {
+      "kind": "refund_overdue",
+      "merchant": "Northwind Outfitters",
+      "orderRef": "NW-48213",
+      "amountAtStake": 111.24,
+      "dueDate": "2026-10-10",
+      "messageIds": [
+        "nw-48213-order",
+        "nw-48213-return-started",
+        "nw-48213-return-received"
+      ],
+      "note": "Return received 2026-10-03 (strong trigger); stated SLA 'Refunds are issued within 7 days of receiving your return.' -> expected by 2026-10-10. No refund or store credit since. Whole order returned -> expected = order total $111.24."
+    },
+    {
+      "kind": "refund_overdue",
+      "merchant": "Voltline Electronics",
+      "orderRef": "VL-77120",
+      "amountAtStake": 163.5,
+      "dueDate": "2026-10-08",
+      "messageIds": [
+        "vl-77120-order",
+        "vl-77120-return-started",
+        "vl-77120-return-received"
+      ],
+      "note": "Partial return: headphones $150.00 of $200.00 subtotal. Return received 2026-09-28 (strong); no SLA stated -> default 10 days -> 2026-10-08. Expected = 150.00 + 18.00 tax x 150/200 = 150.00 + 13.50 = $163.50."
+    },
+    {
+      "kind": "refund_overdue",
+      "merchant": "Bazaarly",
+      "orderRef": "BZ-114-2290417",
+      "amountAtStake": 70.35,
+      "dueDate": "2026-10-08",
+      "messageIds": [
+        "bz-114-2290417-order",
+        "bz-114-2290417-return-dropped"
+      ],
+      "note": "Return dropped off 2026-09-24 (weak trigger, no received email); no SLA stated -> default 14 days -> 2026-10-08. Whole order returned -> expected = order total $70.35."
+    },
+    {
+      "kind": "refund_overdue",
+      "merchant": "Grandmart",
+      "orderRef": "GM-2210-5531",
+      "amountAtStake": 193.77,
+      "dueDate": "2026-10-11",
+      "messageIds": [
+        "gm-2210-5531-order",
+        "gm-2210-5531-return-dropped",
+        "gm-2210-5531-return-received"
+      ],
+      "note": "Return received 2026-10-06 (strong trigger beats the 2026-09-30 drop-off); stated SLA 5 days -> expected by 2026-10-11. Whole order returned -> expected = order total $193.77."
+    },
+    {
+      "kind": "refund_short",
+      "merchant": "Oakhaven Home",
+      "orderRef": "OH-12007",
+      "amountAtStake": 21,
+      "messageIds": [
+        "oh-12007-order",
+        "oh-12007-return-received",
+        "oh-12007-refund"
+      ],
+      "note": "Whole order returned -> expected = order total $261.00 (240.00 + 21.00 tax, free shipping). Refund issued 2026-10-01 was $240.00, short by $21.00 (tolerance max(0.50, 2% = 5.22))."
+    },
+    {
+      "kind": "refund_short",
+      "merchant": "Lumen Beauty",
+      "orderRef": "LB-60455",
+      "amountAtStake": 4.2,
+      "messageIds": [
+        "lb-60455-order",
+        "lb-60455-return-received",
+        "lb-60455-refund"
+      ],
+      "note": "Partial return: 2 x Glow Serum = $48.00 of $96.00 subtotal. Expected = 48.00 + 8.40 tax x 48/96 = $52.20. Refund issued 2026-09-22 was $48.00, short by $4.20 (tolerance max(0.50, 2% = 1.04))."
+    },
+    {
+      "kind": "return_deadline",
+      "merchant": "Northwind Outfitters",
+      "orderRef": "NW-49007",
+      "amountAtStake": 105.84,
+      "dueDate": "2026-10-19",
+      "messageIds": [
+        "nw-49007-order",
+        "nw-49007-delivered"
+      ],
+      "note": "'Returns accepted within 30 days of delivery.' Delivered 2026-09-19 -> deadline 2026-10-19, 1.8 days after asOf. No return events. Amount = order total."
+    },
+    {
+      "kind": "return_deadline",
+      "merchant": "Voltline Electronics",
+      "orderRef": "VL-78455",
+      "amountAtStake": 359.69,
+      "dueDate": "2026-10-21",
+      "messageIds": [
+        "vl-78455-order",
+        "vl-78455-delivered"
+      ],
+      "note": "'Returns accepted within 30 days of delivery.' Delivered 2026-09-21 -> deadline 2026-10-21, 3.9 days after asOf (an order-date anchor would have expired 2026-10-17). Amount = order total."
+    },
+    {
+      "kind": "return_deadline",
+      "merchant": "Grandmart",
+      "orderRef": "GM-2210-6104",
+      "amountAtStake": 134.22,
+      "dueDate": "2026-10-20",
+      "messageIds": [
+        "gm-2210-6104-order"
+      ],
+      "note": "'Returns accepted within 90 days of purchase.' Placed 2026-07-22 -> deadline 2026-10-20, 3.0 days after asOf (anchor is purchase, not the 2026-07-25 delivery). Amount = order total."
+    },
+    {
+      "kind": "return_deadline",
+      "merchant": "Lumen Beauty",
+      "orderRef": "LB-62310",
+      "amountAtStake": 97.88,
+      "dueDate": "2026-10-22",
+      "messageIds": [
+        "lb-62310-order"
+      ],
+      "note": "'Returns accepted within 60 days of purchase.' Placed 2026-08-23 -> deadline 2026-10-22, 4.8 days after asOf. No return events. Amount = order total."
+    },
+    {
+      "kind": "return_deadline",
+      "merchant": "Oakhaven Home",
+      "orderRef": "OH-11842",
+      "amountAtStake": 428.54,
+      "dueDate": "2026-10-23",
+      "messageIds": [
+        "oh-11842-order",
+        "oh-11842-delivered"
+      ],
+      "note": "'Returns accepted within 30 days of delivery.' Delivered 2026-09-23 -> deadline 2026-10-23, 5.9 days after asOf. Amount = order total incl. $49.00 shipping."
+    },
+    {
+      "kind": "price_drop",
+      "merchant": "Voltline Electronics",
+      "orderRef": "VL-80231",
+      "lineItem": "Echo Mini Smart Speaker",
+      "amountAtStake": 30,
+      "dueDate": "2026-10-22",
+      "messageIds": [
+        "vl-80231-order"
+      ],
+      "note": "Paid $129.99 on 2026-10-08; simulated feed shows $99.99 on 2026-10-13 (the $89.99 point is dated after asOf and ignored). Drop = 30.00 x 1 >= max(5, 6.50). 'Price adjustments within 14 days of purchase.' -> by 2026-10-22."
+    },
+    {
+      "kind": "price_drop",
+      "merchant": "Grandmart",
+      "orderRef": "GM-2210-7789",
+      "lineItem": "Ceramic Nonstick Pan, 10 in",
+      "amountAtStake": 14,
+      "dueDate": "2026-10-23",
+      "messageIds": [
+        "gm-2210-7789-order"
+      ],
+      "note": "Paid $34.99 x 2 on 2026-10-09; simulated feed shows $27.99 on 2026-10-15. Drop = 7.00 x 2 = $14.00 >= max(5, 3.50). 14-day window -> by 2026-10-23. Utensil set dropped only $1.00 (below threshold)."
+    },
+    {
+      "kind": "price_drop",
+      "merchant": "Northwind Outfitters",
+      "orderRef": "NW-50112",
+      "lineItem": "Ridgeline Down Jacket",
+      "amountAtStake": 40,
+      "dueDate": "2026-10-19",
+      "messageIds": [
+        "nw-50112-order",
+        "northwind-promo-fall-markdowns"
+      ],
+      "note": "Paid $189.00 on 2026-10-05; simulated feed and the 2026-10-14 promo email show $149.00. Drop = $40.00 >= max(5, 9.45). 14-day window -> by 2026-10-19. The pocket tee dipped to $18 but is back at $28."
+    }
+  ]
+}

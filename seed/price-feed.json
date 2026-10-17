@@ -1,0 +1,141 @@
+{
+  "simulated": true,
+  "observations": [
+    {
+      "merchant": "Northwind Outfitters",
+      "sku": "NW-JKT-RDG",
+      "name": "Ridgeline Down Jacket",
+      "price": 189,
+      "currency": "USD",
+      "observedAt": "2026-09-30T12:00:00Z"
+    },
+    {
+      "merchant": "Northwind Outfitters",
+      "sku": "NW-JKT-RDG",
+      "name": "Ridgeline Down Jacket",
+      "price": 149,
+      "currency": "USD",
+      "observedAt": "2026-10-14T12:00:00Z"
+    },
+    {
+      "merchant": "Northwind Outfitters",
+      "sku": "NW-TEE-HVY",
+      "name": "Heavyweight Pocket Tee",
+      "price": 28,
+      "currency": "USD",
+      "observedAt": "2026-10-01T12:00:00Z"
+    },
+    {
+      "merchant": "Northwind Outfitters",
+      "sku": "NW-TEE-HVY",
+      "name": "Heavyweight Pocket Tee",
+      "price": 18,
+      "currency": "USD",
+      "observedAt": "2026-10-10T12:00:00Z"
+    },
+    {
+      "merchant": "Northwind Outfitters",
+      "sku": "NW-TEE-HVY",
+      "name": "Heavyweight Pocket Tee",
+      "price": 28,
+      "currency": "USD",
+      "observedAt": "2026-10-15T12:00:00Z"
+    },
+    {
+      "merchant": "Voltline Electronics",
+      "sku": "VL-SPK-200",
+      "name": "Echo Mini Smart Speaker",
+      "price": 129.99,
+      "currency": "USD",
+      "observedAt": "2026-10-02T12:00:00Z"
+    },
+    {
+      "merchant": "Voltline Electronics",
+      "sku": "VL-SPK-200",
+      "name": "Echo Mini Smart Speaker",
+      "price": 99.99,
+      "currency": "USD",
+      "observedAt": "2026-10-13T12:00:00Z"
+    },
+    {
+      "merchant": "Voltline Electronics",
+      "sku": "VL-SPK-200",
+      "name": "Echo Mini Smart Speaker",
+      "price": 89.99,
+      "currency": "USD",
+      "observedAt": "2026-10-20T12:00:00Z"
+    },
+    {
+      "merchant": "Voltline Electronics",
+      "sku": "VL-MON-27K",
+      "name": "Lumi 27\" 4K Monitor",
+      "price": 329.99,
+      "currency": "USD",
+      "observedAt": "2026-10-01T12:00:00Z"
+    },
+    {
+      "merchant": "Voltline Electronics",
+      "sku": "VL-MON-27K",
+      "name": "Lumi 27\" 4K Monitor",
+      "price": 279.99,
+      "currency": "USD",
+      "observedAt": "2026-10-12T12:00:00Z"
+    },
+    {
+      "merchant": "Grandmart",
+      "sku": "GM-PAN-10",
+      "name": "Ceramic Nonstick Pan, 10 in",
+      "price": 34.99,
+      "currency": "USD",
+      "observedAt": "2026-10-01T12:00:00Z"
+    },
+    {
+      "merchant": "Grandmart",
+      "sku": "GM-PAN-10",
+      "name": "Ceramic Nonstick Pan, 10 in",
+      "price": 27.99,
+      "currency": "USD",
+      "observedAt": "2026-10-15T12:00:00Z"
+    },
+    {
+      "merchant": "Grandmart",
+      "sku": "GM-UTN-5",
+      "name": "Silicone Utensil Set",
+      "price": 12.99,
+      "currency": "USD",
+      "observedAt": "2026-10-01T12:00:00Z"
+    },
+    {
+      "merchant": "Grandmart",
+      "sku": "GM-UTN-5",
+      "name": "Silicone Utensil Set",
+      "price": 11.99,
+      "currency": "USD",
+      "observedAt": "2026-10-15T12:00:00Z"
+    },
+    {
+      "merchant": "Lumen Beauty",
+      "sku": "LB-NCR-50",
+      "name": "Peptide Night Cream",
+      "price": 58,
+      "currency": "USD",
+      "observedAt": "2026-09-01T12:00:00Z"
+    },
+    {
+      "merchant": "Lumen Beauty",
+      "sku": "LB-NCR-50",
+      "name": "Peptide Night Cream",
+      "price": 42,
+      "currency": "USD",
+      "observedAt": "2026-10-01T12:00:00Z"
+    },
+    {
+      "merchant": "Oakhaven Home",
+      "sku": "OH-CHR-LIN",
+      "name": "Linen Accent Chair",
+      "price": 379,
+      "currency": "USD",
+      "observedAt": "2026-10-05T12:00:00Z"
+    }
+  ]
+}

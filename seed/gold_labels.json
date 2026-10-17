@@ -1,0 +1,1978 @@
+{
+  "labels": [
+    {
+      "emailId": "gm-2210-6104-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Grandmart",
+        "merchantDomain": "grandmart.example",
+        "orderRef": "GM-2210-6104",
+        "currency": "USD",
+        "date": "2026-07-22",
+        "lineItems": [
+          {
+            "name": "Air Fryer, 6 qt",
+            "sku": "GM-AF-600",
+            "qty": 1,
+            "unitPrice": 89.99
+          },
+          {
+            "name": "Bath Towel Set (4-pack)",
+            "sku": "GM-TWL-4PK",
+            "qty": 1,
+            "unitPrice": 34
+          }
+        ],
+        "totals": {
+          "subtotal": 123.99,
+          "tax": 10.23,
+          "shipping": 0,
+          "total": 134.22
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 90,
+        "refundSlaDays": 5,
+        "priceAdjustDays": 14
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "gm-2210-6104-delivered",
+      "class": "delivered",
+      "fields": {
+        "merchant": "Grandmart",
+        "merchantDomain": "grandmart.example",
+        "orderRef": "GM-2210-6104",
+        "currency": "USD",
+        "date": "2026-07-25",
+        "returnWindowDays": 90
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "gm-2210-4470-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Grandmart",
+        "merchantDomain": "grandmart.example",
+        "orderRef": "GM-2210-4470",
+        "currency": "USD",
+        "date": "2026-08-01",
+        "lineItems": [
+          {
+            "name": "Memory Foam Pillow (2-pack)",
+            "sku": "GM-PIL-2PK",
+            "qty": 1,
+            "unitPrice": 45
+          }
+        ],
+        "totals": {
+          "subtotal": 45,
+          "tax": 3.71,
+          "shipping": 0,
+          "total": 48.71
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 90,
+        "refundSlaDays": 5,
+        "priceAdjustDays": 14
+      },
+      "tags": [
+        "refund_matched"
+      ],
+      "holdout": true
+    },
+    {
+      "emailId": "bb-sub-20817-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Brewbox Coffee",
+        "merchantDomain": "brewbox.example",
+        "orderRef": "BB-SUB-20817",
+        "currency": "USD",
+        "date": "2026-08-03",
+        "lineItems": [
+          {
+            "name": "Single Origin Coffee, 2 x 12 oz",
+            "sku": "BB-SO-2X12",
+            "qty": 1,
+            "unitPrice": 18
+          }
+        ],
+        "totals": {
+          "subtotal": 18,
+          "tax": 0,
+          "shipping": 0,
+          "discount": 1.8,
+          "total": 16.2
+        },
+        "last4": "4444",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": null,
+        "refundSlaDays": null,
+        "priceAdjustDays": null
+      },
+      "tags": [
+        "subscription_renewal",
+        "discount",
+        "final_sale"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "lb-60455-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Lumen Beauty",
+        "merchantDomain": "lumenbeauty.example",
+        "orderRef": "LB-60455",
+        "currency": "USD",
+        "date": "2026-08-05",
+        "lineItems": [
+          {
+            "name": "Hydra Cream 50 ml",
+            "sku": "LB-CRM-50",
+            "qty": 2,
+            "unitPrice": 24
+          },
+          {
+            "name": "Glow Serum 30 ml",
+            "sku": "LB-SER-30",
+            "qty": 2,
+            "unitPrice": 24
+          }
+        ],
+        "totals": {
+          "subtotal": 96,
+          "tax": 8.4,
+          "shipping": 0,
+          "total": 104.4
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 60,
+        "refundSlaDays": 14,
+        "priceAdjustDays": null
+      },
+      "tags": [
+        "partial_return",
+        "short_refund"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "vl-ca-30418-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Voltline Electronics",
+        "merchantDomain": "voltline.example",
+        "orderRef": "VL-CA-30418",
+        "currency": "CAD",
+        "date": "2026-08-10",
+        "lineItems": [
+          {
+            "name": "Glide Wireless Mouse",
+            "sku": "VL-MSE-310",
+            "qty": 1,
+            "unitPrice": 49.99
+          }
+        ],
+        "totals": {
+          "subtotal": 49.99,
+          "tax": 6.5,
+          "shipping": 0,
+          "total": 56.49
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 30,
+        "refundSlaDays": null,
+        "priceAdjustDays": 14
+      },
+      "tags": [
+        "multi_currency"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "bz-114-3381025-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Bazaarly",
+        "merchantDomain": "bazaarly.example",
+        "orderRef": "BZ-114-3381025",
+        "currency": "USD",
+        "date": "2026-08-12",
+        "lineItems": [
+          {
+            "name": "Bamboo Cutting Board Set",
+            "sku": "BZ-CBD-BMB",
+            "qty": 1,
+            "unitPrice": 35.9
+          }
+        ],
+        "totals": {
+          "subtotal": 35.9,
+          "tax": 2.96,
+          "shipping": 0,
+          "total": 38.86
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 30,
+        "refundSlaDays": null,
+        "priceAdjustDays": null
+      },
+      "tags": [
+        "store_credit"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "vl-ca-30418-delivered",
+      "class": "delivered",
+      "fields": {
+        "merchant": "Voltline Electronics",
+        "merchantDomain": "voltline.example",
+        "orderRef": "VL-CA-30418",
+        "currency": "CAD",
+        "date": "2026-08-14",
+        "returnWindowDays": 30
+      },
+      "tags": [
+        "multi_currency"
+      ],
+      "holdout": true
+    },
+    {
+      "emailId": "bz-114-3381025-delivered",
+      "class": "delivered",
+      "fields": {
+        "merchant": "Bazaarly",
+        "merchantDomain": "bazaarly.example",
+        "orderRef": "BZ-114-3381025",
+        "currency": "USD",
+        "date": "2026-08-15",
+        "returnWindowDays": 30
+      },
+      "tags": [
+        "store_credit"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "gm-2210-5531-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Grandmart",
+        "merchantDomain": "grandmart.example",
+        "orderRef": "GM-2210-5531",
+        "currency": "USD",
+        "date": "2026-08-15",
+        "lineItems": [
+          {
+            "name": "Cordless Stick Vacuum",
+            "sku": "GM-VAC-220",
+            "qty": 1,
+            "unitPrice": 179
+          }
+        ],
+        "totals": {
+          "subtotal": 179,
+          "tax": 14.77,
+          "shipping": 0,
+          "total": 193.77
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 90,
+        "refundSlaDays": 5,
+        "priceAdjustDays": 14
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "oh-11590-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Oakhaven Home",
+        "merchantDomain": "oakhaven.example",
+        "orderRef": "OH-11590",
+        "currency": "USD",
+        "date": "2026-08-18",
+        "lineItems": [
+          {
+            "name": "Walnut Dining Table",
+            "sku": "OH-TBL-WAL",
+            "qty": 1,
+            "unitPrice": 899
+          },
+          {
+            "name": "Dining Chair",
+            "sku": "OH-CHR-DIN",
+            "qty": 4,
+            "unitPrice": 129
+          }
+        ],
+        "totals": {
+          "subtotal": 1415,
+          "tax": 123.81,
+          "shipping": 0,
+          "total": 1538.81
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 30,
+        "refundSlaDays": 10,
+        "priceAdjustDays": null
+      },
+      "tags": [
+        "split_shipment"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "oh-11590-shipped-1",
+      "class": "shipped",
+      "fields": {
+        "merchant": "Oakhaven Home",
+        "merchantDomain": "oakhaven.example",
+        "orderRef": "OH-11590",
+        "currency": "USD",
+        "date": "2026-08-20"
+      },
+      "tags": [
+        "split_shipment"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "gm-2210-4470-return-received",
+      "class": "return_received",
+      "fields": {
+        "merchant": "Grandmart",
+        "merchantDomain": "grandmart.example",
+        "orderRef": "GM-2210-4470",
+        "currency": "USD",
+        "date": "2026-08-20",
+        "lineItems": [
+          {
+            "name": "Memory Foam Pillow (2-pack)",
+            "sku": "GM-PIL-2PK",
+            "qty": 1,
+            "unitPrice": 45
+          }
+        ],
+        "refundSlaDays": 5
+      },
+      "tags": [
+        "refund_matched"
+      ],
+      "holdout": true
+    },
+    {
+      "emailId": "gm-2210-8820-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Grandmart",
+        "merchantDomain": "grandmart.example",
+        "orderRef": "GM-2210-8820",
+        "currency": "USD",
+        "date": "2026-08-20",
+        "lineItems": [
+          {
+            "name": "Adjustable Desk Lamp",
+            "sku": "GM-LMP-ADJ",
+            "qty": 1,
+            "unitPrice": 24.99
+          },
+          {
+            "name": "Storage Bins (3-pack)",
+            "sku": "GM-BIN-3PK",
+            "qty": 1,
+            "unitPrice": 18
+          }
+        ],
+        "totals": {
+          "subtotal": 42.99,
+          "tax": 3.55,
+          "shipping": 0,
+          "total": 46.54
+        },
+        "last4": "5556",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 90,
+        "refundSlaDays": 5,
+        "priceAdjustDays": 14
+      },
+      "tags": [
+        "forwarded"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "lb-62310-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Lumen Beauty",
+        "merchantDomain": "lumenbeauty.example",
+        "orderRef": "LB-62310",
+        "currency": "USD",
+        "date": "2026-08-23",
+        "lineItems": [
+          {
+            "name": "Peptide Night Cream",
+            "sku": "LB-NCR-50",
+            "qty": 1,
+            "unitPrice": 58
+          },
+          {
+            "name": "Mineral SPF 50",
+            "sku": "LB-SPF-50",
+            "qty": 1,
+            "unitPrice": 32
+          }
+        ],
+        "totals": {
+          "subtotal": 90,
+          "tax": 7.88,
+          "shipping": 0,
+          "total": 97.88
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 60,
+        "refundSlaDays": 14,
+        "priceAdjustDays": null
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "gm-2210-4470-refund",
+      "class": "refund",
+      "fields": {
+        "merchant": "Grandmart",
+        "merchantDomain": "grandmart.example",
+        "orderRef": "GM-2210-4470",
+        "currency": "USD",
+        "date": "2026-08-23",
+        "eventAmount": 48.71,
+        "last4": "4242",
+        "isStoreCredit": false
+      },
+      "tags": [
+        "refund_matched"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "lb-62310-shipped",
+      "class": "shipped",
+      "fields": {
+        "merchant": "Lumen Beauty",
+        "merchantDomain": "lumenbeauty.example",
+        "orderRef": "LB-62310",
+        "currency": "USD",
+        "date": "2026-08-24"
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "oh-11590-delivered-1",
+      "class": "delivered",
+      "fields": {
+        "merchant": "Oakhaven Home",
+        "merchantDomain": "oakhaven.example",
+        "orderRef": "OH-11590",
+        "currency": "USD",
+        "date": "2026-08-25",
+        "returnWindowDays": 30
+      },
+      "tags": [
+        "split_shipment"
+      ],
+      "holdout": true
+    },
+    {
+      "emailId": "oh-12007-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Oakhaven Home",
+        "merchantDomain": "oakhaven.example",
+        "orderRef": "OH-12007",
+        "currency": "USD",
+        "date": "2026-08-26",
+        "lineItems": [
+          {
+            "name": "Arched Floor Lamp",
+            "sku": "OH-LMP-ARC",
+            "qty": 1,
+            "unitPrice": 240
+          }
+        ],
+        "totals": {
+          "subtotal": 240,
+          "tax": 21,
+          "shipping": 0,
+          "total": 261
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 30,
+        "refundSlaDays": 10,
+        "priceAdjustDays": null
+      },
+      "tags": [
+        "short_refund"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "oh-11590-shipped-2",
+      "class": "shipped",
+      "fields": {
+        "merchant": "Oakhaven Home",
+        "merchantDomain": "oakhaven.example",
+        "orderRef": "OH-11590",
+        "currency": "USD",
+        "date": "2026-08-27"
+      },
+      "tags": [
+        "split_shipment"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "nw-48213-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Northwind Outfitters",
+        "merchantDomain": "northwind.example",
+        "orderRef": "NW-48213",
+        "currency": "USD",
+        "date": "2026-08-28",
+        "lineItems": [
+          {
+            "name": "Trail Fleece Pullover",
+            "sku": "NW-FLC-110",
+            "qty": 1,
+            "unitPrice": 79
+          },
+          {
+            "name": "Merino Crew Socks (3-pack)",
+            "sku": "NW-SCK-031",
+            "qty": 1,
+            "unitPrice": 24
+          }
+        ],
+        "totals": {
+          "subtotal": 103,
+          "tax": 8.24,
+          "shipping": 0,
+          "total": 111.24
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 30,
+        "refundSlaDays": 7,
+        "priceAdjustDays": 14
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "vl-77120-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Voltline Electronics",
+        "merchantDomain": "voltline.example",
+        "orderRef": "VL-77120",
+        "currency": "USD",
+        "date": "2026-08-30",
+        "lineItems": [
+          {
+            "name": "Arc Noise-Cancelling Headphones",
+            "sku": "VL-HP-900",
+            "qty": 1,
+            "unitPrice": 150
+          },
+          {
+            "name": "Pulse 65W USB-C Charger",
+            "sku": "VL-CHG-65",
+            "qty": 1,
+            "unitPrice": 50
+          }
+        ],
+        "totals": {
+          "subtotal": 200,
+          "tax": 18,
+          "shipping": 0,
+          "total": 218
+        },
+        "last4": "4444",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 30,
+        "refundSlaDays": null,
+        "priceAdjustDays": 14
+      },
+      "tags": [
+        "partial_return"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "lb-63118-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Lumen Beauty",
+        "merchantDomain": "lumenbeauty.example",
+        "orderRef": "LB-63118",
+        "currency": "USD",
+        "date": "2026-09-01",
+        "lineItems": [
+          {
+            "name": "Rose Clay Mask",
+            "sku": "LB-MSK-RC",
+            "qty": 1,
+            "unitPrice": 36
+          }
+        ],
+        "totals": {
+          "subtotal": 36,
+          "tax": 3.15,
+          "shipping": 0,
+          "total": 39.15
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 60,
+        "refundSlaDays": 14,
+        "priceAdjustDays": null
+      },
+      "tags": [
+        "refund_pending_not_due"
+      ],
+      "holdout": true
+    },
+    {
+      "emailId": "nw-48213-delivered",
+      "class": "delivered",
+      "fields": {
+        "merchant": "Northwind Outfitters",
+        "merchantDomain": "northwind.example",
+        "orderRef": "NW-48213",
+        "currency": "USD",
+        "date": "2026-09-01",
+        "returnWindowDays": 30
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "oh-11590-delivered-2",
+      "class": "delivered",
+      "fields": {
+        "merchant": "Oakhaven Home",
+        "merchantDomain": "oakhaven.example",
+        "orderRef": "OH-11590",
+        "currency": "USD",
+        "date": "2026-09-02",
+        "returnWindowDays": 30
+      },
+      "tags": [
+        "split_shipment"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "bz-114-2290417-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Bazaarly",
+        "merchantDomain": "bazaarly.example",
+        "orderRef": "BZ-114-2290417",
+        "currency": "USD",
+        "date": "2026-09-02",
+        "lineItems": [
+          {
+            "name": "Electric Gooseneck Kettle",
+            "sku": "BZ-KTL-GN",
+            "qty": 1,
+            "unitPrice": 64.99
+          }
+        ],
+        "totals": {
+          "subtotal": 64.99,
+          "tax": 5.36,
+          "shipping": 0,
+          "total": 70.35
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 30,
+        "refundSlaDays": null,
+        "priceAdjustDays": null
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "bb-sub-21544-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Brewbox Coffee",
+        "merchantDomain": "brewbox.example",
+        "orderRef": "BB-SUB-21544",
+        "currency": "USD",
+        "date": "2026-09-03",
+        "lineItems": [
+          {
+            "name": "Single Origin Coffee, 2 x 12 oz",
+            "sku": "BB-SO-2X12",
+            "qty": 1,
+            "unitPrice": 18
+          }
+        ],
+        "totals": {
+          "subtotal": 18,
+          "tax": 0,
+          "shipping": 0,
+          "discount": 1.8,
+          "total": 16.2
+        },
+        "last4": "4444",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": null,
+        "refundSlaDays": null,
+        "priceAdjustDays": null
+      },
+      "tags": [
+        "subscription_renewal",
+        "discount",
+        "final_sale"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "vl-77120-delivered",
+      "class": "delivered",
+      "fields": {
+        "merchant": "Voltline Electronics",
+        "merchantDomain": "voltline.example",
+        "orderRef": "VL-77120",
+        "currency": "USD",
+        "date": "2026-09-03",
+        "returnWindowDays": 30
+      },
+      "tags": [
+        "partial_return"
+      ],
+      "holdout": true
+    },
+    {
+      "emailId": "oh-12007-delivered",
+      "class": "delivered",
+      "fields": {
+        "merchant": "Oakhaven Home",
+        "merchantDomain": "oakhaven.example",
+        "orderRef": "OH-12007",
+        "currency": "USD",
+        "date": "2026-09-04",
+        "returnWindowDays": 30
+      },
+      "tags": [
+        "short_refund"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "bz-114-3381025-return-received",
+      "class": "return_received",
+      "fields": {
+        "merchant": "Bazaarly",
+        "merchantDomain": "bazaarly.example",
+        "orderRef": "BZ-114-3381025",
+        "currency": "USD",
+        "date": "2026-09-05",
+        "lineItems": [
+          {
+            "name": "Bamboo Cutting Board Set",
+            "sku": "BZ-CBD-BMB",
+            "qty": 1,
+            "unitPrice": 35.9
+          }
+        ],
+        "refundSlaDays": null
+      },
+      "tags": [
+        "store_credit"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "bz-114-2290417-delivered",
+      "class": "delivered",
+      "fields": {
+        "merchant": "Bazaarly",
+        "merchantDomain": "bazaarly.example",
+        "orderRef": "BZ-114-2290417",
+        "currency": "USD",
+        "date": "2026-09-06",
+        "returnWindowDays": 30
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "bz-114-3381025-store-credit",
+      "class": "refund",
+      "fields": {
+        "merchant": "Bazaarly",
+        "merchantDomain": "bazaarly.example",
+        "orderRef": "BZ-114-3381025",
+        "currency": "USD",
+        "date": "2026-09-08",
+        "eventAmount": 38.86,
+        "isStoreCredit": true
+      },
+      "tags": [
+        "store_credit"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "lb-60455-return-started",
+      "class": "return_started",
+      "fields": {
+        "merchant": "Lumen Beauty",
+        "merchantDomain": "lumenbeauty.example",
+        "orderRef": "LB-60455",
+        "currency": "USD",
+        "date": "2026-09-08",
+        "lineItems": [
+          {
+            "name": "Glow Serum 30 ml",
+            "sku": "LB-SER-30",
+            "qty": 2,
+            "unitPrice": 24
+          }
+        ],
+        "refundSlaDays": 14
+      },
+      "tags": [
+        "partial_return",
+        "short_refund"
+      ],
+      "holdout": true
+    },
+    {
+      "emailId": "oh-11842-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Oakhaven Home",
+        "merchantDomain": "oakhaven.example",
+        "orderRef": "OH-11842",
+        "currency": "USD",
+        "date": "2026-09-12",
+        "lineItems": [
+          {
+            "name": "Linen Accent Chair",
+            "sku": "OH-CHR-LIN",
+            "qty": 1,
+            "unitPrice": 349
+          }
+        ],
+        "totals": {
+          "subtotal": 349,
+          "tax": 30.54,
+          "shipping": 49,
+          "total": 428.54
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 30,
+        "refundSlaDays": 10,
+        "priceAdjustDays": null
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "lb-60455-return-received",
+      "class": "return_received",
+      "fields": {
+        "merchant": "Lumen Beauty",
+        "merchantDomain": "lumenbeauty.example",
+        "orderRef": "LB-60455",
+        "currency": "USD",
+        "date": "2026-09-15",
+        "lineItems": [
+          {
+            "name": "Glow Serum 30 ml",
+            "sku": "LB-SER-30",
+            "qty": 2,
+            "unitPrice": 24
+          }
+        ],
+        "refundSlaDays": 14
+      },
+      "tags": [
+        "partial_return",
+        "short_refund"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "nw-49007-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Northwind Outfitters",
+        "merchantDomain": "northwind.example",
+        "orderRef": "NW-49007",
+        "currency": "USD",
+        "date": "2026-09-15",
+        "lineItems": [
+          {
+            "name": "Canvas Chore Jacket",
+            "sku": "NW-JKT-CHR",
+            "qty": 1,
+            "unitPrice": 98
+          }
+        ],
+        "totals": {
+          "subtotal": 98,
+          "tax": 7.84,
+          "shipping": 0,
+          "total": 105.84
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 30,
+        "refundSlaDays": 7,
+        "priceAdjustDays": 14
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "nw-49007-shipped",
+      "class": "shipped",
+      "fields": {
+        "merchant": "Northwind Outfitters",
+        "merchantDomain": "northwind.example",
+        "orderRef": "NW-49007",
+        "currency": "USD",
+        "date": "2026-09-16"
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "vl-78455-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Voltline Electronics",
+        "merchantDomain": "voltline.example",
+        "orderRef": "VL-78455",
+        "currency": "USD",
+        "date": "2026-09-17",
+        "lineItems": [
+          {
+            "name": "Lumi 27\" 4K Monitor",
+            "sku": "VL-MON-27K",
+            "qty": 1,
+            "unitPrice": 329.99
+          }
+        ],
+        "totals": {
+          "subtotal": 329.99,
+          "tax": 29.7,
+          "shipping": 0,
+          "total": 359.69
+        },
+        "last4": "4444",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 30,
+        "refundSlaDays": null,
+        "priceAdjustDays": 14
+      },
+      "tags": [],
+      "holdout": true
+    },
+    {
+      "emailId": "oh-11842-shipped",
+      "class": "shipped",
+      "fields": {
+        "merchant": "Oakhaven Home",
+        "merchantDomain": "oakhaven.example",
+        "orderRef": "OH-11842",
+        "currency": "USD",
+        "date": "2026-09-18"
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "vl-78455-shipped",
+      "class": "shipped",
+      "fields": {
+        "merchant": "Voltline Electronics",
+        "merchantDomain": "voltline.example",
+        "orderRef": "VL-78455",
+        "currency": "USD",
+        "date": "2026-09-18"
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "nw-49007-delivered",
+      "class": "delivered",
+      "fields": {
+        "merchant": "Northwind Outfitters",
+        "merchantDomain": "northwind.example",
+        "orderRef": "NW-49007",
+        "currency": "USD",
+        "date": "2026-09-19",
+        "returnWindowDays": 30
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "nw-48213-return-started",
+      "class": "return_started",
+      "fields": {
+        "merchant": "Northwind Outfitters",
+        "merchantDomain": "northwind.example",
+        "orderRef": "NW-48213",
+        "currency": "USD",
+        "date": "2026-09-20",
+        "lineItems": [
+          {
+            "name": "Trail Fleece Pullover",
+            "sku": "NW-FLC-110",
+            "qty": 1,
+            "unitPrice": 79
+          },
+          {
+            "name": "Merino Crew Socks (3-pack)",
+            "sku": "NW-SCK-031",
+            "qty": 1,
+            "unitPrice": 24
+          }
+        ],
+        "refundSlaDays": 7
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "nw-49388-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Northwind Outfitters",
+        "merchantDomain": "northwind.example",
+        "orderRef": "NW-49388",
+        "currency": "USD",
+        "date": "2026-09-20",
+        "lineItems": [
+          {
+            "name": "Clearance Rain Shell",
+            "sku": "NW-RSH-CLR",
+            "qty": 1,
+            "unitPrice": 39
+          }
+        ],
+        "totals": {
+          "subtotal": 39,
+          "tax": 3.12,
+          "shipping": 0,
+          "total": 42.12
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": null,
+        "refundSlaDays": null,
+        "priceAdjustDays": null
+      },
+      "tags": [
+        "final_sale"
+      ],
+      "holdout": true
+    },
+    {
+      "emailId": "vl-78455-delivered",
+      "class": "delivered",
+      "fields": {
+        "merchant": "Voltline Electronics",
+        "merchantDomain": "voltline.example",
+        "orderRef": "VL-78455",
+        "currency": "USD",
+        "date": "2026-09-21",
+        "returnWindowDays": 30
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "vl-77120-return-started",
+      "class": "return_started",
+      "fields": {
+        "merchant": "Voltline Electronics",
+        "merchantDomain": "voltline.example",
+        "orderRef": "VL-77120",
+        "currency": "USD",
+        "date": "2026-09-22",
+        "lineItems": [
+          {
+            "name": "Arc Noise-Cancelling Headphones",
+            "sku": "VL-HP-900",
+            "qty": 1,
+            "unitPrice": 150
+          }
+        ],
+        "refundSlaDays": null
+      },
+      "tags": [
+        "partial_return"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "lb-60455-refund",
+      "class": "refund",
+      "fields": {
+        "merchant": "Lumen Beauty",
+        "merchantDomain": "lumenbeauty.example",
+        "orderRef": "LB-60455",
+        "currency": "USD",
+        "date": "2026-09-22",
+        "eventAmount": 48,
+        "last4": "4242",
+        "isStoreCredit": false
+      },
+      "tags": [
+        "partial_return",
+        "short_refund"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "oh-11842-delivered",
+      "class": "delivered",
+      "fields": {
+        "merchant": "Oakhaven Home",
+        "merchantDomain": "oakhaven.example",
+        "orderRef": "OH-11842",
+        "currency": "USD",
+        "date": "2026-09-23",
+        "returnWindowDays": 30
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "oh-12007-return-received",
+      "class": "return_received",
+      "fields": {
+        "merchant": "Oakhaven Home",
+        "merchantDomain": "oakhaven.example",
+        "orderRef": "OH-12007",
+        "currency": "USD",
+        "date": "2026-09-24",
+        "lineItems": [
+          {
+            "name": "Arched Floor Lamp",
+            "sku": "OH-LMP-ARC",
+            "qty": 1,
+            "unitPrice": 240
+          }
+        ],
+        "refundSlaDays": 10
+      },
+      "tags": [
+        "short_refund"
+      ],
+      "holdout": true
+    },
+    {
+      "emailId": "bz-114-2290417-return-dropped",
+      "class": "return_started",
+      "fields": {
+        "merchant": "Bazaarly",
+        "merchantDomain": "bazaarly.example",
+        "orderRef": "BZ-114-2290417",
+        "currency": "USD",
+        "date": "2026-09-24",
+        "lineItems": [
+          {
+            "name": "Electric Gooseneck Kettle",
+            "sku": "BZ-KTL-GN",
+            "qty": 1,
+            "unitPrice": 64.99
+          }
+        ],
+        "refundSlaDays": null
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "fc-90311-order",
+      "class": "order",
+      "fields": {
+        "merchant": "FreshCart Grocery",
+        "merchantDomain": "freshcart.example",
+        "orderRef": "FC-90311",
+        "currency": "USD",
+        "date": "2026-09-27",
+        "lineItems": [
+          {
+            "name": "Organic Bananas (bunch)",
+            "sku": "FC-PRD-BAN",
+            "qty": 1,
+            "unitPrice": 2.49
+          },
+          {
+            "name": "Whole Milk (1 gal)",
+            "sku": "FC-DRY-MLK",
+            "qty": 1,
+            "unitPrice": 4.29
+          },
+          {
+            "name": "Sourdough Loaf",
+            "sku": "FC-BKY-SDL",
+            "qty": 1,
+            "unitPrice": 5.49
+          },
+          {
+            "name": "Free-Range Eggs (dozen)",
+            "sku": "FC-DRY-EGG",
+            "qty": 1,
+            "unitPrice": 4.99
+          }
+        ],
+        "totals": {
+          "subtotal": 17.26,
+          "tax": 0,
+          "shipping": 3.99,
+          "total": 21.25
+        },
+        "last4": "4444",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": null,
+        "refundSlaDays": null,
+        "priceAdjustDays": null
+      },
+      "tags": [
+        "final_sale"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "vl-77120-return-received",
+      "class": "return_received",
+      "fields": {
+        "merchant": "Voltline Electronics",
+        "merchantDomain": "voltline.example",
+        "orderRef": "VL-77120",
+        "currency": "USD",
+        "date": "2026-09-28",
+        "lineItems": [
+          {
+            "name": "Arc Noise-Cancelling Headphones",
+            "sku": "VL-HP-900",
+            "qty": 1,
+            "unitPrice": 150
+          }
+        ],
+        "refundSlaDays": null
+      },
+      "tags": [
+        "partial_return"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "bz-114-4410938-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Bazaarly",
+        "merchantDomain": "bazaarly.example",
+        "orderRef": "BZ-114-4410938",
+        "currency": "USD",
+        "date": "2026-09-28",
+        "lineItems": [
+          {
+            "name": "Juego de sábanas de algodón (Queen)",
+            "sku": "BZ-SAB-Q",
+            "qty": 1,
+            "unitPrice": 42.4
+          }
+        ],
+        "totals": {
+          "subtotal": 42.4,
+          "tax": 3.5,
+          "shipping": 0,
+          "total": 45.9
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 30,
+        "refundSlaDays": null,
+        "priceAdjustDays": null
+      },
+      "tags": [
+        "non_english"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "gm-2210-5531-return-dropped",
+      "class": "return_started",
+      "fields": {
+        "merchant": "Grandmart",
+        "merchantDomain": "grandmart.example",
+        "orderRef": "GM-2210-5531",
+        "currency": "USD",
+        "date": "2026-09-30",
+        "lineItems": [
+          {
+            "name": "Cordless Stick Vacuum",
+            "sku": "GM-VAC-220",
+            "qty": 1,
+            "unitPrice": 179
+          }
+        ],
+        "refundSlaDays": 5
+      },
+      "tags": [],
+      "holdout": true
+    },
+    {
+      "emailId": "bz-114-5523301-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Bazaarly",
+        "merchantDomain": "bazaarly.example",
+        "orderRef": "BZ-114-5523301",
+        "currency": "USD",
+        "date": "2026-10-01",
+        "lineItems": [
+          {
+            "name": "Mesh Desk Organizer",
+            "sku": "BZ-ORG-MSH",
+            "qty": 2,
+            "unitPrice": 19.99
+          }
+        ],
+        "totals": {
+          "subtotal": 39.98,
+          "tax": 3.3,
+          "shipping": 0,
+          "total": 43.28
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 30,
+        "refundSlaDays": null,
+        "priceAdjustDays": null
+      },
+      "tags": [
+        "duplicate_order"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "bz-114-5523301-order-resent",
+      "class": "order",
+      "fields": {
+        "merchant": "Bazaarly",
+        "merchantDomain": "bazaarly.example",
+        "orderRef": "BZ-114-5523301",
+        "currency": "USD",
+        "date": "2026-10-01",
+        "lineItems": [
+          {
+            "name": "Mesh Desk Organizer",
+            "sku": "BZ-ORG-MSH",
+            "qty": 2,
+            "unitPrice": 19.99
+          }
+        ],
+        "totals": {
+          "subtotal": 39.98,
+          "tax": 3.3,
+          "shipping": 0,
+          "total": 43.28
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 30,
+        "refundSlaDays": null,
+        "priceAdjustDays": null
+      },
+      "tags": [
+        "duplicate_order"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "oh-12007-refund",
+      "class": "refund",
+      "fields": {
+        "merchant": "Oakhaven Home",
+        "merchantDomain": "oakhaven.example",
+        "orderRef": "OH-12007",
+        "currency": "USD",
+        "date": "2026-10-01",
+        "eventAmount": 240,
+        "last4": "4242",
+        "isStoreCredit": false
+      },
+      "tags": [
+        "short_refund"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "bz-114-5523301-order-updated",
+      "class": "order",
+      "fields": {
+        "merchant": "Bazaarly",
+        "merchantDomain": "bazaarly.example",
+        "orderRef": "BZ-114-5523301",
+        "currency": "USD",
+        "date": "2026-10-01",
+        "lineItems": [
+          {
+            "name": "Mesh Desk Organizer",
+            "sku": "BZ-ORG-MSH",
+            "qty": 1,
+            "unitPrice": 19.99
+          }
+        ],
+        "totals": {
+          "subtotal": 19.99,
+          "tax": 1.65,
+          "shipping": 0,
+          "total": 21.64
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 30,
+        "refundSlaDays": null,
+        "priceAdjustDays": null
+      },
+      "tags": [
+        "duplicate_order",
+        "updated_order"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "gm-2210-9350-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Grandmart",
+        "merchantDomain": "grandmart.example",
+        "orderRef": "GM-2210-9350",
+        "currency": "USD",
+        "date": "2026-10-02",
+        "lineItems": [
+          {
+            "name": "Robot Vacuum",
+            "sku": "GM-RBV-100",
+            "qty": 1,
+            "unitPrice": 149
+          }
+        ],
+        "totals": {
+          "subtotal": 149,
+          "tax": 12.29,
+          "shipping": 0,
+          "total": 161.29
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 90,
+        "refundSlaDays": 5,
+        "priceAdjustDays": 14
+      },
+      "tags": [
+        "cancel_before_ship"
+      ],
+      "holdout": true
+    },
+    {
+      "emailId": "bb-sub-22391-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Brewbox Coffee",
+        "merchantDomain": "brewbox.example",
+        "orderRef": "BB-SUB-22391",
+        "currency": "USD",
+        "date": "2026-10-03",
+        "lineItems": [
+          {
+            "name": "Single Origin Coffee, 2 x 12 oz",
+            "sku": "BB-SO-2X12",
+            "qty": 1,
+            "unitPrice": 18
+          }
+        ],
+        "totals": {
+          "subtotal": 18,
+          "tax": 0,
+          "shipping": 0,
+          "discount": 1.8,
+          "total": 16.2
+        },
+        "last4": "4444",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": null,
+        "refundSlaDays": null,
+        "priceAdjustDays": null
+      },
+      "tags": [
+        "subscription_renewal",
+        "discount",
+        "final_sale"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "gm-2210-9350-cancel",
+      "class": "cancel",
+      "fields": {
+        "merchant": "Grandmart",
+        "merchantDomain": "grandmart.example",
+        "orderRef": "GM-2210-9350",
+        "currency": "USD",
+        "date": "2026-10-03",
+        "last4": "4242"
+      },
+      "tags": [
+        "cancel_before_ship"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "nw-48213-return-received",
+      "class": "return_received",
+      "fields": {
+        "merchant": "Northwind Outfitters",
+        "merchantDomain": "northwind.example",
+        "orderRef": "NW-48213",
+        "currency": "USD",
+        "date": "2026-10-03",
+        "lineItems": [
+          {
+            "name": "Trail Fleece Pullover",
+            "sku": "NW-FLC-110",
+            "qty": 1,
+            "unitPrice": 79
+          },
+          {
+            "name": "Merino Crew Socks (3-pack)",
+            "sku": "NW-SCK-031",
+            "qty": 1,
+            "unitPrice": 24
+          }
+        ],
+        "refundSlaDays": 7
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "bb-sub-22391-shipped",
+      "class": "shipped",
+      "fields": {
+        "merchant": "Brewbox Coffee",
+        "merchantDomain": "brewbox.example",
+        "orderRef": "BB-SUB-22391",
+        "currency": "USD",
+        "date": "2026-10-04"
+      },
+      "tags": [
+        "subscription_renewal",
+        "discount",
+        "final_sale"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "fc-90477-order",
+      "class": "order",
+      "fields": {
+        "merchant": "FreshCart Grocery",
+        "merchantDomain": "freshcart.example",
+        "orderRef": "FC-90477",
+        "currency": "USD",
+        "date": "2026-10-04",
+        "lineItems": [
+          {
+            "name": "Baby Spinach (5 oz)",
+            "sku": "FC-PRD-SPN",
+            "qty": 1,
+            "unitPrice": 3.99
+          },
+          {
+            "name": "Sourdough Loaf",
+            "sku": "FC-BKY-SDL",
+            "qty": 1,
+            "unitPrice": 5.49
+          },
+          {
+            "name": "Greek Yogurt (32 oz)",
+            "sku": "FC-DRY-YGT",
+            "qty": 1,
+            "unitPrice": 5.79
+          }
+        ],
+        "totals": {
+          "subtotal": 15.27,
+          "tax": 0,
+          "shipping": 3.99,
+          "total": 19.26
+        },
+        "last4": "4444",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": null,
+        "refundSlaDays": null,
+        "priceAdjustDays": null
+      },
+      "tags": [
+        "final_sale"
+      ],
+      "holdout": true
+    },
+    {
+      "emailId": "fc-90477-refund",
+      "class": "refund",
+      "fields": {
+        "merchant": "FreshCart Grocery",
+        "merchantDomain": "freshcart.example",
+        "orderRef": "FC-90477",
+        "currency": "USD",
+        "date": "2026-10-05",
+        "eventAmount": 5.49,
+        "last4": "4444",
+        "isStoreCredit": false
+      },
+      "tags": [
+        "final_sale",
+        "refund_without_return"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "nw-50112-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Northwind Outfitters",
+        "merchantDomain": "northwind.example",
+        "orderRef": "NW-50112",
+        "currency": "USD",
+        "date": "2026-10-05",
+        "lineItems": [
+          {
+            "name": "Ridgeline Down Jacket",
+            "sku": "NW-JKT-RDG",
+            "qty": 1,
+            "unitPrice": 189
+          },
+          {
+            "name": "Heavyweight Pocket Tee",
+            "sku": "NW-TEE-HVY",
+            "qty": 1,
+            "unitPrice": 28
+          }
+        ],
+        "totals": {
+          "subtotal": 217,
+          "tax": 17.36,
+          "shipping": 0,
+          "total": 234.36
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 30,
+        "refundSlaDays": 7,
+        "priceAdjustDays": 14
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "gm-2210-5531-return-received",
+      "class": "return_received",
+      "fields": {
+        "merchant": "Grandmart",
+        "merchantDomain": "grandmart.example",
+        "orderRef": "GM-2210-5531",
+        "currency": "USD",
+        "date": "2026-10-06",
+        "lineItems": [
+          {
+            "name": "Cordless Stick Vacuum",
+            "sku": "GM-VAC-220",
+            "qty": 1,
+            "unitPrice": 179
+          }
+        ],
+        "refundSlaDays": 5
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "vl-80231-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Voltline Electronics",
+        "merchantDomain": "voltline.example",
+        "orderRef": "VL-80231",
+        "currency": "USD",
+        "date": "2026-10-08",
+        "lineItems": [
+          {
+            "name": "Echo Mini Smart Speaker",
+            "sku": "VL-SPK-200",
+            "qty": 1,
+            "unitPrice": 129.99
+          }
+        ],
+        "totals": {
+          "subtotal": 129.99,
+          "tax": 11.7,
+          "shipping": 0,
+          "total": 141.69
+        },
+        "last4": "4444",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 30,
+        "refundSlaDays": null,
+        "priceAdjustDays": 14
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "nw-50112-delivered",
+      "class": "delivered",
+      "fields": {
+        "merchant": "Northwind Outfitters",
+        "merchantDomain": "northwind.example",
+        "orderRef": "NW-50112",
+        "currency": "USD",
+        "date": "2026-10-08",
+        "returnWindowDays": 30
+      },
+      "tags": [],
+      "holdout": true
+    },
+    {
+      "emailId": "gm-2210-7789-order",
+      "class": "order",
+      "fields": {
+        "merchant": "Grandmart",
+        "merchantDomain": "grandmart.example",
+        "orderRef": "GM-2210-7789",
+        "currency": "USD",
+        "date": "2026-10-09",
+        "lineItems": [
+          {
+            "name": "Ceramic Nonstick Pan, 10 in",
+            "sku": "GM-PAN-10",
+            "qty": 2,
+            "unitPrice": 34.99
+          },
+          {
+            "name": "Silicone Utensil Set",
+            "sku": "GM-UTN-5",
+            "qty": 1,
+            "unitPrice": 12.99
+          }
+        ],
+        "totals": {
+          "subtotal": 82.97,
+          "tax": 6.85,
+          "shipping": 0,
+          "total": 89.82
+        },
+        "last4": "4242",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": 90,
+        "refundSlaDays": 5,
+        "priceAdjustDays": 14
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "lb-63118-return-received",
+      "class": "return_received",
+      "fields": {
+        "merchant": "Lumen Beauty",
+        "merchantDomain": "lumenbeauty.example",
+        "orderRef": "LB-63118",
+        "currency": "USD",
+        "date": "2026-10-09",
+        "lineItems": [
+          {
+            "name": "Rose Clay Mask",
+            "sku": "LB-MSK-RC",
+            "qty": 1,
+            "unitPrice": 36
+          }
+        ],
+        "refundSlaDays": 14
+      },
+      "tags": [
+        "refund_pending_not_due"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "brewbox-price-notice",
+      "class": "not_receipt",
+      "fields": {
+        "merchant": "Brewbox Coffee",
+        "merchantDomain": "brewbox.example"
+      },
+      "tags": [
+        "account_notice"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "gm-2210-7789-shipped",
+      "class": "shipped",
+      "fields": {
+        "merchant": "Grandmart",
+        "merchantDomain": "grandmart.example",
+        "orderRef": "GM-2210-7789",
+        "currency": "USD",
+        "date": "2026-10-10"
+      },
+      "tags": [],
+      "holdout": false
+    },
+    {
+      "emailId": "vl-80231-delivered",
+      "class": "delivered",
+      "fields": {
+        "merchant": "Voltline Electronics",
+        "merchantDomain": "voltline.example",
+        "orderRef": "VL-80231",
+        "currency": "USD",
+        "date": "2026-10-10",
+        "returnWindowDays": 30
+      },
+      "tags": [],
+      "holdout": true
+    },
+    {
+      "emailId": "fc-90652-order",
+      "class": "order",
+      "fields": {
+        "merchant": "FreshCart Grocery",
+        "merchantDomain": "freshcart.example",
+        "orderRef": "FC-90652",
+        "currency": "USD",
+        "date": "2026-10-11",
+        "lineItems": [
+          {
+            "name": "Honeycrisp Apples (3 lb)",
+            "sku": "FC-PRD-APL",
+            "qty": 1,
+            "unitPrice": 6.99
+          },
+          {
+            "name": "Whole Milk (1 gal)",
+            "sku": "FC-DRY-MLK",
+            "qty": 1,
+            "unitPrice": 4.29
+          },
+          {
+            "name": "Ground Coffee (12 oz)",
+            "sku": "FC-PAN-COF",
+            "qty": 1,
+            "unitPrice": 8.49
+          }
+        ],
+        "totals": {
+          "subtotal": 19.77,
+          "tax": 0,
+          "shipping": 3.99,
+          "total": 23.76
+        },
+        "last4": "4444",
+        "customerName": "Sam Rivera",
+        "returnWindowDays": null,
+        "refundSlaDays": null,
+        "priceAdjustDays": null
+      },
+      "tags": [
+        "final_sale"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "lumen-points-balance",
+      "class": "not_receipt",
+      "fields": {
+        "merchant": "Lumen Beauty",
+        "merchantDomain": "lumenbeauty.example"
+      },
+      "tags": [
+        "points_balance"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "bazaarly-daily-deals",
+      "class": "marketing",
+      "fields": {
+        "merchant": "Bazaarly",
+        "merchantDomain": "bazaarly.example"
+      },
+      "tags": [
+        "marketing_not_order"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "northwind-promo-fall-markdowns",
+      "class": "marketing",
+      "fields": {
+        "merchant": "Northwind Outfitters",
+        "merchantDomain": "northwind.example"
+      },
+      "tags": [
+        "marketing_not_order",
+        "price_drop_promo"
+      ],
+      "holdout": false
+    },
+    {
+      "emailId": "phish-n0rthwind-verify-card",
+      "class": "not_receipt",
+      "fields": {},
+      "tags": [
+        "phishing_lookalike"
+      ],
+      "holdout": false
+    }
+  ]
+}
