@@ -60,6 +60,24 @@ e2e/                # Playwright specs
 7. Low confidence (<0.7) items are excluded from "owed" totals until a human confirms.
 8. All demo/seed data is **synthetic** and labeled as such in the UI. Mock price feed is labeled "simulated".
 
+## Team
+| Person | GitHub | Owns |
+|---|---|---|
+| Kenan | `VeneratedApotheosis` | Repo owner, scope decisions, merges Devin PRs |
+| Alex | `ptatoo` | All frontend/design + #1 scaffold |
+| Ethan Lowe | `ethanwlowe7-cmyk` | Backend/ingestion, claimed per issue |
+| Chelsea | `chelsearwang` | Backend/ingestion, claimed per issue |
+
+## Ownership: don't touch Alex's work
+**Alex (`ptatoo`) and his agents own all frontend/design work.** Unless you are Alex or one of his agents:
+- Do not edit `src/app/**/page.tsx`, `src/app/**/layout.tsx`, `src/components/**`, `src/styles/**`,
+  `tailwind.config.*`, `public/**`, or Paper files. That applies even to fixing a build error there.
+- Do not claim, relabel, reassign, or close issues **#1, #9, #10, #11, #16, #24, #25, #26**, or the UI parts of
+  **#12** and **#17**.
+- If you change a schema, type, or API the UI uses, post an `INTERFACE` comment on Alex's issue and tag `@ptatoo`.
+- Need a UI change? Open a new `frontend` issue for Alex.
+Full rules: COORDINATION.md section 0.
+
 ## Code conventions
 - TypeScript strict; no `any` without a comment explaining why.
 - Rules in `src/lib/rules/` are pure functions taking `now` as a parameter — no `Date.now()` inside rules.
@@ -75,9 +93,20 @@ e2e/                # Playwright specs
 - Never paste real personal emails into fixtures, prompts, issues, or commits.
 
 ## How to work (summary — full process in COORDINATION.md)
-1. Pick an **unblocked** issue, claim it (label + comment).
-2. Work in **your own checkout/worktree**; `git pull --rebase` first.
-3. Stay inside the files your issue names; if you must touch a shared file, say so in the issue first.
-4. Small commits referencing the issue (`#6 add PAN redaction`), push often, never push a broken build.
-5. Post a handoff comment when done; close the issue only when every acceptance criterion is checked.
-6. If blocked or the spec is unclear: comment on the issue, add `blocked`, and stop — don't invent scope.
+GitHub Issues is the **only** live status board. Never coordinate through repo files.
+
+0. **Know who you are.** Pick an agent ID `<person>-<tool>-<n>` (e.g. `chelsea-claude-1`). Put it in every
+   comment and as a commit trailer (`Agent: chelsea-claude-1`). COORDINATION.md section 1.
+1. **Session start: read the board** (COORDINATION.md section 3). Find your own open claims first
+   (`gh issue list --assignee @me`, search your agent ID). Then see who holds what, what's available, blocked or
+   closed, and the latest comments on the pinned **Coordination channel, issue #28** (`gh issue view 28 --comments`).
+2. **Claim on GitHub before doing any work.** The issue must be unassigned, unblocked, and not Alex's. Assign yourself
+   **and** post `CLAIMED by <person> / <agent-id>` with plan, files and ETA. Re-check: the earliest claim wins.
+   **No claim = no work.** One active issue per agent.
+3. **Keep it updated:** `PROGRESS` every ~2h, `DECISION`, `INTERFACE` (tag dependents), `BLOCKED` + label,
+   `UNCLAIMED` + unassign if you stop. COORDINATION.md section 5.
+4. Work in **your own checkout/worktree**; `git pull --rebase` first. Stay inside the files your issue names.
+5. Small commits `#<N> <summary>`, push often to `main`, never push a broken build.
+6. **Finish:** post a `DONE by <person> / <agent-id>` handoff. Close the issue only when every acceptance criterion
+   is met. Unblock dependents and announce on the Coordination issue. COORDINATION.md section 6.
+7. Blocked or unclear spec: comment on the issue, add `blocked`, and stop — don't invent scope.
