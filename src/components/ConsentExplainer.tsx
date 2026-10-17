@@ -1,12 +1,19 @@
-import { LinkButton } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import { WillNotList } from "@/components/WillNotList";
 
 // Pre-auth consent screen content (issue #24). Presentational only — all copy is
 // plain, active voice, and truthful about the single `gmail.readonly` scope and
-// the real Google "unverified app" flow (deepdive_S14 §5). No client hooks.
-// Neumorphic soft-UI: headline + trust list on the left, a raised consent card
-// with the read-only scope, the unverified heads-up, and the actions on the right.
-export function ConsentExplainer() {
+// the real Google "unverified app" flow (deepdive_S14 §5). Props-only: both
+// actions are callbacks the page wrapper owns, so there is no routing/fetch/mock
+// here. Neumorphic soft-UI: headline + trust list on the left, a raised consent
+// card with the read-only scope, the unverified heads-up, and the actions.
+export interface ConsentExplainerProps {
+  onConnect: () => void;
+  onTryDemo: () => void;
+  demoLoading?: boolean;
+}
+
+export function ConsentExplainer({ onConnect, onTryDemo, demoLoading }: ConsentExplainerProps) {
   return (
     <div className="mx-auto w-full max-w-5xl animate-fade-rise">
       <div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16">
@@ -50,20 +57,23 @@ export function ConsentExplainer() {
             continue. Access lasts 7 days, then you reconnect.
           </p>
 
-          {/* Criterion 4: primary + secondary actions. Connect Gmail is wired to
-              the real OAuth start route (#3), a GET redirect to Google's consent.
-              It is a plain anchor (not next/link) because it targets a route
-              handler, not a page. "Try demo data" points at demo mode (#4). */}
+          {/* Criterion 4: primary + secondary actions, both callbacks. "Connect
+              Gmail" starts the real OAuth flow (#3) via the wrapper; "Try demo
+              data" loads demo mode (#4) and shows a loading state. */}
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <a
-              href="/api/auth/google"
-              className="neu-accent inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-bold transition-[box-shadow,transform] active:scale-[0.99]"
-            >
+            <Button type="button" onClick={onConnect} className="flex-1">
               Connect Gmail
-            </a>
-            <LinkButton href="/ledger" variant="secondary" className="flex-1">
-              Try demo data
-            </LinkButton>
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onTryDemo}
+              disabled={demoLoading}
+              aria-busy={demoLoading}
+              className="flex-1"
+            >
+              {demoLoading ? "Loading demo…" : "Try demo data"}
+            </Button>
           </div>
           <p className="mt-4 text-sm text-ink-faint">
             Demo data is synthetic and labeled as such. No real inbox required.
