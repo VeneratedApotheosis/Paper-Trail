@@ -1,0 +1,22 @@
+From: "Brewbox Coffee" <orders@brewbox.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Thanks for your order #BB-EU-3307
+Date: Tue, 06 Oct 2026 07:30:00 +0000
+Message-ID: <21-multi-currency-eur@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=order; keep=true; redacts=none; contains=(EUR)
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 8bit
+
+Hi Sam Rivera,
+
+Thanks for your order! Order summary:
+
+Order #BB-EU-3307
+Single-Origin Beans 1kg   1   €24,90
+Subtotal: €24,90
+VAT: €4,73
+Order total: €29,63 (EUR)
+
+Brewbox Coffee (synthetic)

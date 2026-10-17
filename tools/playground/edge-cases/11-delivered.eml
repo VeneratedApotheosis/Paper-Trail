@@ -1,0 +1,18 @@
+From: "Bazaarly" <shipment-tracking@bazaarly.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Delivered: your Bazaarly package
+Date: Tue, 13 Oct 2026 17:20:00 +0000
+Message-ID: <11-delivered@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=delivered; keep=true; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+Your package was delivered on Oct 13, 2026 at 5:12 PM.
+
+Order 114-2290999
+Ceramic Pour-Over Set   1
+
+Not what you expected? You can return it within 30 days of delivery.
+
+Bazaarly (synthetic)

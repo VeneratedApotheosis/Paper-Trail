@@ -1,0 +1,24 @@
+From: "Lumen Beauty" <orders@lumen-beauty.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Order confirmed: #LB-61902
+Date: Thu, 08 Oct 2026 19:00:00 +0000
+Message-ID: <23-html-only@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=order; keep=true; redacts=none; contains=Order total
+X-PT-Synthetic: true
+Content-Type: multipart/alternative; boundary="PT-BOUNDARY-23"
+
+--PT-BOUNDARY-23
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+<html><head><style>p{color:#333}</style></head><body>
+<h1>Thanks for your order, Sam Rivera!</h1>
+<p>Order #LB-61902</p>
+<table><tr><td>Hydrating Cleanser</td><td>1</td><td>$22.00</td></tr>
+<tr><td>Subtotal</td><td></td><td>$22.00</td></tr>
+<tr><td>Tax</td><td></td><td>$1.76</td></tr>
+<tr><td><b>Order total</b></td><td></td><td><b>$23.76</b></td></tr></table>
+<p>Lumen Beauty &amp; Co. (synthetic)</p>
+</body></html>
+--PT-BOUNDARY-23--

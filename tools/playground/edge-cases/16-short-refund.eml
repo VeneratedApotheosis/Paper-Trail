@@ -1,0 +1,19 @@
+From: "Lumen Beauty" <orders@lumen-beauty.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Refund issued for order #LB-60455
+Date: Thu, 15 Oct 2026 10:00:00 +0000
+Message-ID: <16-short-refund@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=refund; keep=true; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+Hi Sam Rivera,
+
+We've processed your refund for order #LB-60455.
+Returned: Vitamin C Serum (1 of 1), paid $64.00 + tax.
+Refund amount: $40.00
+
+A restocking adjustment was applied. (Synthetic case: the refund is less than the item price, so R1 should flag it short.)
+
+Lumen Beauty (synthetic)

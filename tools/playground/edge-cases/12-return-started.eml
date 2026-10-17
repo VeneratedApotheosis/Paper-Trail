@@ -1,0 +1,18 @@
+From: "Northwind Outfitters" <orders@northwind.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Your return label for order #NW-1042
+Date: Mon, 12 Oct 2026 10:30:00 +0000
+Message-ID: <12-return-started@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=return_started; keep=true; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+Hi Sam Rivera,
+
+Your return request has been approved. Print the attached return label and drop off your package within 14 days.
+
+Order #NW-1042
+Returning: Packable Down Vest   1   $95.00
+
+Northwind Outfitters (synthetic)

@@ -1,0 +1,19 @@
+From: "Grandmart" <orders@grandmart.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Price adjustment for order #GM-30551
+Date: Wed, 14 Oct 2026 12:00:00 +0000
+Message-ID: <19-price-adjustment@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=price_adjust; keep=true; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+Hi Sam Rivera,
+
+Good news: the price of an item in your order dropped, so we've issued a price adjustment.
+
+Order #GM-30551
+Cordless Stick Vacuum: paid $199.99, now $149.99
+Price adjustment of $50.00 has been issued to your original payment method.
+
+Grandmart (synthetic)

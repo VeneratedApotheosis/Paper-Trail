@@ -1,0 +1,17 @@
+From: "Northwind Outfitters" <news@northwind.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Fall deals are on their way
+Date: Fri, 09 Oct 2026 15:00:00 +0000
+Message-ID: <09-promo-on-its-way@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=marketing; keep=false; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+Big savings are on the way, Sam!
+
+Up to 30% off outerwear this weekend only. Don't miss our fall sale.
+Shop now at northwind.example.
+
+Unsubscribe
+Northwind Outfitters (synthetic)

@@ -1,0 +1,18 @@
+From: "Bazaarly" <shipment-tracking@bazaarly.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Shipped: your Bazaarly order 114-2290999
+Date: Sat, 10 Oct 2026 07:45:00 +0000
+Message-ID: <10-shipped@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=shipped; keep=true; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+Your package is on its way.
+
+Order 114-2290999 has shipped.
+Ceramic Pour-Over Set   1   $32.50
+Tracking number: TBA330012345000
+Estimated delivery: Oct 13, 2026
+
+Bazaarly (synthetic)

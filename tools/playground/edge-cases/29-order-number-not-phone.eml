@@ -1,0 +1,20 @@
+From: "Bazaarly" <auto-confirm@bazaarly.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Order received: 112-4455-6677
+Date: Sat, 03 Oct 2026 12:00:00 +0000
+Message-ID: <29-order-number-not-phone@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=order; keep=true; redacts=phone
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+Thanks for your order, Sam Rivera!
+
+Order #112-4455-6677
+Bamboo Cutting Board   1   $18.99
+Order total: $20.51
+
+Need help? Phone: 555-0142
+(Synthetic case: the order number must survive redaction; only the phone becomes a token.)
+
+Bazaarly (synthetic)

@@ -1,0 +1,16 @@
+From: "Oakhaven Home" <returns@oakhaven.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Store credit issued for order #OH-7720
+Date: Thu, 15 Oct 2026 15:30:00 +0000
+Message-ID: <17-store-credit@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=refund; keep=true; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+Hi Sam Rivera,
+
+Store credit has been issued for your return on order #OH-7720.
+Store credit amount: $73.44 (added to your Oakhaven account, not your card).
+
+Oakhaven Home (synthetic)

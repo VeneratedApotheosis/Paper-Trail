@@ -1,0 +1,22 @@
+From: "Grandmart" <shipping@grandmart.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Your Grandmart order #GM-30551 has shipped
+Date: Sat, 03 Oct 2026 14:00:00 +0000
+Message-ID: <03-phone-address-redaction@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=shipped; keep=true; redacts=phone,address
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+Good news, Sam Rivera: your order has shipped.
+
+Order #GM-30551
+Tracking number: 1Z999AA10123456784
+
+Shipping to:
+Sam Rivera
+1428 Elm Street, Springfield, IL 62704
+
+Delivery questions? Call us at (555) 010-0142.
+
+Grandmart (synthetic)

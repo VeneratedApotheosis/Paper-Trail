@@ -1,0 +1,17 @@
+From: "Northwind Outfitters" <support@n0rthwind-support.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Your order #NW-88123 is on hold
+Date: Tue, 06 Oct 2026 03:12:00 +0000
+Message-ID: <06-phishing-lookalike@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=not_receipt; keep=true; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+Dear customer,
+
+Your Northwind order #NW-88123 is on hold because of unusual activity.
+Click here to verify your card within 24 hours or the order will be cancelled.
+
+Northwind Security Team
+(Deliberate synthetic phishing look-alike: must never become an order.)

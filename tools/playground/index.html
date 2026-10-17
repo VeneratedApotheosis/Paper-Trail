@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PaperTrail dev playground</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="banner" role="note">
+    <strong>Dev playground.</strong> Demo data is synthetic. Simulated prices are labeled.
+    PaperTrail never sends email or moves money.
+    <span id="api-status" class="pill">checking API…</span>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="ledger" aria-selected="true">Ledger</button>
+    <button role="tab" data-tab="upload">Upload</button>
+    <button role="tab" data-tab="lab">Email lab</button>
+    <button role="tab" data-tab="claims">Claims</button>
+    <button role="tab" data-tab="trust">Trust &amp; eval</button>
+  </nav>
+
+  <main>
+    <section id="tab-ledger" class="tab" role="tabpanel">
+      <div class="toolbar">
+        <button id="ledger-load-demo" class="primary">Load demo</button>
+        <button id="ledger-reset-demo">Reset demo</button>
+        <button id="ledger-refresh">Refresh</button>
+        <span id="ledger-mode" class="muted"></span>
+      </div>
+      <div id="ledger-notices"></div>
+      <div id="ledger-error" class="error" hidden></div>
+      <div id="ledger-summary" class="summary"></div>
+      <h2>Orders</h2>
+      <div id="ledger-orders"></div>
+      <h2>Excluded merchants</h2>
+      <div id="ledger-excluded"></div>
+      <h2>Findings</h2>
+      <div id="ledger-findings"></div>
+      <h2>Needs review</h2>
+      <div id="ledger-review"></div>
+    </section>
+
+    <section id="tab-upload" class="tab" role="tabpanel" hidden>
+      <p class="muted">Upload synthetic <code>.eml</code> / <code>.mbox</code> files (5 MB total). The upload
+        replaces the current ledger and runs the real pipeline. Without <code>ANTHROPIC_API_KEY</code>, emails that need
+        extraction land in the review queue. Try the files in <code>tools/playground/edge-cases/</code>.</p>
+      <div class="toolbar">
+        <input id="upload-files" type="file" accept=".eml,.mbox" multiple>
+        <button id="upload-send" class="primary">Upload</button>
+      </div>
+      <div id="upload-error" class="error" hidden></div>
+      <div id="upload-result"></div>
+    </section>
+
+    <section id="tab-lab" class="tab" role="tabpanel" hidden>
+      <p class="muted">Paste a raw RFC 822 email or pick an edge case, then run it through every pipeline stage.
+        Nothing is stored except an audit row for each live LLM call.</p>
+      <div class="toolbar">
+        <label>Edge case <select id="lab-case"><option value="">(paste your own)</option></select></label>
+        <label>Rules “now” <input id="lab-now" type="datetime-local"></label>
+        <label title="Only enabled when ANTHROPIC_API_KEY is set on the Next server">
+          <input id="lab-use-llm" type="checkbox" disabled> Use Claude (costs tokens)
+        </label>
+        <button id="lab-run" class="primary">Run pipeline</button>
+      </div>
+      <textarea id="lab-raw" rows="14" spellcheck="false" placeholder="From: &quot;Store&quot; &lt;orders@store.example&gt;&#10;Subject: Order confirmation #123&#10;Date: Thu, 01 Oct 2026 10:00:00 +0000&#10;&#10;Thanks for your order…"></textarea>
+      <div id="lab-expect" class="muted"></div>
+      <div id="lab-error" class="error" hidden></div>
+      <div id="lab-result"></div>
+    </section>
+
+    <section id="tab-claims" class="tab" role="tabpanel" hidden>
+      <p class="muted">Draft a claim for a finding. Ledger findings use the real claims API
+        (<code>/api/claims/:findingId</code>: open, regenerate, edit, approve); Email-lab findings, which are not in the
+        store, use <code>/api/debug/claim</code>. The app never sends anything: after approval you copy the text or open
+        your own mail client.</p>
+      <div class="toolbar">
+        <label>Finding <select id="claim-finding"></select></label>
+        <button id="claim-reload">Reload findings</button>
+        <button id="claim-open" class="primary">Open draft</button>
+      </div>
+      <div class="toolbar">
+        <label>Profile name <input id="claim-profile" placeholder="Sam Rivera"></label>
+        <label>Support email <input id="claim-support" type="email" placeholder="support@store.example"></label>
+        <label title="Only enabled when ANTHROPIC_API_KEY is set on the Next server">
+          <input id="claim-rephrase" type="checkbox" disabled> Rephrase with Claude (costs tokens)
+        </label>
+        <button id="claim-regenerate">Regenerate with these options</button>
+      </div>
+      <div id="claim-error" class="error" hidden></div>
+      <div id="claim-result"></div>
+    </section>
+
+    <section id="tab-trust" class="tab" role="tabpanel" hidden>
+      <h2>Audit log</h2>
+      <div class="toolbar"><button id="audit-refresh">Refresh audit log</button></div>
+      <div id="audit-error" class="error" hidden></div>
+      <div id="audit-log"></div>
+
+      <h2>Delete everything</h2>
+      <p class="muted">Purges orders, findings, drafts, review queue, extraction cache, exclusions and the audit log,
+        then re-reads the ledger to prove it is empty.</p>
+      <div class="toolbar"><button id="delete-all" class="danger">Delete everything…</button></div>
+      <div id="delete-error" class="error" hidden></div>
+      <div id="delete-result"></div>
+
+      <h2>Eval report</h2>
+      <div class="toolbar"><button id="eval-run">Run eval (GET /api/eval)</button></div>
+      <div id="eval-error" class="error" hidden></div>
+      <div id="eval-result"></div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+From: "Northwind Outfitters" <refunds@northwind.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Your refund for order #NW-1042 has been issued
+Date: Fri, 16 Oct 2026 13:00:00 +0000
+Message-ID: <15-refund@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=refund; keep=true; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+Hi Sam Rivera,
+
+A refund of $102.60 has been issued to your Visa ending in 4242 for order #NW-1042.
+Please allow 3-5 business days for it to appear.
+
+Northwind Outfitters (synthetic)

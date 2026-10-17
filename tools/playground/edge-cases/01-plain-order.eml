@@ -1,0 +1,29 @@
+From: "Northwind Outfitters" <orders@northwind.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Order confirmation #NW-2041
+Date: Thu, 01 Oct 2026 10:00:00 +0000
+Message-ID: <01-plain-order@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=order; keep=true; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+Hi Sam Rivera,
+
+Thanks for your order! We'll let you know when it ships.
+
+Order #NW-2041 (placed Oct 1, 2026)
+
+Item                 Qty   Price
+Trail Rain Shell      1    $120.00
+Merino Hiking Socks   2     $14.00
+
+Subtotal: $148.00
+Shipping: $0.00
+Tax: $11.84
+Order total: $159.84
+
+Paid with Visa ending in 4242.
+Returns accepted within 30 days of delivery.
+
+Northwind Outfitters (synthetic demo store)

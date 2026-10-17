@@ -1,0 +1,22 @@
+From: "Voltline Electronics" <orders@voltline.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Your Voltline order #VL-55120 is confirmed
+Date: Fri, 02 Oct 2026 09:15:00 +0000
+Message-ID: <02-order-full-pan@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=order; keep=true; redacts=pan; contains=Order total
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+Thank you for your order, Sam Rivera.
+
+Order number: VL-55120
+USB-C Dock (SKU VL-DOCK-7)   1   $89.99
+Subtotal: $89.99
+Tax: $7.20
+Order total: $97.19
+
+Charged to card 4242 4242 4242 4242.
+(Our system should only ever show the last 4 digits; this test email deliberately includes the full TEST number.)
+
+Voltline Electronics (synthetic)

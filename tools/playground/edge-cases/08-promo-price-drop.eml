@@ -1,0 +1,19 @@
+From: "Grandmart Deals" <deals@grandmart.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Prices just dropped on things you love
+Date: Thu, 08 Oct 2026 12:00:00 +0000
+Message-ID: <08-promo-price-drop@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=marketing; keep=false; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+Price drop alert, Sam!
+
+Cordless Stick Vacuum: now $149.99 (was $199.99)
+Air Fryer 6qt: now $59.99 (was $79.99)
+
+Shop the deals before they're gone. Limited-time pricing.
+
+Unsubscribe
+Grandmart (synthetic)

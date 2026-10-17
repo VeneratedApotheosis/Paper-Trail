@@ -1,0 +1,24 @@
+From: "Bazaarly" <pedidos@bazaarly.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: =?UTF-8?B?Q29uZmlybWFjacOzbiBkZSB0dSBwZWRpZG8gbi7CuiA4ODQxLTIyMDM=?=
+Date: Mon, 05 Oct 2026 08:00:00 +0000
+Message-ID: <05-spanish-receipt@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=order; keep=true; redacts=none; contains=Gracias por tu compra
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 8bit
+
+Hola Sam Rivera,
+
+Gracias por tu compra. Resumen del pedido:
+
+Pedido n.º 8841-2203
+Auriculares inalámbricos   1   $45,00
+Subtotal: $45,00
+Impuestos: $3,60
+Total del pedido: $48,60
+
+Aceptamos devoluciones dentro de 30 días a la entrega.
+
+Bazaarly (tienda ficticia)

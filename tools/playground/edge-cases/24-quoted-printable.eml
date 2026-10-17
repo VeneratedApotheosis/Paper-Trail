@@ -1,0 +1,20 @@
+From: "Voltline Electronics" <shipping@voltline.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Your Voltline order #VL-55120 has shipped
+Date: Sat, 03 Oct 2026 09:00:00 +0000
+Message-ID: <24-quoted-printable@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=shipped; keep=true; redacts=none; contains=deliberately long so that the quoted-printable
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+Hi Sam Rivera =E2=80=94 your Voltline order has shipped!
+
+Order #VL-55120 has shipped and is on its way. This line is deliberately lo=
+ng so that the quoted-printable encoder has to wrap it with a soft line bre=
+ak somewhere in the middle.
+Tracking number: VLX-7781-2290
+Total paid: $97.19
+
+Voltline Electronics (synthetic)

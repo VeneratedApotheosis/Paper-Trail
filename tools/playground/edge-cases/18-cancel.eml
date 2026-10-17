@@ -1,0 +1,17 @@
+From: "FreshCart Grocery" <orders@freshcart.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Your order #FC-2210 has been cancelled
+Date: Sun, 11 Oct 2026 06:00:00 +0000
+Message-ID: <18-cancel@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=cancel; keep=true; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+Hi Sam Rivera,
+
+Your order #FC-2210 has been cancelled before it was packed. You have not been charged.
+
+Order total (not charged): $54.18
+
+FreshCart Grocery (synthetic)
