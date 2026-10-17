@@ -1,12 +1,11 @@
 import type { AuditEntry, AuditType } from "@/lib/types";
-import { auditLog } from "@/lib/mock/data";
 import { formatDate } from "@/lib/format";
 import { Chip } from "@/components/ui/Chip";
 import type { ChipTone } from "@/components/ui/Chip";
 
 // Audit log (F1.8): every Gmail fetch, LLM call, approval and delete is recorded.
-// Presentational only — reads the synthetic `auditLog` from mock data. When the
-// backend audit API (#12 / #3) lands, swap the import for the fetched rows.
+// Props-only: entries are supplied by the caller and typed via @/lib/types. The
+// page (and later ui-wiring) owns where the rows come from.
 
 // Human-readable label for each machine audit type.
 const TYPE_LABEL: Record<AuditType, string> = {
@@ -28,9 +27,13 @@ function formatCost(cost: number): string {
   return `$${cost.toFixed(4)}`;
 }
 
-export function AuditLogTable() {
+export interface AuditLogTableProps {
+  entries: AuditEntry[];
+}
+
+export function AuditLogTable({ entries }: AuditLogTableProps) {
   // Newest first.
-  const rows: AuditEntry[] = [...auditLog].sort(
+  const rows: AuditEntry[] = [...entries].sort(
     (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
   );
 

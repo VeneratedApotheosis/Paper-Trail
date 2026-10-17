@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { formatDate } from "@/lib/format";
-import { auditLog, findings, orders } from "@/lib/mock/data";
 
-// Data controls for the Trust page (F1.8). Two client panels live here because
-// the Trust page is a server component and both need local client state; they
+// Data controls for the Trust page (F1.8). Two props-only client panels: they
 // are the user's "control my data" surface (exclude merchants + delete all).
+// They keep only local UI state (type-to-confirm input, pending stage); the
+// actual merchant toggle and deletion bubble through callbacks so the page (and
+// later ui-wiring) owns persistence. No mock/api imports.
 
 // Restrained destructive action: a soft raised chip with muted-red text. The
 // slate palette has no red token, so the muted terracotta is an arbitrary value
@@ -17,23 +18,20 @@ const destructive =
   "inline-flex items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-bold neu-raised-sm text-[#b0574c] transition-[box-shadow,transform] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50";
 
 // --- Per-merchant exclude ----------------------------------------------------
-// Lets the user exclude a merchant from future scanning. State is client-only
-// for now; persistence is pending the backend (exclude list → next sync query).
-export function MerchantExcludePanel() {
-  const merchants = useMemo(
-    () => Array.from(new Set(orders.map((o) => o.merchant.name))).sort(),
-    [],
-  );
-  const [excluded, setExcluded] = useState<ReadonlySet<string>>(new Set());
+// Lets the user exclude a merchant from future scanning. The excluded set and
+// the toggle action are owned by the caller; this panel only renders them.
+export interface MerchantExcludePanelProps {
+  merchants: string[];
+  excludedMerchants: string[];
+  onToggleMerchant: (name: string, exclude: boolean) => void;
+}
 
-  function toggle(name: string) {
-    setExcluded((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
-  }
+export function MerchantExcludePanel({
+  merchants,
+  excludedMerchants,
+  onToggleMerchant,
+}: MerchantExcludePanelProps) {
+  const excluded = new Set(excludedMerchants);
 
   return (
     <div>
@@ -54,7 +52,7 @@ export function MerchantExcludePanel() {
                 <input
                   type="checkbox"
                   checked={isExcluded}
-                  onChange={() => toggle(name)}
+                  onChange={() => onToggleMerchant(name, !isExcluded)}
                   className="h-4 w-4 accent-teal"
                   aria-label={`Exclude ${name} from scanning`}
                 />
@@ -72,14 +70,27 @@ export function MerchantExcludePanel() {
 }
 
 // --- Delete everything -------------------------------------------------------
-type DeleteStage = "idle" | "confirming" | "done";
+type DeleteStage = "idle" | "confirming";
 
 const CONFIRM_WORD = "DELETE";
 
-export function DeleteAllPanel() {
+// Receipt shown after a confirmed deletion. Produced by the caller (the real
+// POST /api/delete-all response, or an optimistic mock) and passed back in.
+export interface DeleteReceipt {
+  ordersPurged: number;
+  findingsPurged: number;
+  auditEntriesPurged: number;
+  completedAt: string; // ISO
+}
+
+export interface DeleteAllPanelProps {
+  onDeleteAll: () => void;
+  deleteReceipt?: DeleteReceipt | null;
+}
+
+export function DeleteAllPanel({ onDeleteAll, deleteReceipt }: DeleteAllPanelProps) {
   const [stage, setStage] = useState<DeleteStage>("idle");
   const [typed, setTyped] = useState("");
-  const [purgedAt, setPurgedAt] = useState<string | null>(null);
 
   function startConfirm() {
     setTyped("");
@@ -92,21 +103,20 @@ export function DeleteAllPanel() {
   }
 
   function confirmDelete() {
-    // Real action (backend #12 / #3): POST /api/delete-all. That endpoint revokes
-    // the stored OAuth token with Google and purges every stored row (orders,
-    // findings, drafts, audit), then returns a receipt. Here we only SIMULATE
-    // success so the UI flow is demonstrable without touching real data.
-    setPurgedAt(new Date().toISOString());
-    setStage("done");
+    // Real action (backend #12 / #3): POST /api/delete-all revokes the stored
+    // OAuth token with Google and purges every stored row, then returns a
+    // receipt. This panel only collects the type-to-confirm and bubbles the
+    // intent; the caller performs the deletion and passes `deleteReceipt` back.
+    onDeleteAll();
   }
 
-  if (stage === "done" && purgedAt) {
+  if (deleteReceipt) {
     const receipt: Array<[string, string]> = [
       ["Gmail access", "OAuth token revoked"],
-      ["Orders purged", String(orders.length)],
-      ["Findings purged", String(findings.length)],
-      ["Audit entries purged", String(auditLog.length)],
-      ["Completed", formatDate(purgedAt)],
+      ["Orders purged", String(deleteReceipt.ordersPurged)],
+      ["Findings purged", String(deleteReceipt.findingsPurged)],
+      ["Audit entries purged", String(deleteReceipt.auditEntriesPurged)],
+      ["Completed", formatDate(deleteReceipt.completedAt)],
     ];
     return (
       <div className="neu-inset rounded-xl p-6">
