@@ -30,9 +30,6 @@ type EdgeCaseAspect = "prefilter" | "classification" | "redaction";
  * visible and flip to a failure once fixed (then remove the entry). Key: `<file>:<aspect>`.
  */
 const KNOWN_FAILURES: Partial<Record<`${string}:${EdgeCaseAspect}`, string>> = {
-  // A labeled order ref ("order #LB-60111") disables the promo check, and "Thanks for your order" in the body then
-  // routes a 20%-off promo (4 promo signals) to `order`, so it would be extracted and could become a ledger row.
-  "07-promo-with-order-number.eml:classification": "promo mentioning a past order number is classified as order",
 };
 
 function readExpectHeader(source: string): string {

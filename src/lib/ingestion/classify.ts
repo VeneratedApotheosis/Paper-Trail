@@ -72,6 +72,11 @@ const ORDER_CONFIRMATION_WORDING =
   /\border (?:(?:is |has been )?confirmed|confirmation|received|placed)\b|\bthanks? (?:you )?for (?:your )?(?:order|purchase)\b|\bwe(?:'ve| have) received your order\b|\byour order (?:has been |was |is )?(?:placed|confirmed)\b|\bconfirmacion (?:de|del) (?:(?:tu|su) )?(?:pedido|compra)\b|\bpedido (?:confirmado|recibido)\b|\bgracias por tu (?:pedido|compra)\b/;
 const ORDER_TOTAL_OR_ITEMS = /\border total\b|\bsubtotal\b|\bgrand total\b|^[ \t]*items\b|\bresumen del pedido\b/m;
 
+/** Concrete purchase details, not promotional headings such as "Items you might like". */
+const PURCHASE_TOTAL = /\b(?:order total|subtotal|grand total|total(?: paid)?|total del pedido)\s*:?\s*(?:[a-z]{3}\s*)?[$€£]?\s*\d/;
+const ITEM_QUANTITY = /\b(?:qty|quantity)\s*:?\s*\d|\bx\s*\d|\b\d+\s*x\b/;
+const ITEM_PRICE = /[$€£]\s*\d|\b\d[\d,.]*\s*(?:usd|eur|gbp|cad|mxn)\b/;
+
 const RETURN_CLASSES: ReadonlySet<TransactionalClass> = new Set(["return_started", "return_received"]);
 
 const PROMO_PATTERNS: readonly RegExp[] = [
@@ -291,10 +296,21 @@ function decide(view: EmailView): Verdict {
 
   const orderRef = hasOrderRef(foldedAll);
   const promo = promoScore(foldedAll);
-  // A subject event only outweighs promo language when the body corroborates it ("deals on the way" is a promo).
-  const subjectAnchored = matchingClasses(subject, "subject").some((cls) => matchingClasses(body, "body").includes(cls));
-  if (promo >= 2 && !orderRef && !subjectAnchored) {
-    return { cls: "marketing", confidence: promo >= 3 ? 0.9 : 0.8, reason: `promotional language (${promo} signals), no order number` };
+  const subjectHits = matchingClasses(subject, "subject");
+  const bodyHits = matchingClasses(body, "body");
+  // A past order number (or "thanks for your order" in an offer) is not proof
+  // of a new purchase. Preserve real confirmations and lifecycle events, including
+  // terse confirmations with offer-heavy footers. Bare "on the way" is not shipping evidence.
+  const lifecycleEvidence = [...subjectHits, ...bodyHits].some(
+    (cls) => cls !== "order" && (cls !== "shipped" || STRONG_SHIPPING_EVIDENCE.test(foldedAll)),
+  );
+  const orderEvidence =
+    (subjectHits.includes("order") && bodyHits.includes("order")) ||
+    (ORDER_CONFIRMATION_WORDING.test(foldedAll) &&
+      (PURCHASE_TOTAL.test(body) || (ITEM_QUANTITY.test(body) && ITEM_PRICE.test(body))));
+  if (promo >= 2 && !lifecycleEvidence && !orderEvidence) {
+    return { cls: "marketing", confidence: promo >= 3 ? 0.9 : 0.8,
+      reason: `promotional language (${promo} signals), no transaction evidence` };
   }
 
   const transactional = classifyTransactional(subject, body, orderRef);

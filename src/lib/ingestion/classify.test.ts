@@ -217,6 +217,50 @@ describe("classify: marketing never becomes an order", () => {
   });
 });
 
+describe("classify: promotional references to past orders", () => {
+  it.each([
+    ["A bonus for order #NW-7782", "Your previous order #NW-7782 unlocks our spring sale. Shop now for 35% off. Unsubscribe"],
+    ["More picks for order #NW-7781", "Thanks for your order #NW-7781 last year.\nItems you might like\nSale prices from $15.00. Shop now. Unsubscribe"],
+    ["Your next adventure starts here", "Thank you for your order #NW-7783 last winter. Save 25% off your next purchase. Use code TRAIL25. Shop now. Unsubscribe"],
+    ["Offers for order #NW-7784 are on the way", "Deals are on the way! A treat for your past order #NW-7784: 30% off. Shop now. Unsubscribe"],
+    ["Rebajas para tu pedido #NW-7785", "Tu pedido #NW-7785 del mes pasado tiene una oferta especial. Compra ahora. Darse de baja."],
+  ])("keeps promotional past-order references out of the ledger: %s", (subject, text) => {
+    const result = classify(email(subject, text));
+    expect(result.class).toBe("marketing");
+    expect(result.confidence).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it("preserves a genuine confirmation with an offer-heavy footer", () => {
+    const result = classify(email("Order confirmation #NW-7786", "Thank you for your order!\nItems\nCamp stove x1 $45.00\nOrder total: $45.00\nShop now for 15% off our sale. Use code CAMP15. Unsubscribe"));
+    expect(result.class).toBe("order");
+  });
+
+  it("preserves item quantity and price details without an order total", () => {
+    expect(classify(email("Your order #NW-7780", "Thank you for your order!\nCamp kettle x1 $35.00\nShop now for 20% off our sale. Unsubscribe")).class).toBe("order");
+  });
+
+  it("preserves a terse confirmation when subject and body corroborate", () => {
+    expect(classify(email("Order confirmed #NW-7787", "Thank you for your order! Shop now for 10% off next time. Unsubscribe")).class).toBe("order");
+  });
+
+  it("preserves purchase details when the subject is just an order reference", () => {
+    expect(classify(email("Your order #NW-7788", "Thank you for your order! Order total: $72.00.\nShop now. Sale ends tonight. Unsubscribe")).class).toBe("order");
+  });
+
+  it.each([
+    ["refund", "Update on order #NW-7789", "We've issued a refund of $72.00 for order #NW-7789."],
+    ["shipped", "Your order #NW-7790 has shipped", "Tracking number: TRACK-SYNTHETIC-7790"],
+    ["return_started", "Update on order #NW-7791", "We've created a return for order #NW-7791."],
+    ["delivered", "Delivered: order #NW-7792", "Your package was delivered on October 2."],
+    ["cancel", "Update on order #NW-7793", "Your order was cancelled."],
+    ["price_adjust", "Update on order #NW-7794", "A price adjustment of $12.00 has been issued."],
+    ["return_received", "Update on order #NW-7795", "We've received your return for order #NW-7795."],
+  ])("preserves a real %s event despite multiple footer offers", (expected, subject, text) => {
+    const result = classify(email(subject, `${text}\nShop now for 15% off our sale. Unsubscribe`));
+    expect(result.class).toBe(expected);
+  });
+});
+
 describe("classify: phishing look-alikes never become orders", () => {
   it("flags a digit-for-letter look-alike domain with urgent verification language", () => {
     const result = classify(
