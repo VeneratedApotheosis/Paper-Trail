@@ -5,12 +5,13 @@ import {
   type FindingSeverity,
   type NormalizedOrder,
 } from "@/lib/contracts";
+import type { PriceFeed } from "@/lib/prices/feed";
 
 /** Inputs shared by all rules. Rules never read the system clock; `now` is always passed in. */
 export interface RuleContext {
   now: Date;
-  /** Price source for R3 (#15). Typed `unknown` until #15 defines it; rules must narrow before use. */
-  priceFeed?: unknown;
+  /** Price observations for R3 (#15). Without a feed R3 emits no findings. */
+  priceFeed?: PriceFeed | undefined;
 }
 
 /** A pure, versioned detection rule (deepdive_S14 §4). */

@@ -1,4 +1,5 @@
 import type { Rule } from "./engine";
+import { priceDropRule } from "./pricedrop";
 import { refundRule } from "./refund";
 import { returnRule } from "./return";
 
@@ -8,6 +9,7 @@ export * from "./time";
 export { expectedRefundAmount, refundRule, type RefundExplain } from "./refund";
 export * from "./policies";
 export { returnRule, type ReturnExplain } from "./return";
+export { priceDropRule, type PriceDropExplain } from "./pricedrop";
 
-/** Rules run by default, in priority order (earlier rules win de-duplication). #14/#15 append R2/R3. */
-export const defaultRules: Rule[] = [refundRule, returnRule];
+/** Rules run by default, in priority order (earlier rules win de-duplication). */
+export const defaultRules: Rule[] = [refundRule, returnRule, priceDropRule];
