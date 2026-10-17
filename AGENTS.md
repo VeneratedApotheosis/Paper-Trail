@@ -126,4 +126,6 @@ GitHub Issues is the **only** live status board. Never coordinate through repo f
 6. **Finish:** confirm your push actually landed on `origin/main` (no `rejected`), then post a
    `DONE by <person> / <agent-id>` handoff with the real commit SHA. Close the issue only when every acceptance criterion
    is met. Unblock dependents and announce on the Coordination issue. COORDINATION.md section 6.
-7. Blocked or unclear spec: comment on the issue, add `blocked`, and stop — don't invent scope.
+7. **Open new issues freely** for follow-ups, bugs, scope creep, or work in someone else's area: search for duplicates
+   first, use the Task template, link the parent, don't self-assign unless claiming (COORDINATION.md section 1).
+8. Blocked or unclear spec: comment on the issue, add `blocked`, and stop — don't invent scope.

@@ -50,6 +50,20 @@ The assignee shows the **human**; the **agent ID** in comments shows which agent
 - Put the agent ID in **every** comment you post (claims, progress, handoffs).
 - Humans working by hand use just their name (e.g. `chelsea`).
 
+### Opening new issues (anyone, human or agent, may and should)
+New work, a discovered bug, a follow-up, scope creep, or the other half of a split issue -> **open a new issue**.
+This is encouraged, especially when coordinating with other people's agents. Rules:
+1. **Search first** to avoid duplicates: `gh issue list --state all --search "<keywords>"`.
+2. Use the **Task template** shape (Goal, Directory/files, Acceptance criteria, Dependencies, Ref). Add layer + area labels.
+3. **Link it:** reference the parent/related issue (`follow-up of #21`, `backend half of #17`) and comment the new
+   number on the parent so the trail is visible from both sides.
+4. **Opening is not claiming.** Leave it unassigned unless you're claiming it now (then follow section 4).
+5. Work in someone else's area (e.g. a UI change for Alex, an OAuth change for Chelsea): open it, label it
+   (`frontend`, ...), tag the owner, and **leave it for them**.
+6. If it affects others (blocks them, changes an interface, adds a dependency), also post a one-liner on #28.
+7. Close an issue you opened only when its work is done, or as `not planned` with a reason (e.g. superseded).
+   Never close someone else's issue.
+
 ---
 
 ## 2. Issue states: how to tell who is doing what
