@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button, LinkButton } from "@/components/ui/Button";
-import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/states";
 
 // Named pipeline stages, in order (deepdive §2): fetch → redact → classify →
@@ -144,7 +143,6 @@ export function SyncProgress({
   }, [sim.phase]);
 
   const targets = stageTargets(totalMessages, receiptCount);
-  const fetched = sim.counts[0];
   const redactedTokens = Math.round((sim.counts[1] / Math.max(totalMessages, 1)) * TOTAL_REDACTED_TOKENS);
   const complete = sim.phase === "complete";
 
@@ -159,92 +157,86 @@ export function SyncProgress({
     );
   }
 
+  // Overall progress across every stage, so the count and the fill bar climb
+  // together through the whole pipeline (not just the fetch stage).
+  const totalWork = targets.reduce((sum, value) => sum + value, 0);
+  const workDone = sim.counts.reduce((sum, value) => sum + value, 0);
+  const overallPct = totalWork === 0 ? 0 : Math.round((workDone / totalWork) * 100);
+  const processed = Math.round((overallPct / 100) * totalMessages);
+
   return (
-    <div className="mx-auto max-w-ledger space-y-8">
-      <header className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <p className="text-label uppercase tracking-wide text-ink-faint">Syncing</p>
-          <h1 className="font-serif text-3xl text-ink">Reading your receipts</h1>
+    <div className="mx-auto max-w-ledger space-y-6">
+      <header className="space-y-2 text-center">
+        <p className="eyebrow">Syncing</p>
+        <h1 className="font-serif text-2xl text-ink">Reading your receipts</h1>
+      </header>
+
+      <div className="neu-raised rounded-xl px-7 py-9">
+        <div className="text-center">
+          <p className="font-serif text-3xl tabular-nums text-money">
+            {processed} / {totalMessages}
+          </p>
+          <p className="mt-1 text-sm text-ink-muted">messages processed</p>
         </div>
+
+        <div className="neu-inset mt-6 h-3 overflow-hidden rounded-full" aria-hidden="true">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-teal-bright to-teal transition-[width]"
+            style={{ width: `${overallPct}%` }}
+          />
+        </div>
+
+        <p className="mt-4 text-center text-sm text-ink-faint">
+          {redactedTokens} tokens redacted before any AI call
+        </p>
+
+        {sim.phase === "backoff" ? (
+          <div
+            role="status"
+            className="neu-inset mt-6 rounded-lg px-5 py-4 text-center text-sm text-ink-muted"
+          >
+            Waiting, Gmail rate limit, retrying in {Math.ceil(sim.backoffSecondsLeft)}s
+          </div>
+        ) : null}
+
+        <div className="mt-7 flex flex-wrap justify-center gap-3">
+          {STAGES.map((stage, index) => {
+            const target = targets[index];
+            const count = sim.counts[index];
+            const status =
+              index < sim.stageIndex || (index === sim.stageIndex && count >= target && target > 0)
+                ? "done"
+                : index === sim.stageIndex
+                  ? "active"
+                  : "pending";
+            const paused = status === "active" && sim.phase === "backoff";
+            const pillClass =
+              status === "done"
+                ? "neu-raised-sm text-teal-deep"
+                : status === "active"
+                  ? paused
+                    ? "neu-inset text-ink-faint"
+                    : "neu-inset text-ink"
+                  : "text-ink-faint";
+
+            return (
+              <span
+                key={stage.key}
+                aria-current={status === "active" ? "step" : undefined}
+                className={`rounded-lg px-4 py-2 text-xs font-semibold ${pillClass}`}
+              >
+                {stage.label}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex justify-center">
         <Button variant="secondary" onClick={onCancel}>
           Cancel
         </Button>
-      </header>
-
-      <div className="flex flex-wrap gap-6 rounded-lg border border-rule bg-paper-raised px-6 py-5">
-        <Stat label="Messages fetched" value={`${fetched} / ${totalMessages}`} />
-        <Stat label="Tokens redacted" value={`${redactedTokens}`} />
       </div>
-
-      {sim.phase === "backoff" ? (
-        <div
-          role="status"
-          className="rounded-lg border border-deadline/30 bg-deadline-tint px-6 py-4 text-sm text-deadline"
-        >
-          Waiting — Gmail rate limit, retrying in {Math.ceil(sim.backoffSecondsLeft)}s. The run
-          resumes where it left off.
-        </div>
-      ) : null}
-
-      <ol className="space-y-3">
-        {STAGES.map((stage, index) => {
-          const target = targets[index];
-          const count = sim.counts[index];
-          const status =
-            index < sim.stageIndex || (index === sim.stageIndex && count >= target && target > 0)
-              ? "done"
-              : index === sim.stageIndex
-                ? "active"
-                : "pending";
-          const skipped = target === 0 && index < sim.stageIndex;
-          const pct = target === 0 ? (skipped ? 100 : 0) : Math.round((count / target) * 100);
-          const isActive = status === "active" && sim.phase !== "backoff";
-
-          return (
-            <li
-              key={stage.key}
-              className="rounded-lg border border-rule bg-paper-raised px-6 py-4"
-              aria-current={status === "active" ? "step" : undefined}
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-ink">{stage.label}</span>
-                    {status === "done" ? (
-                      <Chip tone="saved">done</Chip>
-                    ) : isActive ? (
-                      <Chip tone="deadline">working</Chip>
-                    ) : status === "active" ? (
-                      <Chip tone="deadline">paused</Chip>
-                    ) : (
-                      <Chip tone="neutral">queued</Chip>
-                    )}
-                  </div>
-                  <p className="mt-1 text-sm text-ink-muted">{stage.desc}</p>
-                </div>
-                <span className="text-sm tabular-nums text-ink-faint">
-                  {target === 0 ? (skipped ? "0 / 0" : "—") : `${count} / ${target}`}
-                </span>
-              </div>
-              <div className="mt-3 h-1 overflow-hidden rounded-sm bg-paper-sunk">
-                <div
-                  className="h-full rounded-sm bg-ink transition-[width]"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-            </li>
-          );
-        })}
-      </ol>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="space-y-0.5">
-      <p className="text-label uppercase tracking-wide text-ink-faint">{label}</p>
-      <p className="font-serif text-2xl tabular-nums text-ink">{value}</p>
     </div>
   );
 }
@@ -284,23 +276,22 @@ function SyncResult({
   }
 
   return (
-    <div className="mx-auto max-w-ledger space-y-8">
-      <header className="space-y-2">
-        <Chip tone="saved">Sync complete</Chip>
-        <h1 className="font-serif text-3xl text-ink">
+    <div className="mx-auto max-w-ledger">
+      <div className="neu-raised rounded-xl px-8 py-12 text-center">
+        <p className="eyebrow">Sync complete</p>
+        <h1 className="mt-2 font-serif text-2xl text-ink">
           Found {SIMULATED_FINDINGS} things worth a look
         </h1>
-        <p className="max-w-md text-base text-ink-muted">
+        <p className="mx-auto mt-3 max-w-md text-base text-ink-muted">
           Scanned {fetched} messages, kept {receiptCount} receipts, and redacted {redactedTokens}{" "}
-          tokens before anything was read. These are simulated demo numbers.
+          tokens before any AI call. These are simulated demo numbers.
         </p>
-      </header>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <LinkButton href="/">View what you&apos;re owed</LinkButton>
-        <Button variant="ghost" onClick={onRunAgain}>
-          Run sync again
-        </Button>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <LinkButton href="/">View what you&apos;re owed</LinkButton>
+          <Button variant="ghost" onClick={onRunAgain}>
+            Run sync again
+          </Button>
+        </div>
       </div>
     </div>
   );

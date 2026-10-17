@@ -7,7 +7,7 @@ import { SyncProgress } from "@/components/SyncProgress";
 
 // Manual "Sync now" entry (issue #25). The first-sync cap and Gmail query mirror
 // deepdive §2/§5: receipt-like query, last 90 days, ≤300 messages, 429 backoff.
-// All counts here are simulated demo numbers — no real Gmail call happens.
+// All counts here are simulated demo numbers, no real Gmail call happens.
 const GMAIL_QUERY = "newer_than:90d category:purchases";
 const PREVIEW_MESSAGE_COUNT = 18;
 
