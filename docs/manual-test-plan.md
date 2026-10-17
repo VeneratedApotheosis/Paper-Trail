@@ -7,6 +7,15 @@ simulated and labeled as such.
 
 ## Start
 
+**Quickest (one command, issue #41):**
+```powershell
+npm run demo         # starts Next + playground, preloads the synthetic demo, opens your browser
+npm run demo -- --no-open   # same, without opening a browser; Ctrl+C stops everything
+```
+It reuses a PaperTrail dev server already on port 3000, picks a free playground port (prints the URL), and
+loads the demo so the Ledger tab has data immediately.
+
+Manual alternative:
 ```powershell
 npm run dev          # terminal 1: Next on http://localhost:3000
 npm run playground   # terminal 2: playground on http://localhost:4000
