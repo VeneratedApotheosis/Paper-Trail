@@ -11,6 +11,7 @@ import {
   type OrderEventType,
   type RawEmail,
 } from "@/lib/contracts";
+import { roundCents } from "@/lib/rules/money";
 
 /** One classified + extracted email, the matcher's input unit. */
 export interface MatchInput {
@@ -212,10 +213,6 @@ function firstValue<T>(inputs: readonly MatchInput[], pick: (input: MatchInput) 
     if (value !== null && value !== undefined) return value;
   }
   return null;
-}
-
-function roundCents(amount: number): number {
-  return Math.round((amount + Number.EPSILON) * 100) / 100;
 }
 
 function buildLineItems(orderId: string, items: readonly ExtractedLineItem[]): NormalizedLineItem[] {

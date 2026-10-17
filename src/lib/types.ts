@@ -36,10 +36,16 @@ export interface Draft {
 
 // Hero totals (#16). Low-confidence / needs-review items are excluded from the
 // owed total until a human confirms them (AGENTS.md hard rule #7).
+// Open and drafted ("claim sent") findings count until resolved or dismissed
+// (#77, computed by computeOwed in src/lib/rules/owed.ts).
 export interface OwedSummary {
   currency: string;
   owedTotal: number;
   findingCount: number;
+  // Drafted subset of findingCount / owedTotal. Always set by the API; optional
+  // only so existing hand-written summaries (view fixtures) stay valid.
+  claimSentCount?: number;
+  claimSentTotal?: number;
   excludedCount: number;
   excludedTotal: number;
 }

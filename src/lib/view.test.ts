@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { orders, findings } from "@/lib/mock/data";
-import { computeOwedSummary, deriveOrderStatus, orderNeedsReview } from "@/lib/view";
+import { computeOwedSummary, deriveOrderStatus, findingCountsTowardOwed, orderNeedsReview } from "@/lib/view";
 
 describe("deriveOrderStatus", () => {
   it("returns 'ordered' when there are no events", () => {
@@ -44,5 +44,17 @@ describe("computeOwedSummary", () => {
     const summary = computeOwedSummary([...findings, extra], orders);
     expect(summary.excludedCount).toBe(1);
     expect(summary.excludedTotal).toBeCloseTo(50, 2);
+  });
+
+  it("keeps approved (drafted) claims in the owed total until resolved (#77 Option A)", () => {
+    const rowan = orders.find((o) => o.id === "ord_1001")!;
+    const drafted = { ...findings[0], orderId: rowan.id, status: "drafted" as const };
+    expect(findingCountsTowardOwed(drafted, rowan)).toBe(true);
+    expect(findingCountsTowardOwed({ ...drafted, status: "resolved" }, rowan)).toBe(false);
+
+    const open = computeOwedSummary(findings, orders);
+    const withDraft = computeOwedSummary([drafted, ...findings.slice(1)], orders);
+    expect(withDraft.owedTotal).toBe(open.owedTotal);
+    expect(withDraft).toMatchObject({ claimSentCount: 1, claimSentTotal: drafted.amountAtStake });
   });
 });

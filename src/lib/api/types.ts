@@ -19,12 +19,15 @@ export interface ApiErrorBody {
   details?: unknown;
 }
 
+/** Owed summary as served by the API (`computeOwed` in src/lib/rules/owed.ts): the claim-sent fields are always set. */
+export type LedgerSummary = Required<OwedSummary>;
+
 export interface LedgerResponse {
   mode: StoreMode;
   asOf: string | null;
   orders: NormalizedOrder[];
   findings: Finding[];
-  summary: OwedSummary;
+  summary: LedgerSummary;
   reviewQueue: ReviewQueueItem[];
   excludedMerchants: string[];
   stats: PipelineStats | null;
@@ -46,10 +49,24 @@ export interface FindingResponse {
   order: NormalizedOrder;
 }
 
+/** Statuses the user may set by hand. `drafted` is set only by approving a claim (POST /api/claims/:findingId/approve). */
+export const FINDING_STATUS_UPDATES = ["resolved", "dismissed", "open"] as const;
+export type FindingStatusUpdate = (typeof FINDING_STATUS_UPDATES)[number];
+
+export interface FindingStatusRequest {
+  status: FindingStatusUpdate;
+}
+
+/** POST /api/findings/:id/status: the updated finding plus the recomputed owed summary. */
+export interface FindingStatusResponse {
+  finding: Finding;
+  summary: LedgerSummary;
+}
+
 export interface PipelineRunResponse {
   mode: StoreMode;
   asOf: string;
-  summary: OwedSummary;
+  summary: LedgerSummary;
   stats: PipelineStats;
 }
 

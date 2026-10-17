@@ -36,4 +36,31 @@ describe("buildLedgerResponse", () => {
 
     expect(buildLedgerResponse().summary).toMatchObject({ owedTotal: 0.3, excludedTotal: 0 });
   });
+
+  it("serves the rules owed summary: drafted claims count and are reported as claim sent (#77)", () => {
+    const order = { ...orders[0], confMin: 1, needsReview: false };
+    const result: PipelineResult = {
+      orders: [order],
+      findings: [
+        { ...findings[0], id: "open-1", orderId: order.id, amountAtStake: 0.1 },
+        { ...findings[0], id: "sent-1", orderId: order.id, amountAtStake: 0.2, status: "drafted" },
+        { ...findings[0], id: "sent-2", orderId: order.id, amountAtStake: 0.1, status: "drafted" },
+        { ...findings[0], id: "done-1", orderId: order.id, amountAtStake: 5, status: "resolved" },
+      ],
+      reviewQueue: [],
+      stats,
+    };
+
+    setPipelineResult("demo", "2026-10-17T00:00:00.000Z", result);
+
+    expect(buildLedgerResponse().summary).toEqual({
+      currency: "USD",
+      owedTotal: 0.4,
+      findingCount: 3,
+      claimSentCount: 2,
+      claimSentTotal: 0.3,
+      excludedCount: 0,
+      excludedTotal: 0,
+    });
+  });
 });

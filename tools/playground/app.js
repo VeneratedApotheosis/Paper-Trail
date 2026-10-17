@@ -175,6 +175,30 @@ function simulatedLabel() {
   return (state.ledger && state.ledger.labels && state.ledger.labels.simulatedPrice) || "simulated";
 }
 
+/** Mirrors orderNeedsReview in src/lib/rules/owed.ts (matcher flag, or low confidence not yet confirmed by a human). */
+function orderNeedsReview(order) {
+  return Boolean(order.needsReview || (order.confMin < 0.7 && !(order.review && order.review.confirmedAt)));
+}
+
+/** Open and drafted ("claim sent") findings still count toward owed (#77 Option A); resolved / dismissed don't. */
+const isOutstanding = (finding) => finding.status === "open" || finding.status === "drafted";
+
+function findingStatusBadge(finding) {
+  if (finding.status === "open") return null;
+  if (finding.status === "drafted") return badge("claim sent: still owed", "ok");
+  return badge(`${finding.status}: not counted`);
+}
+
+/** Resolve / Dismiss / Reopen buttons for a stored finding (POST /api/findings/:id/status). */
+function findingStatusActions(finding) {
+  const choices = isOutstanding(finding)
+    ? [["resolved", "Mark resolved"], ["dismissed", "Dismiss"]]
+    : [["open", "Reopen"]];
+  return choices.map(([status, label]) =>
+    el("button", { class: "small", onclick: () => setFindingStatus(finding.id, status) }, label),
+  );
+}
+
 function renderFinding(finding, order, options) {
   const explain = finding.explain || {};
   const dates = Array.isArray(explain.dates) ? explain.dates : [];
@@ -187,9 +211,9 @@ function renderFinding(finding, order, options) {
       {},
       badge(finding.kind),
       badge(finding.severity, finding.severity),
-      finding.status !== "open" ? badge(finding.status) : null,
+      findingStatusBadge(finding),
       finding.simulated ? badge(simulatedLabel(), "simulated") : null,
-      order && order.needsReview ? badge("order needs review: not counted", "review") : null,
+      order && orderNeedsReview(order) ? badge("order needs review: not counted", "review") : null,
     ),
     el("div", { class: "amount" }, money(finding.amountAtStake, finding.currency)),
     el(
@@ -199,6 +223,7 @@ function renderFinding(finding, order, options) {
     ),
     el("p", {}, finding.summary),
     options && options.onDraft ? el("button", { class: "small", onclick: options.onDraft }, "Draft claim") : null,
+    options && options.statusActions ? findingStatusActions(finding) : null,
     el(
       "details",
       {},
@@ -259,10 +284,12 @@ function renderLedger() {
   }
   render($("ledger-notices"), notices);
 
-  // Summary + client-side cross-checks of the owed total (AGENTS.md rule 7) and merchant exclusions.
+  // The owed numbers come from the backend summary (src/lib/rules/owed.ts). The checks below only cross-check it
+  // against the Option A semantics (#77, AGENTS.md rule 7) and merchant exclusions; nothing here is displayed as owed.
   const summary = ledger.summary;
-  const counted = findings.filter((f) => f.status === "open" && orderById.has(f.orderId) && !orderById.get(f.orderId).needsReview);
-  const recomputed = Math.round(counted.reduce((sum, f) => sum + f.amountAtStake, 0) * 100) / 100;
+  const counted = findings.filter((f) => isOutstanding(f) && orderById.has(f.orderId) && !orderNeedsReview(orderById.get(f.orderId)));
+  const claimSent = counted.filter((f) => f.status === "drafted");
+  const cents = (list) => Math.round(list.reduce((sum, f) => sum + f.amountAtStake, 0) * 100);
   const excluded = excludedKeys();
   const leaked = orders.filter(
     (order) => excluded.has(order.merchant.name.toLowerCase()) || (order.merchant.domain && excluded.has(order.merchant.domain.toLowerCase())),
@@ -272,6 +299,7 @@ function renderLedger() {
     el("div", {}, el("div", { class: "muted" }, "You're owed"), el("div", { class: "big" }, money(summary.owedTotal, summary.currency))),
     kv([
       ["Findings counted", String(summary.findingCount)],
+      ["Claim sent (still owed)", `${summary.claimSentCount} · ${money(summary.claimSentTotal, summary.currency)}`],
       ["Excluded (needs review)", `${summary.excludedCount} · ${money(summary.excludedTotal, summary.currency)}`],
       ["Orders", String(orders.length)],
     ]),
@@ -279,9 +307,14 @@ function renderLedger() {
       "div",
       {},
       check(
-        Math.abs(recomputed - Math.round(summary.owedTotal * 100) / 100) < 0.005,
-        "owed total = open findings on confirmed orders",
-        `owed total ${summary.owedTotal} ≠ recomputed ${recomputed}`,
+        cents(counted) === Math.round(summary.owedTotal * 100) && counted.length === summary.findingCount,
+        "owed total = open + claim-sent findings on confirmed orders",
+        `summary ${summary.findingCount} findings / ${summary.owedTotal} ≠ ledger ${counted.length} findings / ${cents(counted) / 100}`,
+      ),
+      check(
+        cents(claimSent) === Math.round(summary.claimSentTotal * 100) && claimSent.length === summary.claimSentCount,
+        "claim sent = drafted subset of the owed total",
+        `summary claim sent ${summary.claimSentCount} / ${summary.claimSentTotal} ≠ ledger ${claimSent.length} / ${cents(claimSent) / 100}`,
       ),
       check(leaked.length === 0, "no excluded merchant in the ledger", `excluded merchant still listed: ${leaked.map((o) => o.merchant.name).join(", ")}`),
     ),
@@ -335,6 +368,7 @@ function renderLedger() {
               $("claim-finding").value = `ledger:${finding.id}`;
               $("claim-open").click();
             },
+            statusActions: true,
           }),
         )
       : emptyNote("No findings."),
@@ -358,6 +392,13 @@ async function refreshLedger() {
   await guarded("ledger-error", async () => {
     state.ledger = await api("/api/ledger");
     renderLedger();
+  });
+}
+
+async function setFindingStatus(findingId, status) {
+  await guarded("ledger-error", async () => {
+    await api(`/api/findings/${encodeURIComponent(findingId)}/status`, jsonInit("POST", { status }));
+    await refreshLedger();
   });
 }
 

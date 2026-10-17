@@ -3,6 +3,7 @@ import { loadSeedDemo } from "@/lib/demo/seed";
 import type { PipelineResult } from "@/lib/pipeline/run";
 import {
   appendAudit,
+  clearLedger,
   deleteAll,
   excludeMerchant,
   getExtractionCache,
@@ -78,6 +79,40 @@ describe("store", () => {
     expect(setFindingStatus(finding.id, "resolved")).toBeUndefined();
     includeMerchant(order.merchant.name);
     expect(getFinding(finding.id)?.status).toBe("drafted");
+  });
+
+  it("setPipelineResult carries finding statuses over by id; findings no longer produced disappear (#77)", () => {
+    const [drafted, resolved, dismissed, gone] = seed.findings;
+    setFindingStatus(drafted.id, "drafted");
+    setFindingStatus(resolved.id, "resolved");
+    setFindingStatus(dismissed.id, "dismissed");
+    setFindingStatus(gone.id, "resolved");
+
+    const rerun = { ...seed, findings: seed.findings.filter((finding) => finding.id !== gone.id) };
+    setPipelineResult("demo", seed.asOf, rerun);
+
+    const statusOf = (id: string) => getFinding(id)?.status;
+    expect([statusOf(drafted.id), statusOf(resolved.id), statusOf(dismissed.id)]).toEqual(["drafted", "resolved", "dismissed"]);
+    expect(getFinding(gone.id)).toBeUndefined();
+    expect(getState().findings.filter((finding) => finding.status !== "open")).toHaveLength(3);
+    expect(seed.findings.every((finding) => finding.status === "open")).toBe(true);
+
+    // A finding that comes back after it was gone for a run starts open again.
+    setPipelineResult("demo", seed.asOf, seed);
+    expect(statusOf(gone.id)).toBe("open");
+  });
+
+  it("does not carry finding statuses over across deleteAll or clearLedger", async () => {
+    const finding = seed.findings[0];
+    setFindingStatus(finding.id, "resolved");
+    await deleteAll();
+    setPipelineResult("demo", seed.asOf, seed);
+    expect(getFinding(finding.id)?.status).toBe("open");
+
+    setFindingStatus(finding.id, "dismissed");
+    clearLedger();
+    setPipelineResult("demo", seed.asOf, seed);
+    expect(getFinding(finding.id)?.status).toBe("open");
   });
 
   it("deleteAll purges everything except one delete audit record", async () => {

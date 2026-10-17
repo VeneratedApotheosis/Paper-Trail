@@ -9,6 +9,9 @@ import type {
   ClaimResponse,
   DeleteAllResponse,
   FindingResponse,
+  FindingStatusRequest,
+  FindingStatusResponse,
+  FindingStatusUpdate,
   LedgerResponse,
   MerchantExcludeResponse,
   OrderResponse,
@@ -59,6 +62,14 @@ export function getOrder(id: string): Promise<OrderResponse> {
 
 export function getFinding(id: string): Promise<FindingResponse> {
   return request(`/api/findings/${encodeURIComponent(id)}`);
+}
+
+/**
+ * Marks a finding `resolved` (money came back), `dismissed`, or `open` again; returns the finding and the new owed
+ * summary. Open and drafted ("claim sent") findings count toward owed; `drafted` is set by `approveClaim`.
+ */
+export function setFindingStatus(id: string, status: FindingStatusUpdate): Promise<FindingStatusResponse> {
+  return request(`/api/findings/${encodeURIComponent(id)}/status`, sendJson("POST", { status } satisfies FindingStatusRequest));
 }
 
 export function loadDemo(): Promise<PipelineRunResponse> {

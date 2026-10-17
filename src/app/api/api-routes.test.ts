@@ -67,7 +67,15 @@ describe("demo + ledger routes", () => {
   it("returns an empty ledger before anything is loaded", async () => {
     const body = await getLedger();
     expect(body).toMatchObject({ mode: "empty", asOf: null, orders: [], findings: [], reviewQueue: [] });
-    expect(body.summary).toEqual({ currency: "USD", owedTotal: 0, findingCount: 0, excludedCount: 0, excludedTotal: 0 });
+    expect(body.summary).toEqual({
+      currency: "USD",
+      owedTotal: 0,
+      findingCount: 0,
+      claimSentCount: 0,
+      claimSentTotal: 0,
+      excludedCount: 0,
+      excludedTotal: 0,
+    });
     expect(body.labels).toEqual({ demo: "Demo data — synthetic", simulatedPrice: "Simulated price feed", precomputedExtraction: null });
   });
 

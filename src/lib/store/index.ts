@@ -154,14 +154,23 @@ export function getFindingsForOrder(orderId: string): Finding[] {
   return getState().findings.filter((finding) => finding.orderId === orderId);
 }
 
-/** Replaces the ledger with a pipeline run. Drafts belong to the previous findings and are cleared. */
+/**
+ * Replaces the ledger with a pipeline run. Drafts belong to the previous findings and are cleared.
+ * Finding statuses carry over by deterministic finding id (#77): a re-run keeps drafted / resolved / dismissed,
+ * while findings the rules no longer produce (e.g. the refund arrived) disappear. Delete-all and clearLedger empty
+ * the findings first, so nothing carries over across them.
+ */
 export function setPipelineResult(mode: Exclude<StoreMode, "empty">, asOf: string, result: PipelineResult): void {
   const store = data();
+  const previousStatus = new Map(store.findings.map((finding) => [finding.id, finding.status]));
   store.mode = mode;
   store.asOf = asOf;
   // New snapshots invalidate stale review forms, including after a repeat sync.
   store.orders = result.orders.map(order => ({ ...order, review: { revision: randomUUID() } }));
-  store.findings = result.findings;
+  store.findings = result.findings.map((finding) => {
+    const status = previousStatus.get(finding.id);
+    return status === undefined || status === finding.status ? finding : { ...finding, status };
+  });
   store.reviewQueue = result.reviewQueue;
   store.stats = result.stats;
   store.drafts = [];

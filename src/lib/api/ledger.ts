@@ -1,25 +1,16 @@
+import { computeOwed } from "@/lib/rules/owed";
 import { getState } from "@/lib/store";
-import { computeOwedSummary } from "@/lib/view";
 import { API_LABELS, type LedgerResponse, type PipelineRunResponse } from "./types";
-
-function roundToCents(amount: number): number {
-  return Math.round((amount + Number.EPSILON) * 100) / 100;
-}
 
 /** Server-side: builds GET /api/ledger from the store (exclusions already applied). */
 export function buildLedgerResponse(): LedgerResponse {
   const state = getState();
-  const summary = computeOwedSummary(state.findings, state.orders);
   return {
     mode: state.mode,
     asOf: state.asOf,
     orders: state.orders,
     findings: state.findings,
-    summary: {
-      ...summary,
-      owedTotal: roundToCents(summary.owedTotal),
-      excludedTotal: roundToCents(summary.excludedTotal),
-    },
+    summary: computeOwed(state.findings, state.orders),
     reviewQueue: state.reviewQueue,
     excludedMerchants: state.excludedMerchants,
     stats: state.stats,

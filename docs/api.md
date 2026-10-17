@@ -15,6 +15,7 @@ Raw email bodies are never stored: only orders, findings, drafts, the review que
 | `GET /api/ledger` | none | `LedgerResponse` `{ mode, asOf, orders, findings, summary, reviewQueue, excludedMerchants, stats, labels }` | |
 | `GET /api/orders/:id` | id URL-encoded (`encodeURIComponent`) | `{ order, findings }` | 400 empty id, 404 unknown / excluded |
 | `GET /api/findings/:id` | id URL-encoded | `{ finding, order }` | 400, 404 |
+| `POST /api/findings/:id/status` | `{ status: "resolved" \| "dismissed" \| "open" }` | `FindingStatusResponse` `{ finding, summary }` (summary recomputed) | 400 empty id / invalid JSON / body, 404 unknown / excluded / deleted |
 | `POST /api/upload` | `multipart/form-data`, one or more `.eml` / `.mbox` files (any field name), 5 MB total | `UploadResponse` = `PipelineRunResponse` (`mode: "upload"`) + `{ files: [{ name, emails }], parseErrors: [{ file, index, reason }] }` | 400 no files / wrong type / nothing parseable, 413 too large |
 | `GET /api/prefilter` | none | `{ query, description, windowDays }` (exact Gmail search + plain-language text) | |
 | `GET /api/audit` | none | `{ entries: AuditEntry[] }`, newest first | |
@@ -27,8 +28,8 @@ Notes:
   `mode === "demo"`, and `labels.simulatedPrice` on findings with `simulated: true`.
 - `labels.precomputedExtraction` is non-null when extractions came from seed gold labels instead of an LLM
   (demo mode without a committed `seed/llm-cache.json`); show it with the demo banner.
-- `summary` is `computeOwedSummary(findings, orders)` from `src/lib/view.ts`: needs-review orders are excluded from
-  `owedTotal` (AGENTS.md rule 7).
+- `summary` is `computeOwed(findings, orders)` from `src/lib/rules/owed.ts`, the single source of truth for the owed
+  total (`computeOwedSummary` / `findingCountsTowardOwed` in `src/lib/view.ts` delegate to it). See "Owed summary" below.
 - `reviewQueue` items are `{ emailId, stage: "classify" | "extract" | "match", reason, orderId? }`: uncertain
   classifications that were not extracted, failed / invalid / low-confidence extractions, and orders that need review.
 - Excluded merchants are hidden from every response (ledger, orders, findings, review queue) until re-included.
@@ -40,6 +41,42 @@ Notes:
   "Precomputed extraction from seed gold label, no LLM call".
 - Uploads use real extraction (`ANTHROPIC_API_KEY`) with a session cache; without a key, cache misses land in the
   review queue instead of failing. Uploads replace the current ledger.
+
+## Owed summary and finding status (issue #77, Option A)
+
+Approving a claim does not mean the money came back, so an approved claim keeps counting until the user resolves it:
+
+| Finding `status` | Order doesn't need review | Order needs review (rule 7) |
+|---|---|---|
+| `open` | counts toward `owedTotal` | `excludedCount` / `excludedTotal` |
+| `drafted` ("claim sent", set by approving a claim) | counts toward `owedTotal` **and** `claimSentCount` / `claimSentTotal` | `excludedCount` / `excludedTotal` |
+| `resolved` (money came back) / `dismissed` | never counted | never counted |
+
+An order needs review when `needsReview` is set, or when `confMin < 0.7` and no human confirmed it (`review.confirmedAt`,
+#47); `orderNeedsReview` lives in `src/lib/rules/owed.ts`.
+
+`summary` (`LedgerSummary` = `Required<OwedSummary>`) fields, every amount rounded to cents:
+
+| Field | Meaning |
+|---|---|
+| `owedTotal`, `findingCount` | open + drafted findings on orders that don't need review |
+| `claimSentTotal`, `claimSentCount` | the drafted subset of `owedTotal` / `findingCount` (show as "claim sent") |
+| `excludedTotal`, `excludedCount` | open + drafted findings held out because their order needs review (or is missing) |
+| `currency` | the first counted finding's currency, else `"USD"`. Amounts are not converted: mixed-currency ledgers are a known follow-up |
+
+`OwedSummary` in `src/lib/types.ts` declares `claimSentCount` / `claimSentTotal` optional only so hand-written view
+fixtures stay valid; the API always sets them.
+
+`POST /api/findings/:id/status` sets a status by hand: `resolved` when the refund / adjustment arrived, `dismissed` when
+the user doesn't want to pursue it, `open` to undo either (or to take back a "claim sent"). `drafted` can't be set
+here: only `POST /api/claims/:findingId/approve` sets it. Each change writes an `approval` audit entry
+`Finding <id> marked <status> (was <previous>) by the user`. Client: `setFindingStatus(id, status)`.
+
+Statuses survive a pipeline re-run in the same store (account) scope: `setPipelineResult` copies the previous status
+onto findings with the same deterministic id (`${kind}:${orderId}[:${lineItemId}]`), so drafted / resolved /
+dismissed stick across demo reloads, uploads and Gmail syncs. Findings the rules no longer produce (e.g. the refund
+arrived) simply disappear. Delete-all and `DELETE /api/demo` clear the findings first, so nothing carries over.
+Claim drafts are still cleared by a re-run (a drafted finding keeps its status; re-open the claim to see a fresh draft).
 
 ## Pipeline
 
@@ -61,7 +98,7 @@ The client in `src/lib/api/client.ts` returns the same shapes as `@/lib/mock/dat
 | `getFinding(id)` | `(await getFinding(id)).finding` (+ `.order`) |
 | `auditLog` | `await getAudit()` |
 | `DEMO_LABEL`, `SIMULATED_PRICE_LABEL` | `labels.demo`, `labels.simulatedPrice` from `getLedger()` |
-| (none) | `loadDemo()`, `resetDemo()`, `uploadFiles(files)`, `getPrefilter()`, `deleteAll()`, `excludeMerchant(name)`, `includeMerchant(name)` |
+| (none) | `loadDemo()`, `resetDemo()`, `uploadFiles(files)`, `getPrefilter()`, `deleteAll()`, `excludeMerchant(name)`, `includeMerchant(name)`, `setFindingStatus(id, status)` |
 
 ```ts
 // before
@@ -103,7 +140,8 @@ Notes:
   approved). When a cited fact no longer appears in the body it adds the warning
   `Edited body no longer contains: <label> (<value>), ...` because the user may have changed a number.
 - `approve` sets `approvedAt`, sets the finding's `status` to `"drafted"`, and writes an `approval` audit entry that
-  names the draft and finding but never the subject or body. Approving again refreshes `approvedAt`.
+  names the draft and finding but never the subject or body. Approving again refreshes `approvedAt`. A drafted finding
+  keeps counting toward `owedTotal` (and `claimSentTotal`) until it is marked `resolved` or `dismissed` (#77).
 - Excluded merchants and delete-all apply: their findings and drafts 404 on every claims route.
 
 Client (`src/lib/api/client.ts`): `getClaim(findingId)`, `regenerateClaim(findingId, { profileName?, supportEmail?,
