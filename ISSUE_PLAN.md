@@ -1,5 +1,7 @@
 # GitHub Issue Plan — PaperTrail
 
+> **Update 2026-10-17:** Devin / Cognition *Best Use of Devin* was **dropped** (see plan.md decision log). Targets are Paper + Visa (+ optional Sentry). Any "Devin ticket" below is just a work item, now done by the team and its own agents (pi, Codex, ...) coordinated via GitHub Issues.
+
 Derived from: `plan.md`, `scope_features.md`, `deepdive_S14.md`, `brief.md`.  
 Design guidance: `frontend-design-skill.md` (linked in relevant issues, not turned into issues).
 
@@ -549,7 +551,7 @@ Design guidance: `frontend-design-skill.md` (linked in relevant issues, not turn
 - [ ] Problem statement, one-liner
 - [ ] Architecture diagram (Gmail → prefilter → LLM → rules → UI)
 - [ ] Setup and run instructions
-- [ ] Per-sponsor sections: Visa criteria mapping, Devin session links, Paper design rationale
+- [ ] Per-sponsor sections: Visa criteria mapping, Paper design rationale (Devin dropped)
 - [ ] Synthetic data disclosure, Testing-mode disclosure
 - [ ] Team members, license
 
@@ -614,7 +616,7 @@ assignees: ''
 
 ### Open questions (need your input)
 1. **Sentry issues:** Should I create issues for Sentry integration (Tracing, AI monitoring)? It's marked optional/skip-if->10%-effort in plan.md.
-2. **Devin logging:** Should there be an issue specifically for maintaining the Devin session log, or is that just a process we follow?
+2. ~~**Devin logging**~~: resolved 2026-10-17, Devin dropped.
 3. **Video recording:** Should there be an issue for recording the backup demo video, or is that outside GitHub tracking?
 4. **Layer 3 vs capped rebuy:** Plan.md says this is undecided. Should I create issues for both paths or just the L3 stub?
 

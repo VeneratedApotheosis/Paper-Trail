@@ -1,4 +1,6 @@
 # PaperTrail — Feature Scope (Receipt Ledger + Refunds + Rewards Manager)
+
+> **Update 2026-10-17:** Devin / Cognition *Best Use of Devin* was **dropped** (see plan.md decision log). Targets are Paper + Visa (+ optional Sentry). Any "Devin ticket" below is just a work item, now done by the team and its own agents (pi, Codex, ...) coordinated via GitHub Issues.
 Derived from plan.md (S14, locked constraints), deepdive_S14.md, brief.md. Software-only custom web app · targets Devin + Paper + Visa (optional Sentry). Scope doc only; not a decision record. Visa tags: **Inn**ovation · **UX** · **Tech** · **Imp**act · **Trust**. Priority: P0 must (demo breaks without) · P1 should · P2 nice. Effort: S ≤2h · M ≈2-6h · L >6h.
 
 ## 1. Product summary
@@ -104,7 +106,7 @@ On a price-drop card: **"Rebuy at $X lower, return the original"** against a moc
 ## 9. Non-goals
 Real merchant integrations or scraping retailer sites · real payments or real Visa API claims · sending email on the user's behalf · production Gmail verification · push/Pub/Sub sync · bank/statement access · subscriptions cancellation or bill negotiation · mobile app · multi-inbox · legal-grade claims advice.
 
-## 10. Stack options and Devin tickets
+## 10. Stack options and work breakdown (originally Devin tickets; Devin dropped)
 **Option A (recommend): Next.js (App Router) + TS + Tailwind + Framer Motion, route handlers + in-process jobs, SQLite via Drizzle, zod schemas, one LLM with JSON-schema output (cache + fixtures), localhost/Vercel.** One repo/language, shared types UI↔rules, fastest for Devin parallel tickets and Paper token import.
 **Option B: React/Vite frontend + FastAPI (Python) + Postgres.** Better Python eval/ML tooling; two services, duplicated types, slower integration. Choose only if the team's strength is Python.
 | Ticket | Scope | Features |
@@ -123,11 +125,11 @@ Real merchant integrations or scraping retailer sites · real payments or real V
 | D12 | Mock rail + cap/approval/block flow | F3.4 |
 | D13 | Vision screenshot import | F3.3 |
 | D14 | Playwright e2e of the demo path (QA) | MVP |
-Critical path: D1 → D2/D3 → D4 → D5 → D6 → D9. Log each Devin session link + outcome; human reviews and merges.
+Critical path: D1 → D2/D3 → D4 → D5 → D6 → D9. Human reviews and merges.
 
 ## 11. Open questions for the team
 - [x] **Name:** PaperTrail (decided)
-- [ ] **Roles:** owners for Design (Paper) / Ingestion (Gmail+LLM) / Backend (rules+rail) / Frontend / QA+Devin board — ___
+- [ ] **Roles:** owners for Design (Paper) / Ingestion (Gmail+LLM) / Backend (rules+rail) / Frontend / QA — ___
 - [ ] **Stack:** Option A or B; which LLM + key; SQLite or hosted Postgres — ___
 - [ ] **Layer 3:** include rewards (F3.1)? If not, commit to F3.4 rebuy for the 3-stage bar — yes / no
 - [ ] **Rebuy (F3.4):** build it? Does Visa sandbox access exist, or mock only? — ___

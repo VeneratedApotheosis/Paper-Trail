@@ -13,7 +13,7 @@ Repo: `VeneratedApotheosis/Paper-Trail`
 
 | Person | GitHub | Owns |
 |---|---|---|
-| **Kenan** | `VeneratedApotheosis` | Repo owner, final say on scope. Merges Devin PRs. Backend via orchestrated `kenan-pi-*` agents (section 5) |
+| **Kenan** | `VeneratedApotheosis` | Repo owner, final say on scope. Backend via orchestrated `kenan-pi-*` agents (section 5) |
 | **Alex** | `ptatoo` | **All frontend/design** (hands off, see below) + issue #1 scaffold. **Redesigning the UI in Paper**: current pages will be replaced |
 | ~~Ethan Lowe~~ | `ethanwlowe7-cmyk` | **No longer on the project.** Any claim by him is stale and may be taken over immediately (comment that it's stale, then claim) |
 | **Chelsea** | `chelsearwang` | Gmail OAuth (#2 done, **#3**): `src/app/api/auth/**`, `src/lib/auth/**`, DB init. Other backend work claimed per issue |
@@ -44,7 +44,7 @@ Rules for everyone who isn't Alex or one of his agents:
 Several agents can post from the **same GitHub account** (e.g. all of Alex's agents post as `ptatoo`).
 The assignee shows the **human**; the **agent ID** in comments shows which agent.
 
-**Agent ID format:** `<person>-<tool>-<n>`, e.g. `kenan-pi-1`, `alex-pi-ui-2`, `chelsea-claude-1`, `kenan-devin-1`.
+**Agent ID format:** `<person>-<tool>-<n>`, e.g. `kenan-pi-1`, `alex-pi-ui-2`, `chelsea-codex-1`.
 - Pick it at session start. If your operator didn't give you one, use `<person>-<tool>-1`; if that ID already has an
   open claim that isn't yours, increment `n`.
 - Put the agent ID in **every** comment you post (claims, progress, handoffs).
@@ -177,7 +177,6 @@ DONE by <person> / <agent-id>
 - Interfaces changed: <types/APIs/schema others depend on, or "none">
 - How to verify: <command or steps>
 - Follow-ups: #<new issue> (or "none")
-- Devin session: <link>   (only if Devin did the work)
 ```
 **Verify the push landed before posting DONE or closing.** The `git push` output must show `<old>..<new>  ... -> main`
 and no `rejected`; confirm with `git log origin/main -1`. If the push was rejected: `git pull --rebase`, re-run checks,
@@ -212,7 +211,7 @@ Comment there with your agent ID. Read its latest comments at every session star
 5. **Never force-push `main`.** Never rewrite pushed history.
 6. Stage specific files (`git add <paths>`), not `git add .` blindly. Check for secrets first.
 7. **Pushing to `main` once lint/typecheck/test pass is the normal workflow.** No PR or extra approval is needed
-   (Devin is the exception, see below). If an agent's tooling asks for explicit push approval, its human operator gives it.
+   If an agent's tooling asks for explicit push approval, its human operator gives it.
 
 ### Typical loop
 ```powershell
@@ -253,9 +252,7 @@ The `wip/*` branch is local only. Never push it as its own branch.
 - Agents: **don't resolve conflicts in files outside your issue by guessing.** Stop and comment on the issue.
 - Conflict in an Alex-owned file: keep Alex's version and tell him.
 
-### Devin and short-lived branches
-**Devin** works on its own branch `devin/<N>-<slug>` and opens a PR titled `#<N> <summary>` with `Closes #<N>` and the
-session link. Kenan merges Devin PRs quickly; they double as sponsor evidence.
+### Short-lived branches
 Humans may use a short-lived branch only for risky changes (schema rewrite, big refactor): finish and merge within the hour.
 
 ---
@@ -310,13 +307,13 @@ Run at most ~3–4 backend agents at once; more creates conflicts faster than th
 
 ---
 
-## 12. Devin usage log (Cognition prize requirement)
-Every Devin session: put the session link in the `DONE` comment and the PR body. The log is built from GitHub:
+## 12. AI agent usage log (for the README / Devpost "how we built it")
+Devin is **not used** (dropped 2026-10-17). Agent work is documented through GitHub itself: every agent posts its
+agent ID in `CLAIMED`/`DONE` comments and an `Agent: <id>` commit trailer, so the log can be rebuilt any time:
 ```powershell
-gh pr list --state all --search "devin in:title,body"
-gh search issues "Devin session" --repo VeneratedApotheosis/Paper-Trail
+git log --format="%h %an | %s | %(trailers:key=Agent,valueonly,separator=%x2C)"
+gh search issues "DONE by" --repo VeneratedApotheosis/Paper-Trail --state closed
 ```
-This feeds the README "Built with Devin" section and the Devpost form.
 
 ---
 

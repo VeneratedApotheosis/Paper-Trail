@@ -1,12 +1,12 @@
 # AGENTS.md — PaperTrail
 
-Instructions for every AI coding agent (Devin, Claude Code, Cursor, pi, etc.) and humans working in this repo.
+Instructions for every AI coding agent (pi, Claude Code, Codex, Cursor, etc.) and humans working in this repo.
 **Read this file and [COORDINATION.md](COORDINATION.md) before starting any task.**
 
 ## What we're building
 PaperTrail (LA Hacks 2026): read-only Gmail → every purchase becomes a ledger row → rules find money the user is owed
 (overdue/short refunds, closing return windows, price drops) → one **"You're owed $X"** number, each finding backed by an
-evidence quote + confidence, with a drafted claim the user approves and sends themselves. Sponsor targets: Devin, Paper, Visa.
+evidence quote + confidence, with a drafted claim the user approves and sends themselves. Sponsor targets: Paper, Visa (optional Sentry). **Devin/Cognition was dropped (2026-10-17): don't add Devin workflows, PRs, or session logs.**
 
 ## Source of truth (read the relevant section, don't guess)
 | Doc | Use it for |
@@ -73,7 +73,7 @@ e2e/                # Playwright specs
 ## Team
 | Person | GitHub | Owns |
 |---|---|---|
-| Kenan | `VeneratedApotheosis` | Repo owner, scope decisions, merges Devin PRs; backend via orchestrated `kenan-pi-*` agents |
+| Kenan | `VeneratedApotheosis` | Repo owner, scope decisions; backend via orchestrated `kenan-pi-*` agents |
 | Alex | `ptatoo` | All frontend/design + #1 scaffold. Redesigning the UI in Paper (current pages will be replaced) |
 | ~~Ethan Lowe~~ | `ethanwlowe7-cmyk` | **No longer on the project.** All his claims are stale; don't wait on them |
 | Chelsea | `chelsearwang` | Gmail OAuth (#3): `src/app/api/auth/**`, `src/lib/auth/**`, DB init; other backend per issue |

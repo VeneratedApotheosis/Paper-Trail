@@ -1,4 +1,6 @@
 # S14 Tally (working name) — Receipt Ledger + Refund Watcher + Rewards Manager — Deep Dive
+
+> **Update 2026-10-17:** Devin / Cognition *Best Use of Devin* was **dropped** (see plan.md decision log). Targets are Paper + Visa (+ optional Sentry). Any "Devin ticket" below is just a work item, now done by the team and its own agents (pi, Codex, ...) coordinated via GitHub Issues.
 Software-only custom web app · Devin + Paper + Visa (+ optional Sentry). Tags: **[V]** verified 2026-10-16 by fetching Google docs · **[A]** assumed/unverified. Web *search* unavailable; direct doc fetches only. plan.md untouched.
 
 ## 1. Concept & Visa fit
@@ -48,7 +50,7 @@ Gotchas: refresh token only returned on first consent unless `prompt=consent` [A
 ## 7. Trust & privacy design (Visa Trust 15)
 Read-only (`gmail.readonly`); **never sends, deletes, labels, or marks read** (Tally cannot — scope [V] doesn't permit send/modify). Query-narrowed fetch (receipt-like only; first-sync count shown before it runs; user sees the Gmail query). Minimal storage: no raw bodies, evidence snippets ≤200 chars, redaction pre-LLM (PAN, phones, addresses → tokens), tokens encrypted at rest. LLM sees only redacted text; provider no-train API terms [A]. **"What Tally will NOT do"** panel (send mail, move money, store full card numbers, read non-receipt mail, share data). **Delete-all:** revokes token (`oauth2.googleapis.com/revoke` [A]) + purges all user rows + audit confirmation; also per-merchant exclude + per-email "forget". Full **audit log** UI (every fetch, LLM call, approval). Every outbound draft needs a human click; money-at-stake numbers always show their evidence quote + confidence. Sentry Replay (if used) must `maskAllText/blockAllMedia`.
 
-## 8. Devin tickets (parallel; human reviews/merges; log session link + outcome per ticket)
+## 8. Work breakdown T1-T10 (originally planned as Devin tickets; Devin dropped 2026-10-17)
 T1 Scaffold: Next/TS/Tailwind/Drizzle, schema (§3), CI, lint, token import from Paper. · T2 **Seed generator:** 8 store HTML/plain templates, 45+ emails w/ edge cases, `gold_label` + `expected_findings.json`, `messages.insert` seeder + `inbox.json` export. · T3 Gmail OAuth + sync (PKCE, token encryption, list/get/backoff, demo-mode loader, delete-all/revoke). · T4 Redaction + prefilter + class/extract with zod schemas, confidence, cache, fixtures. · T5 Order matcher/normalizer (grouping events→orders, tolerance matching). · T6 **Rules engine** R1-R4 with injectable clock + table/property tests vs expected_findings. · T7 Price sources: mock feed + fast-forward + email_promo + JSON-LD mock store page. · T8 Eval harness + `/eval` page + CI gate on metrics. · T9 UI screens from Paper specs (Ledger, Findings, Order detail, Draft sheet) + component tests/Playwright e2e of demo path. · T10 Trust surfaces: audit log UI, privacy panel, delete-all e2e, Sentry wiring. Critical path: T1→T2/T3→T4→T5→T6; T9 starts at h8 off mocked API.
 
 ## 9. Paper screens & design direction

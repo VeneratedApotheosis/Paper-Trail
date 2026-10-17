@@ -9,7 +9,7 @@
 ## Company Challenges (prize / hard requirements)
 - Fetch.ai ASI:One Agent Challenge: register on agentverse.ai, implement Agent Chat Protocol (ACP), full primary workflow demoable INSIDE asi1.ai chat (no custom frontend), multi-step orchestration/tools, public GitHub repo, submit via Submission Agent + Devpost. Bonus: multi-agent, Payment Protocol, ASI Interactive Cards, error recovery, real-time data. Avoid thin chatbot wrappers.
 - Paper Best Designed Hack ($1500/1000/500): design fundamentals, ease of use, personal craft (not obviously AI-generated). Free Paper Pro code LAHACKS26.
-- Cognition Best Use of Devin ($5000 Devin credits): creativity, novelty, polish; ambitious scope; Devin builds alongside you.
+- Cognition Best Use of Devin ($5000 Devin credits) [NOT TARGETED: dropped 2026-10-17]: creativity, novelty, polish; ambitious scope; Devin builds alongside you.
 - Base44 Build Something People Want ($1500/$500): real user + problem, live working Base44 app, learning/iteration evidence, post-weekend potential. Must be built substantially on Base44.
 - QNX Best use of QNX ($1000/250/250): embedded system on QNX OS + one open-source AI module from oss.qnx.com.
 - Workday Future of Work: AI agent/prototype helping people succeed after joining a company (onboarding, trusted info, tasks, skills, growth).
