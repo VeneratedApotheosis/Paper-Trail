@@ -2,16 +2,16 @@
 
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { ReviewCard, type OrderFieldEdit } from "@/components/ReviewCard";
-import { EmptyState } from "@/components/states";
+import { type OrderFieldEdit } from "@/components/ReviewCard";
+import { ReviewView } from "@/components/views/ReviewView";
 import { Chip } from "@/components/ui/Chip";
 import type { NormalizedOrder } from "@/lib/contracts";
 import { orders } from "@/lib/mock/data";
 import { orderNeedsReview } from "@/lib/view";
 
 // Apply one inline field edit immutably. In production this patch would POST to a
-// backend edit endpoint and the server would persist it + write an audit row; here
-// it only updates local component state (see INTERFACE notes below).
+// backend edit endpoint (POST /api/review/:id/edit) and the server would persist
+// it + write an audit row; here it only updates local component state.
 function applyEdit(order: NormalizedOrder, edit: OrderFieldEdit): NormalizedOrder {
   switch (edit.field) {
     case "merchantName":
@@ -46,25 +46,30 @@ function applyEdit(order: NormalizedOrder, edit: OrderFieldEdit): NormalizedOrde
   }
 }
 
+// Thin wrapper: owns the mock review queue (client state) and supplies it to the
+// props-only ReviewView. ui-wiring (Kenan) replaces the mock source + optimistic
+// handlers with real calls to POST /api/review/:id/confirm and /edit here; the
+// view itself stays data-agnostic.
 export default function ReviewPage() {
-  // The page owns the queue (client state). Seeded from orders that fail the
-  // confidence threshold (demo: ord_1004 at 61%).
+  // Seeded from orders that fail the confidence threshold (demo: ord_1004 at 61%).
   const [queue, setQueue] = useState<NormalizedOrder[]>(() =>
     orders.filter(orderNeedsReview),
   );
-  // Names of orders the user has confirmed this session, for the "now included" note.
+  // Names of orders confirmed this session, for the "now included" note.
   const [confirmed, setConfirmed] = useState<string[]>([]);
 
-  function handleEdit(orderId: string, edit: OrderFieldEdit) {
+  function handleEditField(orderId: string, edit: OrderFieldEdit) {
     setQueue((prev) =>
       prev.map((o) => (o.id === orderId ? applyEdit(o, edit) : o)),
     );
   }
 
   function handleConfirm(orderId: string) {
-    // Compute the confirmed name and record it OUTSIDE the setQueue updater.
-    // Under React StrictMode dev double-invokes the updater, so calling
-    // setConfirmed inside it appended the merchant name twice.
+    // Record the confirmed name OUTSIDE the setQueue updater. Under React
+    // StrictMode dev double-invokes updaters, so calling setConfirmed inside
+    // setQueue appended the merchant name twice. Real persistence will POST to
+    // /api/review/:id/confirm (writes the audit row); here we optimistically
+    // drop the order from the local queue.
     const confirmedOrder = queue.find((o) => o.id === orderId);
     if (confirmedOrder) {
       setConfirmed((names) => [...names, confirmedOrder.merchant.name]);
@@ -74,13 +79,6 @@ export default function ReviewPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <h1 className="font-serif text-3xl text-ink">Needs review</h1>
-        <p className="mt-2 max-w-ledger text-base text-ink-muted">
-          Held out of your total until you confirm.
-        </p>
-      </div>
-
       {confirmed.length > 0 ? (
         <div className="neu-inset mb-6 flex flex-wrap items-center gap-2 rounded-lg px-4 py-3 text-sm text-ink-muted">
           <Chip tone="saved">Confirmed</Chip>
@@ -90,31 +88,11 @@ export default function ReviewPage() {
           </span>
         </div>
       ) : null}
-
-      {queue.length === 0 ? (
-        <EmptyState title="Nothing to review">
-          {confirmed.length > 0
-            ? "Every flagged order has been confirmed and is now counted in your owed total."
-            : "No orders fell below the confidence threshold. New low-confidence purchases will appear here for a quick check."}
-        </EmptyState>
-      ) : (
-        <>
-          <p className="mb-4 text-sm text-ink-muted">
-            <span className="font-semibold tabular-nums text-ink">{queue.length}</span>{" "}
-            order{queue.length === 1 ? "" : "s"} remaining to review.
-          </p>
-          <div className="flex flex-col gap-6">
-            {queue.map((order) => (
-              <ReviewCard
-                key={order.id}
-                order={order}
-                onEdit={handleEdit}
-                onConfirm={handleConfirm}
-              />
-            ))}
-          </div>
-        </>
-      )}
+      <ReviewView
+        items={queue}
+        onConfirm={handleConfirm}
+        onEditField={handleEditField}
+      />
     </AppShell>
   );
 }
