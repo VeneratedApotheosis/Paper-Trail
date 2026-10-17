@@ -2,6 +2,11 @@ import type { AuditEntry } from "@/lib/types";
 import type {
   ApiErrorBody,
   AuditResponse,
+  ClaimApproveResponse,
+  ClaimEditRequest,
+  ClaimRegenerateRequest,
+  ClaimRegenerateResponse,
+  ClaimResponse,
   DeleteAllResponse,
   FindingResponse,
   LedgerResponse,
@@ -40,7 +45,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return json as T;
 }
 
-function sendJson(method: "POST" | "DELETE", body: unknown): RequestInit {
+function sendJson(method: "POST" | "PUT" | "DELETE", body: unknown): RequestInit {
   return { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
 }
 
@@ -91,4 +96,27 @@ export function excludeMerchant(merchant: string): Promise<MerchantExcludeRespon
 
 export function includeMerchant(merchant: string): Promise<MerchantExcludeResponse> {
   return request("/api/merchants/exclude", sendJson("DELETE", { merchant }));
+}
+
+function claimPath(findingId: string): string {
+  return `/api/claims/${encodeURIComponent(findingId)}`;
+}
+
+/** Stored claim draft for a finding, generated from the template on first open. */
+export function getClaim(findingId: string): Promise<ClaimResponse> {
+  return request(claimPath(findingId));
+}
+
+/** Regenerates the draft (discards edits); `rephrase` uses the LLM only when the server has a key. */
+export function regenerateClaim(findingId: string, options: ClaimRegenerateRequest = {}): Promise<ClaimRegenerateResponse> {
+  return request(claimPath(findingId), sendJson("POST", options));
+}
+
+export function saveClaim(findingId: string, edits: ClaimEditRequest): Promise<ClaimResponse> {
+  return request(claimPath(findingId), sendJson("PUT", edits));
+}
+
+/** Records approval and returns `mailtoUrl` + `clipboardText`. The app never sends the email. */
+export function approveClaim(findingId: string): Promise<ClaimApproveResponse> {
+  return request(`${claimPath(findingId)}/approve`, { method: "POST" });
 }

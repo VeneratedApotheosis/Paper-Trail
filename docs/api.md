@@ -71,4 +71,40 @@ import { ApiError, getLedger } from "@/lib/api/client";
 const ledger = await getLedger(); // ledger.orders, ledger.findings, ledger.summary
 ```
 
-Drafts (`getDraftForFinding`) are served by the claims routes (#17), not by this API.
+Drafts (`getDraftForFinding`) are served by the claims routes below (#35).
+
+## Claims (issue #35)
+
+Claim drafts for one finding, built by `draftClaim` (`src/lib/claims`, #32) from the finding, its explain payload
+and the order. **The app never sends email:** approval only records consent and returns a `mailto:` URL and
+clipboard text for the user to send from their own mail client (AGENTS.md hard rule 2). Every amount and date in a
+draft comes from the rules (hard rule 4). `:findingId` is URL-encoded (`encodeURIComponent`).
+
+| Method + path | Request | Response (200) | Errors |
+|---|---|---|---|
+| `GET /api/claims/:findingId` | none | `ClaimResponse` `{ draft, finding, order }`: the stored draft, or a fresh template draft (then stored) | 400 empty id, 404 unknown / excluded / deleted, 422 no claim template |
+| `POST /api/claims/:findingId` | optional JSON `{ profileName?, supportEmail?, rephrase?: boolean }` (empty body = defaults) | `ClaimRegenerateResponse` = `ClaimResponse` + `{ rephrased, reason? }` | 400, 404, 422 |
+| `PUT /api/claims/:findingId` | `{ subject (1-300), body (1-10000), recipient ("" or email, max 320) }` | `ClaimResponse` with the edited draft | 400, 404, 422 |
+| `POST /api/claims/:findingId/approve` | none | `ClaimApproveResponse` `{ draft, mailtoUrl, clipboardText }` | 400, 404, 409 no draft yet (GET first) |
+
+`draft` is a `ClaimDraftRecord`: the `ClaimDraft` from `src/lib/claims` (`id`, `findingId`, `kind`, `subject`,
+`body`, `recipient`, `recipientVerified`, `signedName`, `facts`, `warnings`, `note?`, `approvedAt?`) plus
+`edited` and `rephrased` booleans.
+
+Notes:
+- 422 bodies are `{ error: <draftClaim message>, details: { reason } }` with `reason` `"unsupported_kind"`
+  (e.g. `rewards_gap`), `"order_mismatch"` or `"invalid_finding"`.
+- Deadline warnings ("... has passed") use the ledger clock `asOf` (the seed date in demo mode).
+- `POST` regenerates from the template and discards user edits and any approval. With `rephrase: true` and
+  `ANTHROPIC_API_KEY` set, the LLM rewords the body; the result is fact-checked (every cited fact verbatim, no new
+  numbers) and an `llm_call` audit entry is written. Without a key, or when the check fails, the template is kept and
+  `rephrased: false` with a `reason`. The key is never returned or logged.
+- `PUT` keeps the template `facts` and `warnings`, sets `edited: true`, and clears `approvedAt` (the new text was not
+  approved). When a cited fact no longer appears in the body it adds the warning
+  `Edited body no longer contains: <label> (<value>), ...` because the user may have changed a number.
+- `approve` sets `approvedAt`, sets the finding's `status` to `"drafted"`, and writes an `approval` audit entry that
+  names the draft and finding but never the subject or body. Approving again refreshes `approvedAt`.
+- Excluded merchants and delete-all apply: their findings and drafts 404 on every claims route.
+
+Client (`src/lib/api/client.ts`): `getClaim(findingId)`, `regenerateClaim(findingId, { profileName?, supportEmail?,
+rephrase? })`, `saveClaim(findingId, { subject, body, recipient })`, `approveClaim(findingId)`.

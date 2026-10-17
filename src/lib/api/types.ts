@@ -1,3 +1,4 @@
+import type { ClaimDraft } from "@/lib/claims";
 import type { Finding, NormalizedOrder } from "@/lib/contracts";
 import type { PipelineStats, ReviewQueueItem } from "@/lib/pipeline/run";
 import type { DeleteAllResult, StoreMode } from "@/lib/store";
@@ -77,4 +78,44 @@ export type DeleteAllResponse = DeleteAllResult;
 
 export interface MerchantExcludeResponse {
   excludedMerchants: string[];
+}
+
+/** Claim draft as stored and served by /api/claims/:findingId (issue #35). */
+export interface ClaimDraftRecord extends ClaimDraft {
+  /** True once the user saved their own subject/body/recipient (PUT); regenerating resets it. */
+  edited: boolean;
+  /** True when the body is a fact-checked LLM rewording of the template (POST with `rephrase: true`). */
+  rephrased: boolean;
+}
+
+export interface ClaimResponse {
+  draft: ClaimDraftRecord;
+  finding: Finding;
+  order: NormalizedOrder;
+}
+
+export interface ClaimRegenerateRequest {
+  profileName?: string;
+  supportEmail?: string;
+  /** Ask the LLM to reword the template; only honored when the server has ANTHROPIC_API_KEY. */
+  rephrase?: boolean;
+}
+
+export interface ClaimRegenerateResponse extends ClaimResponse {
+  rephrased: boolean;
+  /** Why the template wording was kept; set when `rephrased` is false. */
+  reason?: string;
+}
+
+export interface ClaimEditRequest {
+  subject: string;
+  body: string;
+  recipient: string;
+}
+
+/** The app never sends: the user copies `clipboardText` or opens `mailtoUrl` in their own mail client. */
+export interface ClaimApproveResponse {
+  draft: ClaimDraftRecord;
+  mailtoUrl: string;
+  clipboardText: string;
 }

@@ -1,4 +1,4 @@
-import type { Finding, NormalizedOrder } from "@/lib/contracts";
+import type { Finding, FindingStatus, NormalizedOrder } from "@/lib/contracts";
 import { createMemoryCache, type ExtractionCache } from "@/lib/ingestion";
 import {
   isExcludedMerchant,
@@ -156,6 +156,19 @@ export function clearLedger(): void {
 export function upsertDraft(draft: Draft): void {
   const store = data();
   store.drafts = [...store.drafts.filter((existing) => existing.id !== draft.id), draft];
+}
+
+/** Sets a visible finding's status (e.g. "drafted" after a claim approval). Returns undefined when hidden or unknown. */
+export function setFindingStatus(id: string, status: FindingStatus): Finding | undefined {
+  if (!getFinding(id)) return undefined;
+  const store = data();
+  let updated: Finding | undefined;
+  store.findings = store.findings.map((finding) => {
+    if (finding.id !== id) return finding;
+    updated = { ...finding, status };
+    return updated;
+  });
+  return updated;
 }
 
 export function appendAudit(event: PipelineAuditEvent): AuditEntry {

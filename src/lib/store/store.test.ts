@@ -12,6 +12,7 @@ import {
   includeMerchant,
   resetStore,
   setPipelineResult,
+  setFindingStatus,
   setRevokeOAuthHook,
   upsertDraft,
 } from "./index";
@@ -62,6 +63,21 @@ describe("store", () => {
     if (!order?.merchant.domain) throw new Error("seed order without domain");
     excludeMerchant(order.merchant.domain);
     expect(getOrder(order.id)).toBeUndefined();
+  });
+
+  it("setFindingStatus updates a visible finding and ignores hidden or unknown ones", () => {
+    const finding = seed.findings[0];
+    const order = seed.orders.find((candidate) => candidate.id === finding.orderId);
+    if (!order) throw new Error("seed finding without order");
+    expect(setFindingStatus(finding.id, "drafted")).toMatchObject({ id: finding.id, status: "drafted" });
+    expect(getFinding(finding.id)?.status).toBe("drafted");
+    expect(seed.findings[0].status).toBe("open");
+    expect(setFindingStatus("nope", "drafted")).toBeUndefined();
+
+    excludeMerchant(order.merchant.name);
+    expect(setFindingStatus(finding.id, "resolved")).toBeUndefined();
+    includeMerchant(order.merchant.name);
+    expect(getFinding(finding.id)?.status).toBe("drafted");
   });
 
   it("deleteAll purges everything except one delete audit record", async () => {
