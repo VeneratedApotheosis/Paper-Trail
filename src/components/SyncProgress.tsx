@@ -179,7 +179,14 @@ export function SyncProgress({
           <p className="mt-1 text-sm text-ink-muted">messages processed</p>
         </div>
 
-        <div className="neu-inset mt-6 h-3 overflow-hidden rounded-full" aria-hidden="true">
+        <div
+          className="neu-inset mt-6 h-3 overflow-hidden rounded-full"
+          role="progressbar"
+          aria-label="Sync progress"
+          aria-valuenow={overallPct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
           <div
             className="h-full rounded-full bg-gradient-to-r from-teal-bright to-teal transition-[width]"
             style={{ width: `${overallPct}%` }}
@@ -263,7 +270,7 @@ function SyncResult({
           <>
             <LinkButton href="/ledger">Explore demo data</LinkButton>
             <Button variant="secondary" onClick={onRunAgain}>
-              Run sync again
+              Back to sync
             </Button>
           </>
         }
@@ -289,7 +296,7 @@ function SyncResult({
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <LinkButton href="/">View what you&apos;re owed</LinkButton>
           <Button variant="ghost" onClick={onRunAgain}>
-            Run sync again
+            Back to sync
           </Button>
         </div>
       </div>

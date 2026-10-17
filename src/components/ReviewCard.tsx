@@ -37,6 +37,16 @@ function ReadWell({ children }: { children: ReactNode }) {
 
 const inputClass = "neu-inset w-full rounded-sm px-3 py-2 text-sm text-ink";
 
+// Parse a numeric <input> value, ignoring a transient empty/invalid field. While
+// editing, clearing the field yields "" (Number("") === 0), which would snap the
+// value to 0 mid-edit; returning null lets callers skip the edit until a real
+// number is typed (the controlled input keeps showing the last valid value).
+function parseNumericInput(raw: string): number | null {
+  if (raw.trim() === "") return null;
+  const n = Number(raw);
+  return Number.isNaN(n) ? null : n;
+}
+
 // A needs-review item: parsed fields and the context that flagged it. Fields are
 // read-only wells by default; Edit switches them to editable input wells so the
 // user can correct the extractor before confirming (Scope screen 7).
@@ -122,7 +132,10 @@ export function ReviewCard({
               step="0.01"
               className={`${inputClass} tabular-nums`}
               value={order.total}
-              onChange={(e) => handleEdit({ field: "total", value: Number(e.target.value) })}
+              onChange={(e) => {
+                const value = parseNumericInput(e.target.value);
+                if (value !== null) handleEdit({ field: "total", value });
+              }}
             />
           ) : (
             <ReadWell>
@@ -161,13 +174,11 @@ export function ReviewCard({
                       min="1"
                       className={`${inputClass} w-16 tabular-nums`}
                       value={item.qty}
-                      onChange={(e) =>
-                        handleEdit({
-                          field: "lineItemQty",
-                          lineItemId: item.id,
-                          value: Number(e.target.value),
-                        })
-                      }
+                      onChange={(e) => {
+                        const value = parseNumericInput(e.target.value);
+                        if (value !== null)
+                          handleEdit({ field: "lineItemQty", lineItemId: item.id, value });
+                      }}
                     />
                     <input
                       aria-label="Unit price"
@@ -175,13 +186,11 @@ export function ReviewCard({
                       step="0.01"
                       className={`${inputClass} w-24 tabular-nums`}
                       value={item.unitPrice}
-                      onChange={(e) =>
-                        handleEdit({
-                          field: "lineItemUnitPrice",
-                          lineItemId: item.id,
-                          value: Number(e.target.value),
-                        })
-                      }
+                      onChange={(e) => {
+                        const value = parseNumericInput(e.target.value);
+                        if (value !== null)
+                          handleEdit({ field: "lineItemUnitPrice", lineItemId: item.id, value });
+                      }}
                     />
                   </>
                 ) : (

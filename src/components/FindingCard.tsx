@@ -81,39 +81,43 @@ export function FindingCard({
         </button>
       </div>
 
-      {expanded ? (
-        <div id={panelId} className="animate-fade-rise mt-5 space-y-5">
-          <p className="text-base text-ink">{finding.summary}</p>
+      {/* Panel stays mounted so aria-controls always resolves; `hidden` toggles
+          visibility and the fade-rise entry only plays while expanded. */}
+      <div
+        id={panelId}
+        hidden={!expanded}
+        className={`mt-5 space-y-5 ${expanded ? "animate-fade-rise" : ""}`}
+      >
+        <p className="text-base text-ink">{finding.summary}</p>
 
-          <div>
-            <p className="eyebrow mb-2">Evidence from your inbox</p>
-            <ul className="space-y-2">
-              {finding.evidence.map((e, i) => (
-                <li
-                  key={`${e.messageId}-${i}`}
-                  className="neu-inset rounded-sm px-4 py-3 text-sm italic text-ink-muted"
-                >
-                  &ldquo;{e.quote}&rdquo;
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {explainEntries.length > 0 ? (
-            <div className="neu-inset rounded-sm px-4 py-4">
-              <p className="eyebrow mb-2">How we got the number</p>
-              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                {explainEntries.map(([key, value]) => (
-                  <div key={key} className="contents">
-                    <dt className="text-ink-muted">{humanizeKey(key)}</dt>
-                    <dd className="text-ink tabular-nums">{renderValue(value)}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          ) : null}
+        <div>
+          <p className="eyebrow mb-2">Evidence from your inbox</p>
+          <ul className="space-y-2">
+            {finding.evidence.map((e, i) => (
+              <li
+                key={`${e.messageId}-${i}`}
+                className="neu-inset rounded-sm px-4 py-3 text-sm italic text-ink-muted"
+              >
+                &ldquo;{e.quote}&rdquo;
+              </li>
+            ))}
+          </ul>
         </div>
-      ) : null}
+
+        {explainEntries.length > 0 ? (
+          <div className="neu-inset rounded-sm px-4 py-4">
+            <p className="eyebrow mb-2">How we got the number</p>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+              {explainEntries.map(([key, value]) => (
+                <div key={key} className="contents">
+                  <dt className="text-ink-muted">{humanizeKey(key)}</dt>
+                  <dd className="text-ink tabular-nums">{renderValue(value)}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ) : null}
+      </div>
     </article>
   );
 }

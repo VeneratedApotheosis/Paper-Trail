@@ -62,13 +62,14 @@ export default function ReviewPage() {
   }
 
   function handleConfirm(orderId: string) {
-    setQueue((prev) => {
-      const confirmedOrder = prev.find((o) => o.id === orderId);
-      if (confirmedOrder) {
-        setConfirmed((names) => [...names, confirmedOrder.merchant.name]);
-      }
-      return prev.filter((o) => o.id !== orderId);
-    });
+    // Compute the confirmed name and record it OUTSIDE the setQueue updater.
+    // Under React StrictMode dev double-invokes the updater, so calling
+    // setConfirmed inside it appended the merchant name twice.
+    const confirmedOrder = queue.find((o) => o.id === orderId);
+    if (confirmedOrder) {
+      setConfirmed((names) => [...names, confirmedOrder.merchant.name]);
+    }
+    setQueue((prev) => prev.filter((o) => o.id !== orderId));
   }
 
   return (

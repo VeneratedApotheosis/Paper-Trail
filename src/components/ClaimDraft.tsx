@@ -7,6 +7,7 @@ import type { Draft } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { formatMoney } from "@/lib/format";
 import { merchantName } from "@/lib/view";
+import { SIMULATED_PRICE_LABEL } from "@/lib/mock/data";
 
 // Subject prefix per rule kind (rules R1–R4, deepdive §4). Wording only — the
 // amount and dates always come from the finding, never invented here.
@@ -135,6 +136,13 @@ export function ClaimDraft({
           {KIND_LABEL[finding.kind]}, {merchantName(order)},{" "}
           <span className="font-serif text-money">{amount}</span>
         </p>
+        {/* Label simulated amounts on this screen too (AGENTS hard rule #8) —
+            not only via the global demo banner. */}
+        {finding.simulated ? (
+          <p className="neu-inset mt-3 inline-block rounded-md px-2.5 py-1 text-xs text-ink-muted">
+            {SIMULATED_PRICE_LABEL}
+          </p>
+        ) : null}
       </header>
 
       {/* The letter — editable, reads like paper */}
@@ -192,23 +200,24 @@ export function ClaimDraft({
         </div>
       </section>
 
-      {/* Approval confirmation */}
-      {approved ? (
-        <div
-          role="status"
-          className="neu-inset animate-fade-rise mt-6 rounded-xl px-5 py-4"
-        >
-          <p className="font-serif text-lg text-teal-deep">
-            {copyOk
-              ? "Approved and copied to clipboard"
-              : "Approved. Copy failed, use \u201cOpen in email\u201d or copy manually"}
-          </p>
-          <p className="mt-1 text-sm text-ink-muted">
-            This approval is logged to your audit trail. You still send the email
-            yourself. PaperTrail never sends it for you.
-          </p>
-        </div>
-      ) : null}
+      {/* Approval confirmation. The role=status live region is always mounted so
+          screen readers observe it before the text appears; only its inner
+          content is toggled on approval. */}
+      <div role="status" aria-live="polite">
+        {approved ? (
+          <div className="neu-inset animate-fade-rise mt-6 rounded-xl px-5 py-4">
+            <p className="font-serif text-lg text-teal-deep">
+              {copyOk
+                ? "Approved and copied to clipboard"
+                : "Approved. Copy failed, use \u201cOpen in email\u201d or copy manually"}
+            </p>
+            <p className="mt-1 text-sm text-ink-muted">
+              This approval is logged to your audit trail. You still send the
+              email yourself. PaperTrail never sends it for you.
+            </p>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

@@ -43,22 +43,27 @@ export default function Home() {
   return (
     <AppShell>
       <div className="space-y-8">
+        <h1 className="sr-only">
+          You&apos;re owed {formatMoney(summary.owedTotal, summary.currency)}
+        </h1>
         <HeroCard
           total={summary.owedTotal}
           currency={summary.currency}
           count={summary.findingCount}
         />
 
-        <section id="findings" aria-label="Open findings" className="space-y-4">
-          <h2 className="font-serif text-2xl text-ink">Findings</h2>
-          {owedFindings.map((finding) => (
-            <FindingCard
-              key={finding.id}
-              finding={finding}
-              merchant={merchantName(getOrder(finding.orderId))}
-            />
-          ))}
-        </section>
+        {owedFindings.length > 0 ? (
+          <section id="findings" aria-label="Open findings" className="space-y-4">
+            <h2 className="font-serif text-2xl text-ink">Findings</h2>
+            {owedFindings.map((finding) => (
+              <FindingCard
+                key={finding.id}
+                finding={finding}
+                merchant={merchantName(getOrder(finding.orderId))}
+              />
+            ))}
+          </section>
+        ) : null}
 
         {summary.excludedCount > 0 ? (
           <section

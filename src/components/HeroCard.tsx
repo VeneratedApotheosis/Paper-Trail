@@ -6,7 +6,7 @@ import { LinkButton } from "@/components/ui/Button";
 import { formatMoney } from "@/lib/format";
 
 // The one bold moment (design-system.md): the "You're owed $X" figure set in
-// Fraunces, deep-teal money, centered on a soft raised card. The count-up is
+// Spectral, deep-teal money, centered on a soft raised card. The count-up is
 // optional polish and fully respects prefers-reduced-motion (reduced motion
 // shows the final value with no animation).
 export function HeroCard({
@@ -47,7 +47,7 @@ export function HeroCard({
       <p
         id="hero-amount"
         aria-label={`${owedMoney} waiting for you`}
-        className="font-serif text-hero font-semibold tracking-tight text-money tabular-nums"
+        className="font-serif text-5xl font-semibold tracking-tight text-money tabular-nums sm:text-hero"
       >
         <span aria-hidden>
           {dollars}
@@ -60,12 +60,22 @@ export function HeroCard({
           : "Nothing to claim right now."}
       </p>
       <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-        <LinkButton href="#findings" variant="primary">
-          Draft claims
-        </LinkButton>
-        <LinkButton href="/review" variant="secondary">
-          Review
-        </LinkButton>
+        {count > 0 ? (
+          <>
+            <LinkButton href="#findings" variant="primary">
+              Draft claims
+            </LinkButton>
+            <LinkButton href="/review" variant="secondary">
+              Review
+            </LinkButton>
+          </>
+        ) : (
+          // No findings count toward the total (only needs-review items remain),
+          // so there is nothing to draft; point the one action at /review.
+          <LinkButton href="/review" variant="primary">
+            Review these
+          </LinkButton>
+        )}
       </div>
     </section>
   );

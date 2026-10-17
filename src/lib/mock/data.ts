@@ -287,8 +287,8 @@ export const drafts: Draft[] = [
 
 export const auditLog: AuditEntry[] = [
   { id: "aud_1", at: iso(-0.02), type: "sync_complete", detail: "Sync finished: 4 orders, 4 findings" },
-  { id: "aud_2", at: iso(-0.05), type: "llm_call", detail: "Extract fields — order RV-48213", redactedTokenCount: 3, model: "gpt-4o-mini", cost: 0.0021 },
-  { id: "aud_3", at: iso(-0.06), type: "llm_call", detail: "Classify — 18 messages", redactedTokenCount: 24, model: "gpt-4o-mini", cost: 0.0039 },
+  { id: "aud_2", at: iso(-0.05), type: "llm_call", detail: "Extract fields, order RV-48213", redactedTokenCount: 3, model: "gpt-4o-mini", cost: 0.0021 },
+  { id: "aud_3", at: iso(-0.06), type: "llm_call", detail: "Classify, 18 messages", redactedTokenCount: 24, model: "gpt-4o-mini", cost: 0.0039 },
   { id: "aud_4", at: iso(-0.08), type: "gmail_fetch", detail: "Fetched 18 messages (query: newer_than:90d category:purchases)" },
   { id: "aud_5", at: iso(-0.08), type: "sync_start", detail: "Sync started" },
 ];

@@ -9,6 +9,17 @@ import { deriveOrderStatus, type OrderDisplayStatus } from "@/lib/view";
 
 const ALL = "all" as const;
 
+// Canonical lifecycle order so status pills never reorder across renders/data.
+const STATUS_ORDER: OrderDisplayStatus[] = [
+  "ordered",
+  "shipped",
+  "delivered",
+  "return in progress",
+  "returned",
+  "refunded",
+  "cancelled",
+];
+
 export default function LedgerPage() {
   const [merchant, setMerchant] = useState<string>(ALL);
   const [status, setStatus] = useState<string>(ALL);
@@ -26,10 +37,10 @@ export default function LedgerPage() {
     () => Array.from(new Set(sorted.map((o) => o.merchant.name))).sort(),
     [sorted],
   );
-  const statuses = useMemo(
-    () => Array.from(new Set(sorted.map((o) => deriveOrderStatus(o)))),
-    [sorted],
-  );
+  const statuses = useMemo(() => {
+    const present = new Set(sorted.map((o) => deriveOrderStatus(o)));
+    return STATUS_ORDER.filter((s) => present.has(s));
+  }, [sorted]);
 
   const visible = sorted.filter((o) => {
     if (merchant !== ALL && o.merchant.name !== merchant) return false;
@@ -47,9 +58,13 @@ export default function LedgerPage() {
       </div>
 
       <div className="mb-7 space-y-3">
-        <div className="flex flex-wrap gap-2">
+        <div
+          role="group"
+          aria-label="Filter by status"
+          className="flex flex-wrap gap-2"
+        >
           <FilterPill active={status === ALL} onClick={() => setStatus(ALL)}>
-            All
+            All statuses
           </FilterPill>
           {statuses.map((s: OrderDisplayStatus) => (
             <FilterPill key={s} active={status === s} onClick={() => setStatus(s)}>
@@ -57,7 +72,11 @@ export default function LedgerPage() {
             </FilterPill>
           ))}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div
+          role="group"
+          aria-label="Filter by merchant"
+          className="flex flex-wrap gap-2"
+        >
           <FilterPill active={merchant === ALL} onClick={() => setMerchant(ALL)}>
             All merchants
           </FilterPill>
