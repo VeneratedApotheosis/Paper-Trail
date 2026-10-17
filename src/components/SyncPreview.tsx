@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/Button";
 // exactly what will happen before anything is read. Numbers are simulated.
 export function SyncPreview({
   query,
+  windowDays = 90,
   messageCount,
   simulateNoReceipts,
   onToggleNoReceipts,
   onStart,
 }: {
   query: string;
+  windowDays?: number;
   messageCount: number;
   simulateNoReceipts: boolean;
   onToggleNoReceipts: (next: boolean) => void;
@@ -44,7 +46,7 @@ export function SyncPreview({
           </div>
           <div className="space-y-1">
             <p className="eyebrow">First-sync cap</p>
-            <p className="text-sm text-ink-muted">Last 90 days, up to 300 messages</p>
+            <p className="text-sm text-ink-muted">Last {windowDays} days, up to 300 messages</p>
           </div>
         </div>
       </section>

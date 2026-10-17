@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Button, LinkButton } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/states";
 
 // Named pipeline stages, in order (deepdive §2): fetch → redact → classify →
@@ -105,15 +105,22 @@ function advance(prev: SimState, total: number, receipts: number): SimState {
 
 // Shown during the run (issue #25, criteria 2–5): named stages with climbing
 // counts, a redacted-token tally, a visible 429 backoff, cancel, and a terminal
-// state that either routes to the hero or shows an EmptyState for no receipts.
+// state that either calls onComplete (wrapper navigates) or shows an EmptyState
+// for no receipts.
 export function SyncProgress({
+  query,
   totalMessages,
   simulateNoReceipts,
   onCancel,
+  onComplete,
+  onUpload,
 }: {
+  query: string;
   totalMessages: number;
   simulateNoReceipts: boolean;
   onCancel: () => void;
+  onComplete: () => void;
+  onUpload: (files: FileList) => void;
 }) {
   const receiptCount = simulateNoReceipts ? 0 : 12;
   const [sim, setSim] = useState<SimState>(initialSim);
@@ -149,10 +156,13 @@ export function SyncProgress({
   if (complete) {
     return (
       <SyncResult
+        query={query}
         fetched={totalMessages}
         receiptCount={receiptCount}
         redactedTokens={TOTAL_REDACTED_TOKENS}
         onRunAgain={onCancel}
+        onComplete={onComplete}
+        onUpload={onUpload}
       />
     );
   }
@@ -248,27 +258,34 @@ export function SyncProgress({
   );
 }
 
-// Terminal state: route to the hero when receipts were found, otherwise invite
-// the user into demo mode / .eml import instead of dead-ending.
+// Terminal state: hand navigation back to the wrapper via onComplete when
+// receipts were found, otherwise invite the user into .eml/.mbox import instead
+// of dead-ending. No routing lives in the view.
 function SyncResult({
+  query,
   fetched,
   receiptCount,
   redactedTokens,
   onRunAgain,
+  onComplete,
+  onUpload,
 }: {
+  query: string;
   fetched: number;
   receiptCount: number;
   redactedTokens: number;
   onRunAgain: () => void;
+  onComplete: () => void;
+  onUpload: (files: FileList) => void;
 }) {
   if (receiptCount === 0) {
     return (
       <EmptyState
         title="No receipts found in this inbox"
-        query="newer_than:90d category:purchases"
+        query={query}
         actions={
           <>
-            <LinkButton href="/ledger">Explore demo data</LinkButton>
+            <UploadButton onUpload={onUpload} />
             <Button variant="secondary" onClick={onRunAgain}>
               Back to sync
             </Button>
@@ -276,8 +293,7 @@ function SyncResult({
         }
       >
         We scanned {fetched} messages and redacted {redactedTokens} tokens, but none looked like a
-        purchase. You can explore PaperTrail with synthetic demo data, or import a receipt as a
-        .eml file to see how parsing works.
+        purchase. Import a receipt as a .eml or .mbox file to see how parsing works.
       </EmptyState>
     );
   }
@@ -294,12 +310,34 @@ function SyncResult({
           tokens before any AI call. These are simulated demo numbers.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <LinkButton href="/">View what you&apos;re owed</LinkButton>
+          <Button onClick={onComplete}>View what you&apos;re owed</Button>
           <Button variant="ghost" onClick={onRunAgain}>
             Back to sync
           </Button>
         </div>
       </div>
     </div>
+  );
+}
+
+// File import affordance: a labelled, keyboard-reachable control that bubbles the
+// chosen .eml/.mbox files to the wrapper via onUpload. Styled to match the
+// secondary Button; the native input is visually hidden but still focusable.
+function UploadButton({ onUpload }: { onUpload: (files: FileList) => void }) {
+  return (
+    <label className="neu-raised-sm inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-bold text-teal-deep transition-[box-shadow,transform] active:scale-[0.99] focus-within:shadow-inset">
+      Import .eml / .mbox
+      <input
+        type="file"
+        accept=".eml,.mbox"
+        multiple
+        className="sr-only"
+        onChange={(event) => {
+          if (event.target.files && event.target.files.length > 0) {
+            onUpload(event.target.files);
+          }
+        }}
+      />
+    </label>
   );
 }

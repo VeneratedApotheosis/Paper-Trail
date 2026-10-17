@@ -1,41 +1,25 @@
 "use client";
 
-import { useState } from "react";
-import { AppShell } from "@/components/AppShell";
-import { SyncPreview } from "@/components/SyncPreview";
-import { SyncProgress } from "@/components/SyncProgress";
+import { useRouter } from "next/navigation";
+import { SyncView } from "@/components/views/SyncView";
 
-// Manual "Sync now" entry (issue #25). The first-sync cap and Gmail query mirror
-// deepdive §2/§5: receipt-like query, last 90 days, ≤300 messages, 429 backoff.
-// All counts here are simulated demo numbers, no real Gmail call happens.
-const GMAIL_QUERY = "newer_than:90d category:purchases";
-const PREVIEW_MESSAGE_COUNT = 18;
+// Thin wrapper (issue #25): SyncView is props-only, so the page owns navigation.
+// Real getPrefilter / loadDemo / uploadFiles wiring is a separate ui-wiring task,
+// so onStart/onUpload are no-ops for the mock split and onComplete routes to the
+// hero. The query mirrors deepdive §2/§5 (receipt-like, last 90 days).
+const PLACEHOLDER_QUERY = "newer_than:90d category:purchases";
 
-// This page is interactive (timers, cancel, reduced-motion branch), so the whole
-// flow is a client component rather than a server page that renders one.
 export default function SyncPage() {
-  const [running, setRunning] = useState(false);
-  // Dev affordance: preview the "inbox had no receipts" outcome without waiting
-  // for a real empty result. Set on the preview, consumed by the progress run.
-  const [simulateNoReceipts, setSimulateNoReceipts] = useState(false);
+  const router = useRouter();
 
   return (
-    <AppShell>
-      {running ? (
-        <SyncProgress
-          totalMessages={PREVIEW_MESSAGE_COUNT}
-          simulateNoReceipts={simulateNoReceipts}
-          onCancel={() => setRunning(false)}
-        />
-      ) : (
-        <SyncPreview
-          query={GMAIL_QUERY}
-          messageCount={PREVIEW_MESSAGE_COUNT}
-          simulateNoReceipts={simulateNoReceipts}
-          onToggleNoReceipts={setSimulateNoReceipts}
-          onStart={() => setRunning(true)}
-        />
-      )}
-    </AppShell>
+    <SyncView
+      query={PLACEHOLDER_QUERY}
+      windowDays={90}
+      onStart={() => {}}
+      onUpload={() => {}}
+      onComplete={() => router.push("/")}
+      onCancel={() => {}}
+    />
   );
 }
