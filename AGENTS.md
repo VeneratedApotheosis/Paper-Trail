@@ -65,7 +65,7 @@ e2e/                # Playwright specs
 |---|---|---|
 | Kenan | `VeneratedApotheosis` | Repo owner, scope decisions, merges Devin PRs |
 | Alex | `ptatoo` | All frontend/design + #1 scaffold |
-| Ethan Lowe | `ethanwlowe7-cmyk` | Backend/ingestion, claimed per issue |
+| ~~Ethan Lowe~~ | `ethanwlowe7-cmyk` | **No longer on the project.** All his claims are stale; don't wait on them |
 | Chelsea | `chelsearwang` | Backend/ingestion, claimed per issue |
 
 ## Ownership: don't touch Alex's work

@@ -15,7 +15,7 @@ Repo: `VeneratedApotheosis/Paper-Trail`
 |---|---|---|
 | **Kenan** | `VeneratedApotheosis` | Repo owner, final say on scope. Merges Devin PRs |
 | **Alex** | `ptatoo` | **All frontend/design** (hands off, see below) + issue #1 scaffold |
-| **Ethan Lowe** | `ethanwlowe7-cmyk` | Backend/ingestion work, claimed per issue |
+| ~~Ethan Lowe~~ | `ethanwlowe7-cmyk` | **No longer on the project.** Any claim by him is stale and may be taken over immediately (comment that it's stale, then claim) |
 | **Chelsea** | `chelsearwang` | Backend/ingestion work, claimed per issue |
 
 ### Alex owns frontend/design: everyone else stays out
@@ -42,7 +42,7 @@ Rules for everyone who isn't Alex or one of his agents:
 Several agents can post from the **same GitHub account** (e.g. all of Alex's agents post as `ptatoo`).
 The assignee shows the **human**; the **agent ID** in comments shows which agent.
 
-**Agent ID format:** `<person>-<tool>-<n>`, e.g. `kenan-pi-1`, `alex-pi-ui-2`, `chelsea-claude-1`, `ethan-cursor-1`, `kenan-devin-1`.
+**Agent ID format:** `<person>-<tool>-<n>`, e.g. `kenan-pi-1`, `alex-pi-ui-2`, `chelsea-claude-1`, `kenan-devin-1`.
 - Pick it at session start. If your operator didn't give you one, use `<person>-<tool>-1`; if that ID already has an
   open claim that isn't yours, increment `n`.
 - Put the agent ID in **every** comment you post (claims, progress, handoffs).
@@ -72,7 +72,6 @@ gh search issues "<your-agent-id>" --repo VeneratedApotheosis/Paper-Trail --stat
 # 2. Who is doing what? (one line per teammate)
 gh issue list --assignee ptatoo
 gh issue list --assignee VeneratedApotheosis
-gh issue list --assignee ethanwlowe7-cmyk
 gh issue list --assignee chelsearwang
 
 # 3. What's available, blocked, finished?
@@ -92,7 +91,8 @@ If you already have an open claim with your agent ID, **continue that work** bef
 
 1. Read it: `gh issue view <N> --comments`
 2. Check it's **yours to take**:
-   - **unassigned** and no active `CLAIMED` comment
+   - **unassigned** and no active `CLAIMED` comment. Read **every** comment: a claim can exist as a comment
+     without an assignee (e.g. the claimer lacked assign permission). A comment-only claim still counts.
    - **not Alex's** (section 0), unless you are Alex or Alex's agent
    - **unblocked**: every issue under "Dependencies" is closed
 3. Claim it, both steps:
