@@ -2,10 +2,9 @@
 
 import { useId, useState } from "react";
 import type { Finding, FindingKind } from "@/lib/contracts";
-import { LinkButton } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { countdownLabel, daysUntil, formatDate, formatMoney } from "@/lib/format";
-import { SIMULATED_PRICE_LABEL } from "@/lib/mock/data";
 
 // Human headline per rule kind (rules R1–R4, deepdive §4).
 const KIND_LABELS: Record<FindingKind, string> = {
@@ -37,9 +36,13 @@ function renderValue(value: unknown): string {
 export function FindingCard({
   finding,
   merchant,
+  simulatedLabel,
+  onDraftClaim,
 }: {
   finding: Finding;
   merchant: string;
+  simulatedLabel: string;
+  onDraftClaim: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const panelId = useId();
@@ -63,13 +66,13 @@ export function FindingCard({
         {finding.dueAt ? (
           <Chip tone={overdue ? "owed" : "deadline"}>{countdownLabel(finding.dueAt)}</Chip>
         ) : null}
-        {finding.simulated ? <Chip tone="neutral">{SIMULATED_PRICE_LABEL}</Chip> : null}
+        {finding.simulated ? <Chip tone="neutral">{simulatedLabel}</Chip> : null}
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <LinkButton href={`/claim/${finding.id}`} variant="primary">
+        <Button type="button" variant="primary" onClick={onDraftClaim}>
           Draft a claim
-        </LinkButton>
+        </Button>
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}

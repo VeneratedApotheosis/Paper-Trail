@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { animate, useReducedMotion } from "framer-motion";
-import { LinkButton } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import { formatMoney } from "@/lib/format";
 
 // The one bold moment (design-system.md): the "You're owed $X" figure set in
@@ -13,10 +13,14 @@ export function HeroCard({
   total,
   currency,
   count,
+  onDraftClaims,
+  onReview,
 }: {
   total: number;
   currency: string;
   count: number;
+  onDraftClaims: () => void;
+  onReview: () => void;
 }) {
   const reducedMotion = useReducedMotion();
   const [displayed, setDisplayed] = useState(reducedMotion ? total : 0);
@@ -62,19 +66,19 @@ export function HeroCard({
       <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
         {count > 0 ? (
           <>
-            <LinkButton href="#findings" variant="primary">
+            <Button type="button" variant="primary" onClick={onDraftClaims}>
               Draft claims
-            </LinkButton>
-            <LinkButton href="/review" variant="secondary">
+            </Button>
+            <Button type="button" variant="secondary" onClick={onReview}>
               Review
-            </LinkButton>
+            </Button>
           </>
         ) : (
           // No findings count toward the total (only needs-review items remain),
-          // so there is nothing to draft; point the one action at /review.
-          <LinkButton href="/review" variant="primary">
+          // so there is nothing to draft; point the one action at review.
+          <Button type="button" variant="primary" onClick={onReview}>
             Review these
-          </LinkButton>
+          </Button>
         )}
       </div>
     </section>
