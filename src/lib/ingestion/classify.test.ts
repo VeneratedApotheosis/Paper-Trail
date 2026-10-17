@@ -82,6 +82,83 @@ describe("classify: lifecycle classes", () => {
   });
 });
 
+describe("classify: order confirmations vs transit wording", () => {
+  const confirmationBody = [
+    "Order confirmation",
+    "Your new camp gear is on its way soon.",
+    "Order number: NW-3307",
+    "Items",
+    "  Enamel Camp Mug x1 $18.00",
+    "Subtotal: $18.00",
+    "Order total: $19.62",
+  ].join("\n");
+
+  it("keeps an order confirmation with a greeting 'on its way' line as an order", () => {
+    const result = classify(email("Northwind order NW-3307: you're all set", confirmationBody));
+    expect(result.class).toBe("order");
+    expect(result.confidence).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it("lets confirmation evidence outrank an 'on the way' subject without tracking", () => {
+    const result = classify(email("Good things are on the way, Sam", confirmationBody));
+    expect(result.class).toBe("order");
+  });
+
+  it("stays shipped when there is real shipping evidence", () => {
+    const result = classify(email("Your Northwind order NW-3307 is on its way", `${confirmationBody}\nTracking number: 1Z555EX0000000001`));
+    expect(result.class).toBe("shipped");
+    expect(result.confidence).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it("stays shipped for bare transit wording without confirmation evidence", () => {
+    expect(classify(email("Your order #NW-3308 is on its way", "Expect it in 3-5 business days.")).class).toBe("shipped");
+  });
+});
+
+describe("classify: return phrasings", () => {
+  it("recognizes a return event with words between 'return' and the verb in the subject", () => {
+    const result = classify(
+      email("Your Northwind return for order #NW-3310 has been approved", "Pack the jacket in its original bag and ship it back within 14 days."),
+    );
+    expect(result.class).toBe("return_started");
+    expect(result.confidence).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it.each([
+    ["We've opened a return for order NW-3311. Bring the box to any drop point."],
+    ["Return label created for order NW-3313. Print it at home and tape it to the box."],
+    ["Your return request was received and is being reviewed for order NW-3313."],
+    ["Your return of two items from order NW-3315 has started."],
+  ])("recognizes body return wording: %s", (text) => {
+    const result = classify(email("Update on order #NW-3311", text));
+    expect(result.class).toBe("return_started");
+    expect(result.confidence).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it("does not treat a dropped-off return 'on its way' to the warehouse as a shipment", () => {
+    const result = classify(
+      email("Update on order #NW-3312", "Your return for order NW-3312 was dropped off this morning. The parcel is on its way to our warehouse."),
+    );
+    expect(result.class).toBe("return_started");
+    expect(result.confidence).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it("lets a return subject outrank transit wording", () => {
+    const result = classify(
+      email("Your Northwind return for #NW-3316 was dropped off", "Thanks! The box is on its way back to us. Tracking number: 1Z555EX0000000002"),
+    );
+    expect(result.class).toBe("return_started");
+  });
+
+  it("stays ambiguous (< 0.7) when a return and another lifecycle event both appear in the body", () => {
+    const result = classify(
+      email("Update on order #NW-3314", "Your return for order NW-3314 has been started. Your original package was delivered on Sep 2."),
+    );
+    expect(result.class).toBe("return_started");
+    expect(result.confidence).toBeLessThan(0.7);
+  });
+});
+
 describe("classify: Spanish", () => {
   const cases: Array<[EmailClass, string, string]> = [
     ["order", "Confirmación de tu pedido #MX-5521", "¡Gracias por tu compra, Sam! Resumen del pedido: Mochila $899.00 MXN"],

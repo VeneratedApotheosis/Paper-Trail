@@ -36,8 +36,8 @@ const CLASS_RULES: readonly ClassRule[] = [
   {
     cls: "return_started",
     subject:
-      /\breturn (?:label|request|started|initiated|authorized|approved|created|confirmation|instructions|dropped off|in transit|on its way)\b|\bstart(?:ed)? (?:a|your) return\b|\brma\b|\bdevolucion (?:iniciada|solicitada|aprobada)\b|\b(?:etiqueta|solicitud) de devolucion\b/,
-    body: /\byour return (?:request )?(?:has been |was |is )?(?:started|initiated|created|approved|authorized|submitted)\b|\b(?:print|download|attached)[^.\n]{0,20}return label\b|\breturn label (?:is )?(?:attached|ready|below)\b|\bwe(?:'ve| have) received your return request\b|\bdropped off your return\b|\b(?:tu|su) devolucion (?:ha sido )?(?:iniciada|solicitada|aprobada)\b/,
+      /\breturn (?:label|request|started|initiated|authorized|approved|created|confirmation|instructions|dropped off|in transit|on its way)\b|\breturn\b[^.\n]{0,60}\b(?:has |have |was |is )(?:been )?(?:started|initiated|created|approved|authorized|submitted|dropped off)\b|\bstart(?:ed)? (?:a|your) return\b|\brma\b|\bdevolucion (?:iniciada|solicitada|aprobada)\b|\b(?:etiqueta|solicitud) de devolucion\b/,
+    body: /\byour return (?:request )?(?:has been |was |is )?(?:started|initiated|created|approved|authorized|submitted)\b|\byour return\b[^.\n]{0,60}\b(?:has |have |was |is )(?:been )?(?:started|initiated|created|approved|authorized|submitted|dropped off)\b|\bwe(?:'ve| have) (?:created|started|initiated|opened|approved|authorized) (?:a|your) return\b|\b(?:print|download|attached)[^.\n]{0,20}return label\b|\breturn label (?:has been |was |is )?(?:attached|ready|below|created)\b|\bwe(?:'ve| have) received your return request\b|\breturn request (?:has been |was |is )?(?:received|approved|accepted)\b|\bdropped off your return\b|\b(?:tu|su) devolucion (?:ha sido )?(?:iniciada|solicitada|aprobada)\b/,
   },
   {
     cls: "price_adjust",
@@ -62,6 +62,17 @@ const CLASS_RULES: readonly ClassRule[] = [
     body: /\bthanks? (?:you )?for (?:your )?(?:order|purchase)\b|\border (?:confirmed|confirmation|summary)\b|\bwe(?:'ve| have) received your order\b|\border total\b|\bgracias por tu (?:pedido|compra)\b|\bresumen del pedido\b|\bpedido confirmado\b|\bpayment (?:received|confirmation)\b/,
   },
 ];
+
+/** Real shipping evidence. Bare transit wording ("on its way", "en camino") is not enough on its own. */
+const STRONG_SHIPPING_EVIDENCE =
+  /\bshipped\b|\bshipping confirmation\b|\bshipment\b|\bout for delivery\b|\bin transit\b|\btracking (?:number|#|id|link)\b|\btrack (?:your|my) (?:package|shipment|order)\b|\bcarrier\s*:|\b(?:ups|usps|fedex|dhl)\b|\benviad[oa]\b|\bnumero de (?:seguimiento|rastreo)\b/;
+
+/** Order-confirmation wording; with an order number and an order total or items list it outranks transit wording. */
+const ORDER_CONFIRMATION_WORDING =
+  /\border (?:(?:is |has been )?confirmed|confirmation|received|placed)\b|\bthanks? (?:you )?for (?:your )?(?:order|purchase)\b|\bwe(?:'ve| have) received your order\b|\byour order (?:has been |was |is )?(?:placed|confirmed)\b|\bconfirmacion (?:de|del) (?:(?:tu|su) )?(?:pedido|compra)\b|\bpedido (?:confirmado|recibido)\b|\bgracias por tu (?:pedido|compra)\b/;
+const ORDER_TOTAL_OR_ITEMS = /\border total\b|\bsubtotal\b|\bgrand total\b|^[ \t]*items\b|\bresumen del pedido\b/m;
+
+const RETURN_CLASSES: ReadonlySet<TransactionalClass> = new Set(["return_started", "return_received"]);
 
 const PROMO_PATTERNS: readonly RegExp[] = [
   /\bunsubscribe\b|\bdarse de baja\b|\bcancelar (?:la )?suscripcion\b/,
@@ -209,10 +220,33 @@ function matchingClasses(text: string, field: "subject" | "body"): Transactional
 
 type Verdict = { cls: EmailClass; confidence: number; reason: string };
 
+/**
+ * Drops "shipped" hits that are not a shipment: transit wording in a return email describes the package going back,
+ * and bare "on its way" in an order confirmation (order number + total/items + confirmation wording) is a greeting.
+ */
+function dropNonShipmentHits(
+  subjectHits: TransactionalClass[],
+  bodyHits: TransactionalClass[],
+  foldedAll: string,
+  orderRef: boolean,
+): { subjectHits: TransactionalClass[]; bodyHits: TransactionalClass[] } {
+  const returnEvent = [...subjectHits, ...bodyHits].some((hit) => RETURN_CLASSES.has(hit));
+  const orderConfirmation =
+    orderRef && ORDER_CONFIRMATION_WORDING.test(foldedAll) && ORDER_TOTAL_OR_ITEMS.test(foldedAll);
+  const notShipment = returnEvent || (orderConfirmation && !STRONG_SHIPPING_EVIDENCE.test(foldedAll));
+  if (!notShipment) return { subjectHits, bodyHits };
+  const keep = (hit: TransactionalClass) => hit !== "shipped";
+  return { subjectHits: subjectHits.filter(keep), bodyHits: bodyHits.filter(keep) };
+}
+
 /** Lifecycle class from subject first (strongest signal), then body. */
 function classifyTransactional(subject: string, body: string, orderRef: boolean): Verdict | null {
-  const subjectHits = matchingClasses(subject, "subject");
-  const bodyHits = matchingClasses(body, "body");
+  const { subjectHits, bodyHits } = dropNonShipmentHits(
+    matchingClasses(subject, "subject"),
+    matchingClasses(body, "body"),
+    `${subject}\n${body}`,
+    orderRef,
+  );
 
   if (subjectHits.length > 0) {
     const cls = subjectHits[0];
