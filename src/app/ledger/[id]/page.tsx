@@ -37,7 +37,7 @@ export default async function OrderDetailPage({
           actions={
             <Link
               href="/ledger"
-              className="rounded-sm border border-rule bg-paper px-3 py-1.5 text-sm text-ink hover:bg-paper-raised"
+              className="neu-raised-sm rounded-sm px-4 py-2 text-sm font-bold text-ink-muted transition-shadow hover:text-ink"
             >
               Back to ledger
             </Link>
@@ -57,36 +57,39 @@ export default async function OrderDetailPage({
 
   return (
     <AppShell>
-      <Link href="/ledger" className="text-sm text-ink-muted hover:text-ink">
+      <Link href="/ledger" className="text-sm font-medium text-ink-muted hover:text-ink">
         ← Ledger
       </Link>
 
-      {/* Order header */}
-      <header className="mt-3 flex flex-wrap items-start justify-between gap-4 border-b border-rule pb-6">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusChip status={deriveOrderStatus(order)} />
-            {needsReview ? <Chip tone="review">Needs review</Chip> : null}
-            {order.merchant.domain ? <Chip tone="neutral">{order.merchant.domain}</Chip> : null}
+      {/* Summary card */}
+      <section className="neu-raised mt-4 rounded-lg px-6 py-6">
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusChip status={deriveOrderStatus(order)} />
+              {needsReview ? <Chip tone="review">Needs review</Chip> : null}
+            </div>
+            <h1 className="mt-3 font-serif text-3xl text-ink">{merchantName(order)}</h1>
+            <p className="mt-1 text-sm text-ink-faint">
+              {order.merchant.domain ? (
+                <span className="block">{order.merchant.domain}</span>
+              ) : null}
+              {order.orderRef ? (
+                <span className="block">Order {order.orderRef}</span>
+              ) : null}
+              <span className="block">Placed {formatDate(order.placedAt)}</span>
+            </p>
           </div>
-          <h1 className="mt-3 font-serif text-3xl text-ink">{merchantName(order)}</h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            {order.orderRef ? <>Order {order.orderRef} · </> : null}
-            Placed {formatDate(order.placedAt)}
-          </p>
-        </div>
-        <div className="text-right">
-          <div className="col-head">Total</div>
-          <div className="mt-1 font-serif text-2xl tabular-nums text-ink">
-            {formatMoney(order.total, currency)}
+          <div className="text-right">
+            <div className="eyebrow">Total</div>
+            <div className="mt-1 font-serif text-2xl tabular-nums text-money">
+              {formatMoney(order.total, currency)}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Total breakdown */}
-      <section className="mt-6">
-        <h2 className="col-head">Breakdown</h2>
-        <dl className="mt-2 max-w-sm space-y-1 text-sm">
+        {/* Total breakdown */}
+        <dl className="mt-6 max-w-sm space-y-1 text-sm">
           {order.subtotal !== null ? (
             <BreakdownRow label="Subtotal" value={formatMoney(order.subtotal, currency)} />
           ) : null}
@@ -99,65 +102,67 @@ export default async function OrderDetailPage({
           {order.discount !== null ? (
             <BreakdownRow label="Discount" value={`−${formatMoney(order.discount, currency)}`} />
           ) : null}
-          <div className="flex items-center justify-between border-t border-rule pt-1 font-medium text-ink">
+          <div className="flex items-center justify-between border-t border-rule pt-2 font-medium text-ink">
             <dt>Total</dt>
-            <dd className="tabular-nums">{formatMoney(order.total, currency)}</dd>
+            <dd className="font-serif tabular-nums text-money">{formatMoney(order.total, currency)}</dd>
           </div>
         </dl>
-      </section>
 
-      {/* Line items */}
-      <section className="mt-8">
-        <h2 className="col-head">Items</h2>
-        <div className="mt-2">
-          <div className="flex items-center gap-4 border-b border-rule pb-2">
-            <span className="col-head min-w-0 flex-1">Item</span>
-            <span className="col-head w-12 text-right">Qty</span>
-            <span className="col-head w-24 text-right">Unit price</span>
-            <span className="col-head w-20 text-right">Returned</span>
-          </div>
-          {order.lineItems.map((item) => (
-            <div key={item.id} className="flex items-center gap-4 border-b border-rule py-3">
-              <span className="min-w-0 flex-1 truncate text-ink">{item.name}</span>
-              <span className="w-12 text-right tabular-nums text-ink-muted">{item.qty}</span>
-              <span className="w-24 text-right tabular-nums text-ink">
-                {formatMoney(item.unitPrice, currency)}
-              </span>
-              <span className="w-20 text-right tabular-nums text-ink-muted">
-                {item.returnedQty > 0 ? `${item.returnedQty} of ${item.qty}` : "—"}
-              </span>
+        {/* Line items */}
+        <div className="mt-7">
+          <h2 className="eyebrow">Items</h2>
+          <div className="mt-3">
+            <div className="flex items-center gap-4 pb-2">
+              <span className="eyebrow min-w-0 flex-1">Item</span>
+              <span className="eyebrow w-12 text-right">Qty</span>
+              <span className="eyebrow w-24 text-right">Unit price</span>
+              <span className="eyebrow w-20 text-right">Returned</span>
             </div>
-          ))}
+            {order.lineItems.map((item) => (
+              <div key={item.id} className="flex items-center gap-4 border-t border-rule py-3">
+                <span className="min-w-0 flex-1 truncate text-ink">{item.name}</span>
+                <span className="w-12 text-right tabular-nums text-ink-muted">{item.qty}</span>
+                <span className="w-24 text-right tabular-nums text-ink">
+                  {formatMoney(item.unitPrice, currency)}
+                </span>
+                <span className="w-20 text-right tabular-nums text-ink-muted">
+                  {item.returnedQty > 0 ? `${item.returnedQty} of ${item.qty}` : "none"}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* Event timeline */}
-      <section className="mt-8">
-        <h2 className="col-head">Timeline</h2>
-        <ol className="mt-3 space-y-5">
+      <section className="neu-raised mt-6 rounded-lg px-6 py-6">
+        <h2 className="eyebrow">Timeline</h2>
+        <ol className="mt-4 space-y-6">
           <li className="flex gap-4">
-            <span className="w-24 shrink-0 text-sm tabular-nums text-ink-muted">
+            <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-teal" aria-hidden />
+            <span className="w-24 shrink-0 text-sm tabular-nums text-ink-faint">
               {formatDate(order.placedAt)}
             </span>
             <span className="font-medium text-ink">Order placed</span>
           </li>
           {events.map((event) => (
             <li key={event.id} className="flex gap-4">
-              <span className="w-24 shrink-0 text-sm tabular-nums text-ink-muted">
+              <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-teal" aria-hidden />
+              <span className="w-24 shrink-0 text-sm tabular-nums text-ink-faint">
                 {formatDate(event.at)}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-ink">{EVENT_LABEL[event.type]}</span>
                   {event.amount != null ? (
-                    <span className="tabular-nums text-ink">
+                    <span className="font-serif tabular-nums text-money">
                       {formatMoney(event.amount, currency)}
                     </span>
                   ) : null}
                   <Chip tone="neutral">{confidencePercent(event.conf)} confidence</Chip>
                 </div>
                 {event.evidence ? (
-                  <blockquote className="mt-2 border-l-2 border-rule bg-paper-sunk px-3 py-2 text-sm italic text-ink-muted">
+                  <blockquote className="neu-inset mt-3 rounded-sm px-4 py-3 text-sm italic text-ink-muted">
                     “{event.evidence}”
                   </blockquote>
                 ) : null}
