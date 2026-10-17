@@ -1,8 +1,7 @@
-// Loading skeletons. Respects reduced-motion via globals.css (pulse is a plain
-// opacity animation that is disabled under prefers-reduced-motion).
+// Loading skeletons. Inset wells pulse gently; reduced-motion disables the pulse.
 
 function Bar({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded bg-paper-sunk ${className}`} />;
+  return <div className={`neu-inset animate-pulse rounded-sm ${className}`} />;
 }
 
 export function Skeleton({ className = "" }: { className?: string }) {
@@ -11,9 +10,9 @@ export function Skeleton({ className = "" }: { className?: string }) {
 
 export function LedgerSkeleton() {
   return (
-    <div className="mx-auto max-w-ledger space-y-px" aria-hidden>
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="flex items-center justify-between gap-4 bg-paper-raised px-4 py-4">
+    <div className="mx-auto max-w-ledger space-y-4" aria-hidden>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="neu-raised flex items-center justify-between gap-4 rounded-lg px-5 py-5">
           <Bar className="h-4 w-40" />
           <Bar className="h-4 w-20" />
           <Bar className="h-5 w-24" />
@@ -26,9 +25,11 @@ export function LedgerSkeleton() {
 export function HeroSkeleton() {
   return (
     <div className="mx-auto max-w-ledger space-y-6" aria-hidden>
-      <Bar className="mx-auto h-4 w-32" />
-      <Bar className="mx-auto h-16 w-72" />
-      <div className="space-y-3 pt-6">
+      <div className="neu-raised rounded-xl p-8">
+        <Bar className="mx-auto h-4 w-32" />
+        <Bar className="mx-auto mt-4 h-16 w-64" />
+      </div>
+      <div className="space-y-4 pt-2">
         {Array.from({ length: 3 }).map((_, i) => (
           <Bar key={i} className="h-20 w-full" />
         ))}
@@ -42,7 +43,7 @@ export function OrderDetailSkeleton() {
     <div className="mx-auto max-w-ledger space-y-4" aria-hidden>
       <Bar className="h-7 w-56" />
       <Bar className="h-4 w-40" />
-      <div className="space-y-2 pt-4">
+      <div className="space-y-3 pt-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <Bar key={i} className="h-12 w-full" />
         ))}

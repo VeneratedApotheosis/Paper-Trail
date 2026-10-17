@@ -4,11 +4,11 @@ import { DEMO_LABEL } from "@/lib/mock/data";
 // synthetic number is ever mistaken for a real one. Shared with demo mode (#4).
 export function DemoBanner({ label = DEMO_LABEL }: { label?: string }) {
   return (
-    <div className="sticky top-0 z-40 border-b border-deadline/30 bg-deadline-tint/80 backdrop-blur">
-      <div className="mx-auto flex max-w-ledger items-center justify-center gap-2 px-4 py-1.5 text-label text-deadline">
-        <span aria-hidden>●</span>
-        <span className="font-medium uppercase tracking-wide">{label}</span>
-      </div>
+    <div className="flex items-center justify-center gap-2 px-4 py-2">
+      <span className="neu-inset inline-flex items-center gap-2 rounded-sm px-3 py-1 text-label font-bold text-ink-muted">
+        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-teal" />
+        {label}
+      </span>
     </div>
   );
 }

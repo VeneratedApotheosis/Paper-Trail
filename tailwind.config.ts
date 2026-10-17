@@ -1,69 +1,69 @@
 import type { Config } from "tailwindcss";
 
-// PaperTrail design system (#9) — "calm editorial ledger".
-// Warm paper base, ink numerals, one signal colour per state, sparing receipt
-// perforation. Palette and scale documented in docs/design-system.md.
+// PaperTrail design system — neumorphic "soft UI" direction.
+// Cool slate base, soft dual shadows (raised + inset), dark-teal serif money,
+// one teal accent. No traffic-light colours. Documented in docs/design-system.md.
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        // Surfaces — unbleached ledger paper, warm not grey.
+        // Single base surface. Cards are the same colour as the page and are
+        // defined by soft shadows, not by fills or borders.
         paper: {
-          DEFAULT: "#faf6ee",
-          raised: "#fffdf8", // cards / rows that sit above the page
-          sunk: "#f1ebdd", // wells, insets, table headers
+          DEFAULT: "#dbe1ea",
+          raised: "#e4e9f1", // faint diagonal sheen on raised cards
+          sunk: "#cfd6e2", // inset wells
         },
-        // Ink — warm near-black, never pure #000.
         ink: {
-          DEFAULT: "#1a1814",
-          muted: "#6b6358", // secondary text, labels
-          faint: "#9a9185", // tertiary / disabled
+          DEFAULT: "#1e2633",
+          muted: "#586273",
+          faint: "#8a93a3",
         },
-        rule: "#ded5c4", // hairline ledger rules and borders
-        // Signal colours — exactly one meaning each (scope_features §3/§9).
-        owed: {
-          DEFAULT: "#c23a1b", // money you're owed (vermilion)
-          tint: "#f7e7df", // faint wash behind owed figures
+        rule: "#c3ccd9",
+        // One accent: a lighter, saturated teal (gradient stops live in CSS).
+        teal: {
+          DEFAULT: "#15a0ab",
+          bright: "#22c3cd",
+          deep: "#0e7079",
         },
-        deadline: {
-          DEFAULT: "#b07a09", // closing window (amber/ochre)
-          tint: "#f6edd6",
-        },
-        saved: {
-          DEFAULT: "#2f7d4f", // resolved / money saved (green)
-          tint: "#e2efe5",
-        },
+        // Money / "owed" values: a deep, confident teal set in the serif.
+        money: "#0a545b",
+        // Soft-shadow endpoints (for arbitrary rgba use).
+        shadowdark: "#b2bccb",
+        shadowlight: "#f3f7fc",
       },
       fontFamily: {
         serif: ["var(--font-display)", "Georgia", "serif"],
         sans: ["var(--font-ui)", "system-ui", "sans-serif"],
       },
       fontSize: {
-        // Modular scale (~1.25), editorial. Line-heights tuned per role.
-        label: ["0.75rem", { lineHeight: "1rem", letterSpacing: "0.02em" }],
+        label: ["0.75rem", { lineHeight: "1rem", letterSpacing: "0.08em" }],
         sm: ["0.8125rem", { lineHeight: "1.25rem" }],
         base: ["0.9375rem", { lineHeight: "1.55rem" }],
         lg: ["1.125rem", { lineHeight: "1.6rem" }],
         xl: ["1.4rem", { lineHeight: "1.75rem" }],
         "2xl": ["1.85rem", { lineHeight: "2rem" }],
-        "3xl": ["2.5rem", { lineHeight: "2.5rem" }],
-        hero: ["4.25rem", { lineHeight: "1", letterSpacing: "-0.02em" }],
-      },
-      borderColor: {
-        DEFAULT: "#ded5c4",
+        "3xl": ["2.5rem", { lineHeight: "1.05" }],
+        hero: ["4.5rem", { lineHeight: "1", letterSpacing: "-0.02em" }],
       },
       borderRadius: {
-        sm: "3px",
-        DEFAULT: "6px",
-        lg: "10px",
+        sm: "10px",
+        DEFAULT: "16px",
+        lg: "22px",
+        xl: "28px",
       },
       boxShadow: {
-        // One quiet shadow; cards are mostly defined by hairline rules, not shadow.
-        raised: "0 1px 2px rgba(26, 24, 20, 0.05)",
+        // Neumorphic raised (light from top-left). Softer = larger blur.
+        "soft-sm": "6px 6px 14px rgba(176,188,206,0.6), -6px -6px 14px rgba(248,251,255,0.85)",
+        soft: "8px 8px 20px rgba(176,188,206,0.6), -8px -8px 20px rgba(248,251,255,0.9)",
+        "soft-lg": "12px 12px 30px rgba(176,188,206,0.75), -12px -12px 30px rgba(248,251,255,0.95)",
+        // Pressed / inset.
+        "inset-sm": "inset 3px 3px 7px rgba(176,188,206,0.8), inset -3px -3px 7px rgba(248,251,255,0.9)",
+        inset: "inset 4px 4px 10px rgba(176,188,206,0.8), inset -4px -4px 10px rgba(248,251,255,0.9)",
       },
       maxWidth: {
-        ledger: "46rem", // ~72ch reading measure for ledger content
+        ledger: "44rem",
       },
       keyframes: {
         "fade-rise": {

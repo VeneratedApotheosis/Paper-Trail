@@ -1,56 +1,44 @@
-# PaperTrail design system (#9)
+# PaperTrail design system — neumorphic "soft UI"
 
-Direction: **calm editorial ledger** (scope_features §3/§9). Warm paper, ink
-numerals, tabular figures, exactly one signal colour per state, sparing receipt
-perforation. No gradients, no purple, no generic-SaaS card kit. The hero figure
-is the one bold moment; everything around it stays quiet.
+Direction: soft, tactile UI on a single cool-slate surface. Cards and controls
+are the same colour as the page, defined by **soft dual shadows** (light top-left,
+dark bottom-right) rather than fills or borders. One teal accent; money values in
+a deep teal serif. No traffic-light colours, no gradient blobs. Lean copy, no em
+dashes. Reference: Paper file "Soft UI" artboards.
 
-Tokens live in `tailwind.config.ts` (source of truth) and are mirrored as CSS
-vars in `src/app/globals.css` for raw motifs.
+Tokens live in `tailwind.config.ts`; CSS vars + neumorphic utilities in
+`src/app/globals.css`.
 
 ## Colour
-
 | Token | Hex | Use |
 |---|---|---|
-| `paper` | `#faf6ee` | page background (unbleached ledger paper) |
-| `paper-raised` | `#fffdf8` | cards / rows above the page |
-| `paper-sunk` | `#f1ebdd` | wells, insets, table headers |
-| `ink` | `#1a1814` | primary text / numerals (warm near-black) |
-| `ink-muted` | `#6b6358` | secondary text, labels |
-| `ink-faint` | `#9a9185` | tertiary / disabled |
-| `rule` | `#ded5c4` | hairline ledger rules + borders |
-| `owed` | `#c23a1b` | money you're owed — **vermilion**, one meaning only |
-| `deadline` | `#b07a09` | closing window — **amber/ochre** |
-| `saved` | `#2f7d4f` | resolved / money saved — **green** |
+| `paper` | `#dbe1ea` | base surface (page + cards) |
+| `paper-raised` | `#e4e9f1` | faint card sheen |
+| `paper-sunk` | `#cfd6e2` | inset wells |
+| `ink` | `#1e2633` | primary text |
+| `ink-muted` | `#586273` | secondary text |
+| `ink-faint` | `#8a93a3` | tertiary |
+| `teal` / `teal-bright` / `teal-deep` | `#15a0ab` / `#22c3cd` / `#0e7079` | the one accent (buttons, links, active nav) |
+| `money` | `#0a545b` | money / "owed" values, always in the serif |
 
-Each signal colour has a `-tint` wash (e.g. `bg-owed-tint`) for faint backgrounds.
-Signal colours are reserved for their one meaning — never decorative.
+## Shadows (the core of the look)
+Use the utilities, not ad-hoc shadows:
+- `.neu-raised` / `.neu-raised-sm` — extruded cards and controls.
+- `.neu-inset` — pressed chips, wells, input fields, active nav.
+- `.neu-accent` — teal gradient primary action.
+- Tailwind `shadow-soft` / `shadow-soft-lg` / `shadow-inset` are also available.
 
 ## Typography
+- **Fraunces** (serif, `font-serif`): money figures, headings, wordmark.
+- **Hanken Grotesk** (sans, `font-sans`): UI/body, with global tabular figures.
+- `.eyebrow` for small-caps section labels.
+- Scale in `tailwind.config.ts`; radii are large (`rounded-lg` = 22px, `rounded-xl` = 28px).
 
-- **Display / headings / hero figure:** Fraunces (serif, editorial), via `font-serif`.
-- **UI / body / ledger amounts:** Inter, via `font-sans`, with `tabular-nums`
-  (set globally on `body`) so amounts align column to column.
-- Scale (`tailwind.config.ts` `fontSize`): `label`, `sm`, `base`, `lg`, `xl`,
-  `2xl`, `3xl`, `hero`. Reading measure capped at `max-w-ledger` (~72ch).
-
-## Receipt-perforation motif (use sparingly)
-
-- `.perf-rule` — a dashed hairline; a ledger rule / receipt perforation. Use to
-  mark a section tear, not as a divider everywhere.
-- `.perf-edge` — a scalloped torn-receipt bottom edge (CSS mask). Reserve for the
-  cover / hero receipt moment.
-- `.col-head` — small-caps letterspaced column header for **real** tables only.
+## Layout
+- `AppShell` is responsive: soft left **sidebar** on `md+`, neumorphic **bottom tab bar** on mobile.
+- Content width capped at `max-w-ledger`.
 
 ## Accessibility & motion
-
-- `:focus-visible` shows a 2px `owed` outline — never remove focus styling.
-- `prefers-reduced-motion` disables animation/transition globally (globals.css).
-- Signal colours pair with text/icon labels, never colour alone.
-
-## Shared building blocks
-
-- Primitives: `src/components/ui/Button.tsx`, `src/components/ui/Chip.tsx`.
-- System states (#26): `src/components/states/` + `src/components/DemoBanner.tsx`.
-- Page chrome: `src/components/AppShell.tsx`.
-- UI contract + mock data: `src/lib/types.ts`, `src/lib/format.ts`, `src/lib/mock/data.ts`.
+- `:focus-visible` is a 2px teal outline. Keep it.
+- `prefers-reduced-motion` disables animation/transition globally.
+- Keep text at accessible contrast even where chrome stays soft.

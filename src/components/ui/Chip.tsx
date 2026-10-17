@@ -2,12 +2,14 @@ import type { ReactNode } from "react";
 
 export type ChipTone = "neutral" | "owed" | "deadline" | "saved" | "review";
 
+// Neumorphic pressed pills. One accent only: tone changes the text colour, not
+// the surface. `owed` uses the deep money teal; time/status tones use the accent.
 const tones: Record<ChipTone, string> = {
-  neutral: "border-rule bg-paper-sunk text-ink-muted",
-  owed: "border-owed/30 bg-owed-tint text-owed",
-  deadline: "border-deadline/30 bg-deadline-tint text-deadline",
-  saved: "border-saved/30 bg-saved-tint text-saved",
-  review: "border-deadline/40 bg-deadline-tint text-deadline",
+  neutral: "text-ink-muted",
+  owed: "text-money",
+  deadline: "text-teal-deep",
+  saved: "text-teal-deep",
+  review: "text-teal-deep",
 };
 
 export function Chip({
@@ -19,7 +21,7 @@ export function Chip({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 text-label font-medium ${tones[tone]}`}
+      className={`neu-inset inline-flex items-center gap-1 rounded-sm px-3 py-1 text-label font-bold ${tones[tone]}`}
     >
       {children}
     </span>

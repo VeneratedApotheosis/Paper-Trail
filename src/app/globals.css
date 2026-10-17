@@ -4,14 +4,15 @@
 
 @layer base {
   :root {
-    /* Mirror of tailwind tokens for raw CSS / motifs. See docs/design-system.md. */
-    --paper: #faf6ee;
-    --paper-raised: #fffdf8;
-    --ink: #1a1814;
-    --rule: #ded5c4;
-    --owed: #c23a1b;
-    --deadline: #b07a09;
-    --saved: #2f7d4f;
+    --base: #dbe1ea;
+    --raised: #e4e9f1;
+    --ink: #1e2633;
+    --teal: #15a0ab;
+    --teal-bright: #22c3cd;
+    --teal-deep: #0e7079;
+    --money: #0a545b;
+    --shadow-dark: rgba(176, 188, 206, 0.7);
+    --shadow-light: rgba(248, 251, 255, 0.92);
   }
 
   html {
@@ -19,17 +20,16 @@
   }
 
   body {
-    /* Tabular figures everywhere so ledger amounts line up column to column. */
+    background: var(--base);
     font-variant-numeric: tabular-nums;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
   }
 
-  /* Visible, on-brand keyboard focus (never remove outlines without a replacement). */
   :focus-visible {
-    outline: 2px solid var(--owed);
+    outline: 2px solid var(--teal);
     outline-offset: 2px;
-    border-radius: 2px;
+    border-radius: 4px;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -45,32 +45,44 @@
 }
 
 @layer components {
-  /* Receipt-perforation motif — used sparingly to mark a tear/section edge.
-     A dashed hairline that reads as a ledger rule or a receipt perforation. */
-  .perf-rule {
-    border: none;
-    height: 0;
-    border-top: 1px dashed var(--rule);
+  /* Neumorphic building blocks. Compose with Tailwind for spacing/typography. */
+  .neu-raised {
+    background: var(--base);
+    box-shadow:
+      10px 10px 24px var(--shadow-dark),
+      -10px -10px 24px var(--shadow-light);
   }
 
-  /* A torn receipt bottom edge: scalloped notches. Apply to a thin element. */
-  .perf-edge {
-    height: 10px;
-    background: var(--paper-raised);
-    -webkit-mask: radial-gradient(circle 6px at 10px 0, transparent 0 6px, #000 6px)
-      repeat-x;
-    mask: radial-gradient(circle 6px at 10px 0, transparent 0 6px, #000 6px) repeat-x;
-    -webkit-mask-size: 20px 10px;
-    mask-size: 20px 10px;
+  .neu-raised-sm {
+    background: var(--base);
+    box-shadow:
+      6px 6px 14px var(--shadow-dark),
+      -6px -6px 14px var(--shadow-light);
   }
 
-  /* Small-caps column header used in real tables (not as decoration). */
-  .col-head {
+  .neu-inset {
+    background: var(--base);
+    box-shadow:
+      inset 4px 4px 10px var(--shadow-dark),
+      inset -4px -4px 10px var(--shadow-light);
+  }
+
+  /* Teal gradient used on primary actions and the active nav marker. */
+  .neu-accent {
+    background: linear-gradient(135deg, var(--teal-bright), var(--teal));
+    color: #ffffff;
+    box-shadow:
+      8px 8px 20px var(--shadow-dark),
+      -8px -8px 20px var(--shadow-light);
+  }
+
+  /* Small-caps label used for section eyebrows and table headers. */
+  .eyebrow {
     font-size: 0.6875rem;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
+    font-weight: 700;
     color: var(--ink);
     opacity: 0.55;
-    font-weight: 600;
   }
 }

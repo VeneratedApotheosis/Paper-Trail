@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Fraunces, Inter } from "next/font/google";
+import { Fraunces, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
 
-// Display serif for headings and the hero figure — editorial, characterful.
+// Display serif for headings and the money figures (soft, editorial).
 const display = Fraunces({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
@@ -13,7 +13,7 @@ const display = Fraunces({
 });
 
 // UI/body grotesk with real tabular figures for aligned ledger amounts.
-const ui = Inter({
+const ui = Hanken_Grotesk({
   subsets: ["latin"],
   variable: "--font-ui",
   display: "swap",
