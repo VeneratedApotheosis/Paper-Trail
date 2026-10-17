@@ -200,12 +200,18 @@ Git won't check out `main` in two folders at once, so each worktree gets a local
 ```powershell
 git fetch origin
 git worktree add -b wip/6 ../pt-issue-6 origin/main   # separate folder for the agent working on #6
+cmd /c mklink /J ..\pt-issue-6\node_modules node_modules   # optional: share deps instead of reinstalling
 cd ../pt-issue-6
 # ...work + commit...
 git pull --rebase origin main
 git push origin HEAD:main                              # lands on shared main
-cd ..; git worktree remove pt-issue-6; git branch -D wip/6   # when the issue is done
+# when the issue is done (from the main checkout):
+cmd /c rmdir ..\pt-issue-6\node_modules              # FIRST remove the junction (deletes the link only)
+git worktree remove ..\pt-issue-6; git branch -D wip/6
 ```
+**Warning:** never `git worktree remove --force` (or `Remove-Item -Recurse`) a worktree that still has a
+`node_modules` junction. It follows the link and deletes the main checkout's `node_modules`.
+Remove the junction with `cmd /c rmdir` first. Worker agents must never run `npm install`/`npm ci` in a junctioned worktree.
 The `wip/*` branch is local only. Never push it as its own branch.
 
 ### Merge conflicts
