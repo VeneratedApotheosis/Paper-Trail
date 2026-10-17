@@ -1,7 +1,9 @@
 // Formatting helpers shared across the UI. Keep money/date formatting here so
 // every screen renders amounts and dates identically.
+import { REVIEW_CONFIDENCE_THRESHOLD } from "@/lib/contracts";
 
-export const CONFIDENCE_THRESHOLD = 0.7;
+// Re-export the canonical threshold (defined in contracts) under a short name.
+export const CONFIDENCE_THRESHOLD = REVIEW_CONFIDENCE_THRESHOLD;
 
 export function formatMoney(amount: number, currency = "USD"): string {
   return new Intl.NumberFormat("en-US", {

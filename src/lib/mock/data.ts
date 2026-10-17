@@ -1,14 +1,9 @@
-// Synthetic demo data (SYNTHETIC — not real purchases). Shape matches the UI
-// contract in src/lib/types.ts. Screens import from here until the real API
-// (owned by backend issues) lands; swapping the source keeps components intact.
-import type {
-  AuditEntry,
-  Draft,
-  Finding,
-  Order,
-  OwedSummary,
-} from "@/lib/types";
-import { CONFIDENCE_THRESHOLD } from "@/lib/format";
+// Synthetic demo data (SYNTHETIC — not real purchases). Shapes are the canonical
+// contracts from "@/lib/contracts" (#29). Screens import from here until the real
+// API (backend issues) lands; swapping the source keeps components intact.
+import type { Finding, MerchantPolicy, NormalizedOrder } from "@/lib/contracts";
+import type { AuditEntry, Draft, OwedSummary } from "@/lib/types";
+import { computeOwedSummary } from "@/lib/view";
 
 export const DEMO_LABEL = "Demo data — synthetic";
 export const SIMULATED_PRICE_LABEL = "Simulated price feed";
@@ -20,212 +15,269 @@ const iso = (offsetDays: number) => new Date(NOW.getTime() + offsetDays * day).t
 
 export const DEMO_NOW = NOW.toISOString();
 
-export const orders: Order[] = [
+function policy(p: Partial<MerchantPolicy>): MerchantPolicy {
+  return {
+    returnWindowDays: null,
+    windowAnchor: null,
+    refundSlaDays: null,
+    priceAdjustDays: null,
+    policySource: null,
+    policyQuote: null,
+    nonReturnable: false,
+    ...p,
+  };
+}
+
+export const orders: NormalizedOrder[] = [
   {
     id: "ord_1001",
-    merchantName: "Rowan & Vale",
-    merchantDomain: "rowanvale.com",
+    merchant: {
+      name: "Rowan & Vale",
+      domain: "rowanvale.com",
+      policy: policy({
+        refundSlaDays: 10,
+        policySource: "email_text",
+        policyQuote: "Refunds are issued within 10 business days of carrier receipt.",
+      }),
+    },
     orderRef: "RV-48213",
     placedAt: iso(-26),
     currency: "USD",
     subtotal: 148.0,
     tax: 12.95,
     shipping: 0,
+    discount: null,
     total: 160.95,
     last4: "4821",
-    status: "return_started",
-    confMin: 0.92,
+    customerName: "Alex Song",
     lineItems: [
       { id: "li_1", name: "Merino crew sweater, oat", qty: 1, unitPrice: 98.0, returnedQty: 1 },
       { id: "li_2", name: "Wool-blend beanie", qty: 1, unitPrice: 50.0, returnedQty: 0 },
     ],
     events: [
-      { id: "ev_1", type: "ordered", at: iso(-26), source: email("Order confirmed — RV-48213", "rowanvale.com", -26) },
-      { id: "ev_2", type: "shipped", at: iso(-24), source: email("Your order shipped", "rowanvale.com", -24) },
-      { id: "ev_3", type: "delivered", at: iso(-21), source: email("Delivered", "rowanvale.com", -21) },
+      { id: "ev_2", type: "shipped", at: iso(-24), messageId: "msg_rv_2", conf: 0.95 },
+      { id: "ev_3", type: "delivered", at: iso(-21), messageId: "msg_rv_3", conf: 0.93 },
       {
         id: "ev_4",
-        type: "return_started",
+        type: "return_received",
         at: iso(-16),
         amount: 98.0,
+        messageId: "msg_rv_4",
         conf: 0.9,
-        evidenceQuote: "We've received your return request for the Merino crew sweater. Refunds are issued within 10 business days of carrier receipt.",
-        source: email("Return started — RV-48213", "rowanvale.com", -16),
+        evidence: "We've received your return for the Merino crew sweater. Refunds are issued within 10 business days of carrier receipt.",
+        lineItemIds: ["li_1"],
       },
     ],
-    source: email("Order confirmed — RV-48213", "rowanvale.com", -26),
+    messageIds: ["msg_rv_1", "msg_rv_2", "msg_rv_3", "msg_rv_4"],
+    confMin: 0.9,
+    needsReview: false,
   },
   {
     id: "ord_1002",
-    merchantName: "Harbor Supply Co.",
-    merchantDomain: "harborsupply.com",
+    merchant: {
+      name: "Harbor Supply Co.",
+      domain: "harborsupply.com",
+      policy: policy({
+        returnWindowDays: 14,
+        windowAnchor: "delivery",
+        priceAdjustDays: 14,
+        policySource: "email_text",
+        policyQuote: "Items may be returned within 14 days of delivery for a full refund.",
+      }),
+    },
     orderRef: "HS-90217",
     placedAt: iso(-9),
     currency: "USD",
     subtotal: 219.0,
     tax: 18.62,
     shipping: 8.0,
+    discount: null,
     total: 245.62,
     last4: "4821",
-    status: "delivered",
-    confMin: 0.88,
+    customerName: "Alex Song",
     lineItems: [
       { id: "li_3", name: "Cast-iron skillet, 12in", qty: 1, unitPrice: 89.0, returnedQty: 0 },
       { id: "li_4", name: "Enamel dutch oven, 5.5qt", qty: 1, unitPrice: 130.0, returnedQty: 0 },
     ],
-    events: [
-      { id: "ev_5", type: "ordered", at: iso(-9), source: email("Thanks for your order", "harborsupply.com", -9) },
-      { id: "ev_6", type: "delivered", at: iso(-4), source: email("Your package arrived", "harborsupply.com", -4) },
-    ],
-    source: email("Thanks for your order", "harborsupply.com", -9),
+    events: [{ id: "ev_6", type: "delivered", at: iso(-4), messageId: "msg_hs_2", conf: 0.88 }],
+    messageIds: ["msg_hs_1", "msg_hs_2"],
+    confMin: 0.86,
+    needsReview: false,
   },
   {
     id: "ord_1003",
-    merchantName: "Field Notes Coffee",
-    merchantDomain: "fieldnotescoffee.com",
+    merchant: {
+      name: "Field Notes Coffee",
+      domain: "fieldnotescoffee.com",
+      policy: policy({ refundSlaDays: 7, policySource: "default_table" }),
+    },
     orderRef: "FN-3391",
     placedAt: iso(-13),
     currency: "USD",
     subtotal: 64.0,
     tax: 5.44,
     shipping: 0,
+    discount: null,
     total: 69.44,
     last4: "1190",
-    status: "refunded",
-    confMin: 0.95,
+    customerName: "Alex Song",
     lineItems: [
       { id: "li_5", name: "Single-origin subscription, 2 bags", qty: 2, unitPrice: 32.0, returnedQty: 2 },
     ],
     events: [
-      { id: "ev_7", type: "ordered", at: iso(-13), source: email("Order received", "fieldnotescoffee.com", -13) },
       {
         id: "ev_8",
         type: "refund_issued",
         at: iso(-5),
         amount: 44.0,
+        messageId: "msg_fn_2",
         conf: 0.96,
-        evidenceQuote: "We've refunded $44.00 to your card ending 1190 for the damaged bags.",
-        source: email("Your refund was processed", "fieldnotescoffee.com", -5),
+        evidence: "We've refunded $44.00 to your card ending 1190 for the damaged bags.",
       },
     ],
-    source: email("Order received", "fieldnotescoffee.com", -13),
+    messageIds: ["msg_fn_1", "msg_fn_2"],
+    confMin: 0.94,
+    needsReview: false,
   },
   {
     id: "ord_1004",
-    merchantName: "Atlas Outdoor",
-    merchantDomain: "atlasoutdoor.com",
+    merchant: {
+      name: "Atlas Outdoor",
+      domain: "atlasoutdoor.com",
+      policy: policy({ returnWindowDays: 30, windowAnchor: "delivery", policySource: "default_table" }),
+    },
     orderRef: "AO-77510",
     placedAt: iso(-6),
     currency: "USD",
     subtotal: 220.0,
     tax: 0,
     shipping: 0,
+    discount: null,
     total: 220.0,
-    last4: "4821",
-    status: "delivered",
+    last4: null,
+    customerName: null,
+    lineItems: [{ id: "li_6", name: "Insulated hooded parka", qty: 1, unitPrice: 220.0, returnedQty: 0 }],
+    events: [],
+    messageIds: ["msg_ao_1"],
     confMin: 0.61, // below threshold -> needs review
-    lineItems: [
-      { id: "li_6", name: "Insulated hooded parka", qty: 1, unitPrice: 220.0, returnedQty: 0 },
-    ],
-    events: [
-      { id: "ev_9", type: "ordered", at: iso(-6), source: email("Fwd: your Atlas order", "mail.example.com", -6) },
-    ],
-    source: email("Fwd: your Atlas order", "mail.example.com", -6),
+    needsReview: true,
   },
 ];
 
 export const findings: Finding[] = [
   {
-    id: "fnd_1",
-    orderId: "ord_1001",
-    merchantName: "Rowan & Vale",
+    id: "refund_overdue:ord_1001",
     kind: "refund_overdue",
+    orderId: "ord_1001",
+    lineItemId: "li_1",
     amountAtStake: 98.0,
     currency: "USD",
-    dueAt: iso(-2), // refund SLA passed 2 days ago
+    dueAt: iso(-2),
     severity: "high",
     status: "open",
-    ruleVersion: "r1.0.0",
+    ruleVersion: "R1@1",
+    summary: "Return received 16 days ago; the $98.00 refund is past the 10-day window.",
+    evidence: [
+      {
+        messageId: "msg_rv_4",
+        quote: "Refunds are issued within 10 business days of carrier receipt.",
+      },
+    ],
     explain: {
-      rule: "refund_overdue",
-      summary: "Your return was received 16 days ago but the $98.00 refund hasn't posted.",
-      dates: [
-        { label: "Return received", value: iso(-16) },
-        { label: "Refund promised by", value: iso(-2) },
-      ],
-      sourceQuote: "Refunds are issued within 10 business days of carrier receipt.",
+      returnReceived: iso(-16),
+      refundPromisedBy: iso(-2),
+      refundSlaDays: 10,
+      policySource: "email_text",
       confidence: 0.9,
     },
+    simulated: false,
   },
   {
-    id: "fnd_2",
-    orderId: "ord_1002",
-    merchantName: "Harbor Supply Co.",
+    id: "return_deadline:ord_1002:li_3",
     kind: "return_deadline",
+    orderId: "ord_1002",
+    lineItemId: "li_3",
     amountAtStake: 89.0,
     currency: "USD",
-    dueAt: iso(2), // window closes in 2 days
+    dueAt: iso(2),
     severity: "medium",
     status: "open",
-    ruleVersion: "r1.0.0",
+    ruleVersion: "R2@1",
+    summary: "Return window for the cast-iron skillet closes in 2 days.",
+    evidence: [
+      {
+        messageId: "msg_hs_2",
+        quote: "Items may be returned within 14 days of delivery for a full refund.",
+      },
+    ],
     explain: {
-      rule: "return_deadline",
-      summary: "Return window for the cast-iron skillet closes in 2 days.",
-      dates: [
-        { label: "Delivered", value: iso(-4) },
-        { label: "Window closes", value: iso(2) },
-      ],
-      sourceQuote: "Items may be returned within 14 days of delivery for a full refund.",
+      delivered: iso(-4),
+      windowCloses: iso(2),
+      returnWindowDays: 14,
+      windowAnchor: "delivery",
       confidence: 0.86,
     },
+    simulated: false,
   },
   {
-    id: "fnd_3",
-    orderId: "ord_1002",
-    merchantName: "Harbor Supply Co.",
+    id: "price_drop:ord_1002:li_4",
     kind: "price_drop",
+    orderId: "ord_1002",
+    lineItemId: "li_4",
     amountAtStake: 26.0,
     currency: "USD",
     dueAt: iso(5),
     severity: "low",
     status: "open",
-    ruleVersion: "r1.0.0",
+    ruleVersion: "R3@1",
+    summary: "The enamel dutch oven dropped $26.00 within the price-adjustment window.",
+    evidence: [
+      {
+        messageId: "msg_hs_2",
+        quote: "Price adjustments honored within 14 days of purchase.",
+      },
+    ],
     explain: {
-      rule: "price_drop",
-      summary: "The enamel dutch oven dropped $26.00 within the price-adjustment window.",
-      dates: [
-        { label: "Purchased at", value: iso(-9) },
-        { label: "Price-match until", value: iso(5) },
-      ],
-      sourceQuote: "Price adjustments honored within 14 days of purchase.",
-      confidence: 0.81,
+      purchasedAt: iso(-9),
+      priceMatchUntil: iso(5),
+      paidPrice: 130.0,
+      currentPrice: 104.0,
       priceSource: "mock",
+      confidence: 0.81,
     },
+    simulated: true, // mock price feed -> UI must label "simulated"
   },
   {
-    id: "fnd_4",
-    orderId: "ord_1003",
-    merchantName: "Field Notes Coffee",
+    id: "refund_short:ord_1003",
     kind: "refund_short",
+    orderId: "ord_1003",
     amountAtStake: 20.0,
     currency: "USD",
+    dueAt: null,
     severity: "medium",
     status: "open",
-    ruleVersion: "r1.0.0",
+    ruleVersion: "R1@1",
+    summary: "Refunded $44.00 but the two bags totalled $64.00 — $20.00 short.",
+    evidence: [
+      {
+        messageId: "msg_fn_2",
+        quote: "We've refunded $44.00 to your card ending 1190 for the damaged bags.",
+      },
+    ],
     explain: {
-      rule: "refund_short",
-      summary: "You were refunded $44.00 but the two bags totalled $64.00 — $20.00 short.",
-      dates: [{ label: "Refund issued", value: iso(-5) }],
-      sourceQuote: "We've refunded $44.00 to your card ending 1190 for the damaged bags.",
+      expected: 64.0,
+      received: 44.0,
+      delta: 20.0,
       confidence: 0.94,
     },
+    simulated: false,
   },
 ];
 
 export const drafts: Draft[] = [
   {
     id: "drf_1",
-    findingId: "fnd_1",
+    findingId: "refund_overdue:ord_1001",
     recipient: "support@rowanvale.com",
     signedName: "Alex Song",
     subject: "Refund not received — order RV-48213",
@@ -241,7 +293,7 @@ export const auditLog: AuditEntry[] = [
   { id: "aud_5", at: iso(-0.08), type: "sync_start", detail: "Sync started" },
 ];
 
-export function getOrder(id: string): Order | undefined {
+export function getOrder(id: string): NormalizedOrder | undefined {
   return orders.find((o) => o.id === id);
 }
 
@@ -253,29 +305,8 @@ export function getDraftForFinding(findingId: string): Draft | undefined {
   return drafts.find((d) => d.findingId === findingId);
 }
 
-// Owed total excludes needs-review orders (confMin < threshold) until confirmed.
 export function owedSummary(): OwedSummary {
-  const included = findings.filter((f) => {
-    const order = getOrder(f.orderId);
-    return (
-      f.status === "open" &&
-      f.explain.confidence >= CONFIDENCE_THRESHOLD &&
-      order !== undefined &&
-      order.confMin >= CONFIDENCE_THRESHOLD
-    );
-  });
-  const excluded = findings.filter((f) => !included.includes(f));
-  return {
-    currency: "USD",
-    owedTotal: included.reduce((sum, f) => sum + f.amountAtStake, 0),
-    findingCount: included.length,
-    excludedCount: excluded.length,
-    excludedTotal: excluded.reduce((sum, f) => sum + f.amountAtStake, 0),
-  };
-}
-
-function email(subject: string, fromDomain: string, offsetDays: number) {
-  return { subject, fromDomain, receivedAt: iso(offsetDays) };
+  return computeOwedSummary(findings, orders);
 }
 
 function pretty(offsetDays: number): string {
