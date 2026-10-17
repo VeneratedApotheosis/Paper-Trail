@@ -559,6 +559,20 @@ Design guidance: `frontend-design-skill.md` (linked in relevant issues, not turn
 
 ---
 
+### Added after review: missing frontend screens (created as #24-#26)
+
+Full text in `ISSUE_DRAFTS_FRONTEND.md`. These cover screens 1, 2 and 12 from `scope_features.md` §3.
+
+| # | Title | Labels | Est | Deps |
+|---|-------|--------|-----|------|
+| #24 | Connect + consent explainer screen | `L1-core`, `frontend`, `design` | 2h | #1, #9; wires to #3, #4 |
+| #25 | Sync preview and progress screen | `L1-core`, `frontend` | 2-3h | #1, #9; real data needs #3 |
+| #26 | System states: empty, error, loading, demo banner | `L1-core`, `frontend`, `design` | 2h | #9; land before or with #10, #16 |
+
+#4, #10, #11, #12, #16 and #17 should use the shared states from #26.
+
+---
+
 ## 3. Issue Template
 
 File: `.github/ISSUE_TEMPLATE/task.md`

@@ -125,8 +125,8 @@ Critical path from `deepdive_S14.md` §8. Pick from the earliest wave with unblo
 | Wave | Issues | Notes |
 |---|---|---|
 | 0 | #1 scaffold · #2 GCP/OAuth · #9 design system | #2 and #9 are **human** tasks (GCP console, Paper) |
-| 1 | #3 OAuth · #4 demo mode · #5 seed inbox | parallel after #1 |
-| 2 | #6 → #7 → #8 ingestion chain · #10, #11 UI (mocked API) | one owner for the whole ingestion chain |
+| 1 | #3 OAuth · #4 demo mode · #5 seed inbox · #26 system states (after #9) | parallel after #1 |
+| 2 | #6 → #7 → #8 ingestion chain · #10, #11, #24 connect screen, #25 sync progress UI (mocked API) | one owner for the whole ingestion chain |
 | 3 | #13 → #14, #15 rules · #12 trust page | |
 | 4 | #16 hero · #17 claim drafts · #21 eval · #22 e2e · #23 README | |
 | cut-first | #18 L3 rewards · #19, #20 stretch | only if ahead (plan.md §3) |
