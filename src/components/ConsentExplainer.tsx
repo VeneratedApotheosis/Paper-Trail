@@ -4,88 +4,72 @@ import { WillNotList } from "@/components/WillNotList";
 // Pre-auth consent screen content (issue #24). Presentational only — all copy is
 // plain, active voice, and truthful about the single `gmail.readonly` scope and
 // the real Google "unverified app" flow (deepdive_S14 §5). No client hooks.
+// Neumorphic soft-UI: headline + trust list on the left, a raised consent card
+// with the read-only scope, the unverified heads-up, and the actions on the right.
 export function ConsentExplainer() {
   return (
-    <div className="space-y-10">
-      <header className="space-y-3">
-        <p className="col-head text-ink-muted">Connect your inbox</p>
-        <h1 className="font-serif text-3xl text-ink">
-          PaperTrail reads your receipts to find money you&apos;re owed
-        </h1>
-        <p className="max-w-ledger text-lg text-ink-muted">
-          Connect Gmail and PaperTrail turns every purchase email into a ledger row,
-          then checks each one for overdue refunds, closing return windows, and price
-          drops — so you can claim what&apos;s yours.
-        </p>
-      </header>
+    <div className="mx-auto w-full max-w-5xl animate-fade-rise">
+      <div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16">
+        {/* Left: the pitch and the trust list. */}
+        <header className="space-y-6">
+          <p className="eyebrow">Connect your inbox</p>
+          <h1 className="font-serif text-3xl text-ink sm:text-[3.25rem] sm:leading-[1.02]">
+            See what your inbox says you&apos;re owed.
+          </h1>
+          <p className="max-w-md text-lg text-ink-muted">
+            Connect Gmail read-only and PaperTrail turns every receipt into a ledger
+            row, then flags overdue refunds, closing return windows, and price drops.
+            It reads receipts, never your private mail.
+          </p>
+          {/* Criterion 2: the trust list. */}
+          <WillNotList />
+        </header>
 
-      {/* Criterion 1: the single scope, in plain language. */}
-      <section
-        aria-labelledby="scope-heading"
-        className="rounded-lg border border-rule bg-paper-sunk px-6 py-6 sm:px-8 sm:py-8"
-      >
-        <h2 id="scope-heading" className="font-serif text-xl text-ink">
-          One permission, read-only
-        </h2>
-        <p className="mt-3 text-base text-ink">
-          PaperTrail asks Google for a single scope:{" "}
-          <code className="rounded-sm bg-paper-raised px-1.5 py-0.5 text-sm text-ink-muted">
-            gmail.readonly
-          </code>
-          . That is read-only access to find your receipts.
-        </p>
-        <p className="mt-2 text-base text-ink-muted">
-          With this scope PaperTrail <strong className="text-ink">cannot</strong> send,
-          delete, label, or mark your mail as read. It can only look.
-        </p>
-      </section>
+        {/* Right: the raised consent card. */}
+        <section
+          aria-labelledby="scope-heading"
+          className="neu-raised rounded-xl px-7 py-8 sm:px-9 sm:py-10"
+        >
+          {/* Criterion 1: the single scope, in plain language. */}
+          <p id="scope-heading" className="eyebrow">
+            Read-only access
+          </p>
+          <p className="mt-3 text-base text-ink">
+            PaperTrail asks Google for one scope,{" "}
+            <code className="rounded-sm bg-paper-sunk px-1.5 py-0.5 text-sm text-teal-deep">
+              gmail.readonly
+            </code>
+            . That is read-only access to find your receipts, nothing more.
+          </p>
 
-      {/* Criterion 2 */}
-      <WillNotList />
+          {/* Criterion 3: the "unverified app" heads-up, framed calmly. */}
+          <p className="mt-5 text-sm text-ink-muted">
+            Google shows an unverified-app screen because PaperTrail is a test app.
+            Click <strong className="font-semibold text-ink">Advanced</strong>, then{" "}
+            <strong className="font-semibold text-ink">Go to PaperTrail</strong> to
+            continue. Access lasts 7 days, then you reconnect.
+          </p>
 
-      {/* Criterion 3: the "unverified app" heads-up, framed calmly and truthfully. */}
-      <section
-        aria-labelledby="unverified-heading"
-        className="rounded-lg border border-deadline/30 bg-deadline-tint/50 px-6 py-6 sm:px-8 sm:py-8"
-      >
-        <h2 id="unverified-heading" className="font-serif text-xl text-ink">
-          Heads-up: Google will show an &ldquo;unverified app&rdquo; screen
-        </h2>
-        <p className="mt-3 text-base text-ink">
-          PaperTrail is a dev/test app, so Google has not run it through public
-          verification yet. During sign-in you&apos;ll see a warning that the app
-          isn&apos;t verified. That&apos;s expected. To continue:
-        </p>
-        <ol className="mt-4 space-y-2 text-base text-ink">
-          <li className="flex gap-3">
-            <span aria-hidden="true" className="font-medium text-ink-muted">1.</span>
-            <span>
-              Click <strong className="text-ink">Advanced</strong>.
-            </span>
-          </li>
-          <li className="flex gap-3">
-            <span aria-hidden="true" className="font-medium text-ink-muted">2.</span>
-            <span>
-              Click <strong className="text-ink">Go to PaperTrail (unsafe)</strong>.
-            </span>
-          </li>
-        </ol>
-        <p className="mt-4 text-sm text-ink-muted">
-          Access is still limited to the single read-only scope above, and test-user
-          access expires after 7 days — you can reconnect any time.
-        </p>
-      </section>
-
-      {/* Criterion 4: primary + secondary actions. */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <LinkButton href="/sync">Connect Gmail</LinkButton>
-        <LinkButton href="/ledger" variant="secondary">
-          Try demo data
-        </LinkButton>
+          {/* Criterion 4: primary + secondary actions. Connect Gmail is wired to
+              the real OAuth start route (#3), a GET redirect to Google's consent.
+              It is a plain anchor (not next/link) because it targets a route
+              handler, not a page. "Try demo data" points at demo mode (#4). */}
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <a
+              href="/api/auth/google"
+              className="neu-accent inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-bold transition-[box-shadow,transform] active:scale-[0.99]"
+            >
+              Connect Gmail
+            </a>
+            <LinkButton href="/ledger" variant="secondary" className="flex-1">
+              Try demo data
+            </LinkButton>
+          </div>
+          <p className="mt-4 text-sm text-ink-faint">
+            Demo data is synthetic and labeled as such. No real inbox required.
+          </p>
+        </section>
       </div>
-      <p className="text-sm text-ink-faint">
-        Demo data is synthetic and labeled as such — no real inbox required.
-      </p>
     </div>
   );
 }
