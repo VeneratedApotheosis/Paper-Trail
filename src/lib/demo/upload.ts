@@ -1,0 +1,44 @@
+import type { RawEmail } from "@/lib/contracts";
+import type { ExtractionCache } from "@/lib/ingestion";
+import type { LlmClient } from "@/lib/llm";
+import { createLlmExtractor } from "@/lib/pipeline/extractors";
+import { runPipeline, type PipelineAuditEvent, type PipelineResult } from "@/lib/pipeline/run";
+import { loadSeedLlmCache } from "./seed";
+
+/** Max total upload size accepted by POST /api/upload. */
+export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+
+/** Reads from `primary` then `fallback`; writes go to `primary` only (the committed seed cache is never modified). */
+function layeredCache(primary: ExtractionCache, fallback: ExtractionCache | null): ExtractionCache {
+  return {
+    get: (textHash) => primary.get(textHash) ?? fallback?.get(textHash),
+    set: (textHash, extraction) => primary.set(textHash, extraction),
+  };
+}
+
+export interface UploadPipelineOptions {
+  /** Session extraction cache (purged by delete-all). */
+  cache: ExtractionCache;
+  now: Date;
+  audit?: (event: PipelineAuditEvent) => void;
+  excludedMerchants?: ReadonlySet<string>;
+  /** Defaults to the Anthropic client; without ANTHROPIC_API_KEY, cache misses go to the review queue. */
+  llm?: LlmClient;
+}
+
+/** Runs uploaded .eml/.mbox emails through the shared pipeline with real (cached) LLM extraction. */
+export function runUploadPipeline(emails: readonly RawEmail[], options: UploadPipelineOptions): Promise<PipelineResult> {
+  const extractor = createLlmExtractor({
+    cache: layeredCache(options.cache, loadSeedLlmCache()),
+    llm: options.llm,
+    audit: options.audit,
+  });
+  return runPipeline(emails, {
+    now: options.now,
+    extractor,
+    audit: options.audit,
+    excludedMerchants: options.excludedMerchants,
+    applyPrefilter: true,
+    sourceLabel: "upload",
+  });
+}
