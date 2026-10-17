@@ -18,7 +18,7 @@ const TYPE_LABEL: Record<AuditType, string> = {
   sync_complete: "Sync complete",
 };
 
-// One signal colour per meaning: delete is the destructive/vermilion signal.
+// One signal colour per meaning: delete is the destructive/money-teal signal.
 function toneFor(type: AuditType): ChipTone {
   return type === "delete" ? "owed" : "neutral";
 }
@@ -36,37 +36,39 @@ export function AuditLogTable() {
 
   return (
     <div>
-      <div className="flex items-center gap-4 border-b border-rule px-2 pb-2">
-        <span className="col-head w-32 shrink-0">When</span>
-        <span className="col-head w-32 shrink-0">Event</span>
-        <span className="col-head min-w-0 flex-1">Detail</span>
+      <div className="hidden gap-4 px-4 pb-3 sm:grid sm:grid-cols-[8rem_7rem_1fr]">
+        <span className="eyebrow">When</span>
+        <span className="eyebrow">Event</span>
+        <span className="eyebrow">Detail</span>
       </div>
-      {rows.map((entry) => (
-        <div
-          key={entry.id}
-          className="flex items-start gap-4 border-b border-rule px-2 py-3 last:border-b-0"
-        >
-          <span className="w-32 shrink-0 text-sm text-ink-muted">{formatDate(entry.at)}</span>
-          <span className="w-32 shrink-0">
-            <Chip tone={toneFor(entry.type)}>{TYPE_LABEL[entry.type]}</Chip>
-          </span>
-          <span className="min-w-0 flex-1 text-sm text-ink">
-            {entry.detail}
-            {entry.type === "llm_call" ? (
-              <span className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-label text-ink-muted">
-                {typeof entry.redactedTokenCount === "number" ? (
-                  <span>
-                    {entry.redactedTokenCount} redacted token
-                    {entry.redactedTokenCount === 1 ? "" : "s"}
-                  </span>
-                ) : null}
-                {entry.model ? <span>model {entry.model}</span> : null}
-                {typeof entry.cost === "number" ? <span>cost {formatCost(entry.cost)}</span> : null}
-              </span>
-            ) : null}
-          </span>
-        </div>
-      ))}
+      <ul className="space-y-3">
+        {rows.map((entry) => (
+          <li
+            key={entry.id}
+            className="neu-inset grid gap-x-4 gap-y-2 rounded-lg px-4 py-3 sm:grid-cols-[8rem_7rem_1fr] sm:items-start"
+          >
+            <span className="font-sans text-sm text-ink-muted">{formatDate(entry.at)}</span>
+            <span>
+              <Chip tone={toneFor(entry.type)}>{TYPE_LABEL[entry.type]}</Chip>
+            </span>
+            <span className="min-w-0 font-sans text-sm text-ink">
+              {entry.detail}
+              {entry.type === "llm_call" ? (
+                <span className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-label text-ink-muted">
+                  {typeof entry.redactedTokenCount === "number" ? (
+                    <span>
+                      {entry.redactedTokenCount} redacted token
+                      {entry.redactedTokenCount === 1 ? "" : "s"}
+                    </span>
+                  ) : null}
+                  {entry.model ? <span>model {entry.model}</span> : null}
+                  {typeof entry.cost === "number" ? <span>cost {formatCost(entry.cost)}</span> : null}
+                </span>
+              ) : null}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
