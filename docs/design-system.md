@@ -42,3 +42,10 @@ Use the utilities, not ad-hoc shadows:
 - `:focus-visible` is a 2px teal outline. Keep it.
 - `prefers-reduced-motion` disables animation/transition globally.
 - Keep text at accessible contrast even where chrome stays soft.
+
+## Decisions log
+- **Display font:** Spectral; **UI font:** Hanken Grotesk (#46, 2026-10-17).
+- **Destructive colour:** muted terracotta `#b0574c` is the one non-neutral accent, used only for the "Delete all my data" action. Kept intentionally (operator-approved 2026-10-17); there is no `red` token in the palette.
+- **Frontend ownership (2026-10-17):** views are props-only and live in `src/components/**` (Alex). Pages (`src/app/**/page.tsx`), `layout.tsx`, `middleware.ts`, and data hooks (`src/hooks/**`) are Kenan's `ui-wiring`. Data wiring never goes in views; views take props typed via `@/lib/contracts` and emit callbacks.
+- **PWA (#44):** `theme-color` is the slate base `#dbe1ea`; app icons live in `public/` (maskable 192/512 + `apple-touch-icon`) and are Alex's. The manifest route (`src/app/manifest.ts`), the service worker (Serwist), and `next.config` are Kenan's (ui-wiring/infra).
+- **owedTotal rounding:** money is rounded to cents in the backend summary (source of truth); `src/lib/format.ts` only formats for display. See backend guard issue.
