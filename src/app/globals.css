@@ -2,6 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-variant-numeric: tabular-nums;
+@layer base {
+  :root {
+    /* Mirror of tailwind tokens for raw CSS / motifs. See docs/design-system.md. */
+    --paper: #faf6ee;
+    --paper-raised: #fffdf8;
+    --ink: #1a1814;
+    --rule: #ded5c4;
+    --owed: #c23a1b;
+    --deadline: #b07a09;
+    --saved: #2f7d4f;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    /* Tabular figures everywhere so ledger amounts line up column to column. */
+    font-variant-numeric: tabular-nums;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Visible, on-brand keyboard focus (never remove outlines without a replacement). */
+  :focus-visible {
+    outline: 2px solid var(--owed);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Receipt-perforation motif — used sparingly to mark a tear/section edge.
+     A dashed hairline that reads as a ledger rule or a receipt perforation. */
+  .perf-rule {
+    border: none;
+    height: 0;
+    border-top: 1px dashed var(--rule);
+  }
+
+  /* A torn receipt bottom edge: scalloped notches. Apply to a thin element. */
+  .perf-edge {
+    height: 10px;
+    background: var(--paper-raised);
+    -webkit-mask: radial-gradient(circle 6px at 10px 0, transparent 0 6px, #000 6px)
+      repeat-x;
+    mask: radial-gradient(circle 6px at 10px 0, transparent 0 6px, #000 6px) repeat-x;
+    -webkit-mask-size: 20px 10px;
+    mask-size: 20px 10px;
+  }
+
+  /* Small-caps column header used in real tables (not as decoration). */
+  .col-head {
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink);
+    opacity: 0.55;
+    font-weight: 600;
+  }
 }
