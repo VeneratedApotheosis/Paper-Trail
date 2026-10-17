@@ -6,6 +6,7 @@ import { syncGmail } from "@/lib/gmail/service";
 import { createLlmExtractor } from "@/lib/pipeline/extractors";
 import { appendAudit, getExcludedMerchants, getExtractionCache, setPipelineResult } from "@/lib/store";
 import { buildPipelineRunResponse } from "@/lib/api/ledger";
+import { gmailProgress } from "@/lib/gmail/progress";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,22 +22,25 @@ async function handlePOST(request: Request): Promise<Response> {
   if (!body.success) return Response.json({ error: "Confirm the Gmail preview before starting sync." }, { status: 400, headers });
   let userId: string | undefined;
   let acquired = false;
+  let progress: ReturnType<typeof gmailProgress.begin> | undefined;
   try {
     const authenticated = gmailRequest(request);
     userId = authenticated.userId;
     if (running.has(userId)) throw new GmailError(409, "sync_already_running");
     running.add(userId);
     acquired = true;
+    progress = gmailProgress.begin(userId);
     const now = new Date();
-    const { result, ...info } = await syncGmail({ ...authenticated.deps, pipeline: {
+    const { result, ...info } = await syncGmail({ ...authenticated.deps, onProgress: progress.update, pipeline: {
       now, audit: appendAudit, excludedMerchants: getExcludedMerchants(),
       extractor: createLlmExtractor({ cache: getExtractionCache(), audit: appendAudit }),
     } });
     request.signal.throwIfAborted();
     if (!authenticated.active()) throw new GmailError(401, "token_expired");
     setPipelineResult("gmail", now.toISOString(), result);
+    progress.complete();
     return Response.json({ ...buildPipelineRunResponse(), ...info }, { headers });
-  } catch (error) { return gmailErrorResponse(error); }
+  } catch (error) { progress?.fail(); return gmailErrorResponse(error); }
   finally { if (userId && acquired) running.delete(userId); }
 }
 export const POST = withAccountStore(handlePOST);

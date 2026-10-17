@@ -18,7 +18,8 @@ it("runs real classification/redaction/matching/rules and reports malformed mess
     return Response.json(path.endsWith("m1") ? fixture("m1") : { id: "m2", payload: {} });
   });
   const audit = vi.fn(), pace = vi.fn().mockResolvedValue(undefined);
-  const result = await syncGmail({ accessToken: async () => "synthetic-access", fetcher, audit, pace, pipeline: {
+  const onProgress = vi.fn();
+  const result = await syncGmail({ accessToken: async () => "synthetic-access", fetcher, audit, pace, onProgress, pipeline: {
     now, audit,
     extractor: async (redacted, classification) => {
       captured.push(redacted);
@@ -41,6 +42,13 @@ it("runs real classification/redaction/matching/rules and reports malformed mess
   expect(pace).toHaveBeenCalledTimes(2);
   expect(JSON.stringify(result)).not.toContain("(555) 012-3456");
   expect(JSON.stringify(audit.mock.calls)).not.toContain("synthetic-access");
+  expect(onProgress.mock.calls.map(([value]) => value)).toEqual([
+    { stage: "listing", fetched: 0, total: null, skipped: 0 },
+    { stage: "fetching", fetched: 0, total: 2, skipped: 0 },
+    { stage: "fetching", fetched: 1, total: 2, skipped: 0 },
+    { stage: "fetching", fetched: 2, total: 2, skipped: 1 },
+    { stage: "processing", fetched: 2, total: 2, skipped: 1 },
+  ]);
 });
 it("returns preview cap and estimate without fetching bodies", async () => {
   const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ resultSizeEstimate: 901 }));
@@ -62,20 +70,24 @@ it("does not call the pipeline on transient fetch failure or all-malformed messa
   expect(extractor).not.toHaveBeenCalled();
 });
 it("reports a message removed between list/get and processes the remaining messages", async () => {
+  const onProgress = vi.fn();
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async url => {
     const path = new URL(String(url)).pathname;
     return path.endsWith("/messages") ? Response.json({ messages: [{ id: "gone" }, { id: "m1" }] })
       : path.endsWith("gone") ? new Response(null, { status: 404 }) : Response.json(fixture("m1"));
   });
-  const result = await syncGmail({ accessToken: async () => "synthetic", fetcher, audit: vi.fn(), pace: async () => {},
+  const result = await syncGmail({ accessToken: async () => "synthetic", fetcher, audit: vi.fn(), pace: async () => {}, onProgress,
     pipeline: { now, extractor: async () => ({ ok: false, needsReview: true, reason: "synthetic review" }) } });
   expect(result.parseErrors).toEqual([{ id: "gone", reason: "message_unavailable" }]);
   expect(result.result.stats.needsReview).toBe(2);
+  expect(onProgress).toHaveBeenLastCalledWith({ stage: "processing", fetched: 2, total: 2, skipped: 1 });
 });
 it("runs an empty inbox through the pipeline without LLM calls", async () => {
+  const onProgress = vi.fn();
   const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({})), extractor = vi.fn();
   const result = await syncGmail({ accessToken: async () => "synthetic", fetcher, audit: vi.fn(),
-    pipeline: { now, extractor }, pace: async () => {} });
+    pipeline: { now, extractor }, pace: async () => {}, onProgress });
   expect(result.result.stats.emails).toBe(0); expect(result.result.orders).toEqual([]);
   expect(extractor).not.toHaveBeenCalled();
+  expect(onProgress).toHaveBeenLastCalledWith({ stage: "processing", fetched: 0, total: 0, skipped: 0 });
 });

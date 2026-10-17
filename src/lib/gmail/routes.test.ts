@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { GET as preview } from "@/app/api/gmail/preview/route";
 import { POST as sync } from "@/app/api/gmail/sync/route";
+import { GET as status } from "@/app/api/gmail/sync/status/route";
 import { GET as ledger } from "@/app/api/ledger/route";
 import { GET as audit } from "@/app/api/audit/route";
 import { POST as demo } from "@/app/api/demo/route";
@@ -12,6 +13,7 @@ import { loadSeedDemo } from "@/lib/demo/seed";
 import { appendAudit, getState, resetStore, withStoreScope } from "@/lib/store";
 import type { GmailSyncResult } from "./service";
 import * as service from "./service";
+import { GmailError } from "./client";
 
 let db: AuthStore;
 vi.mock("@/lib/auth/store", async importOriginal => {
@@ -90,10 +92,13 @@ it("rejects overlapping syncs without unlocking the first running sync", async (
   const spy = vi.spyOn(service, "syncGmail").mockReturnValue(deferred);
   const pending = sync(req("gmail/sync", cookie, { confirmed: true }));
   await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+  expect(await (await status(req("gmail/sync/status", cookie))).json()).toMatchObject({ stage: "listing" });
   expect((await sync(req("gmail/sync", cookie, { confirmed: true }))).status).toBe(409);
+  expect(await (await status(req("gmail/sync/status", cookie))).json()).toMatchObject({ stage: "listing" });
   expect((await sync(req("gmail/sync", cookie, { confirmed: true }))).status).toBe(409);
   release({ result: seed, fetched: 45, capped: false, parseErrors: [] });
   expect((await pending).status).toBe(200);
+  expect(await (await status(req("gmail/sync/status", cookie))).json()).toMatchObject({ stage: "complete" });
 });
 it("does not publish results after deletion invalidates the session", async () => {
   const { id, cookie } = account("one@example.test");
@@ -103,5 +108,58 @@ it("does not publish results after deletion invalidates the session", async () =
     return { result: seed, fetched: 45, capped: false, parseErrors: [] };
   });
   expect((await sync(req("gmail/sync", cookie, { confirmed: true }))).status).toBe(401);
+  expect(withStoreScope(id, getState).orders).toEqual([]);
+  expect((await status(req("gmail/sync/status", cookie))).status).toBe(401);
+});
+
+it("polls actual progress locally and isolates other accounts, never returning message data", async () => {
+  const first = account("first@example.test"), second = account("second@example.test");
+  const seed = await loadSeedDemo({ cachePath: "missing-llm-cache.json" });
+  const fetcher = vi.fn(() => { throw new Error("Unexpected network call"); });
+  vi.stubGlobal("fetch", fetcher);
+  let release!: (value: GmailSyncResult) => void;
+  vi.spyOn(service, "syncGmail").mockImplementation(options => {
+    options.onProgress?.({ stage: "fetching", fetched: 2, total: 5, skipped: 1 });
+    return new Promise(resolve => { release = resolve; });
+  });
+  const pending = sync(req("gmail/sync", first.cookie, { confirmed: true }));
+  await vi.waitFor(() => expect(release).toBeDefined());
+  const response = await status(req("gmail/sync/status", first.cookie));
+  expect(response.headers.get("cache-control")).toBe("no-store");
+  expect(await response.json()).toEqual({ stage: "fetching", fetched: 2, total: 5, skipped: 1 });
+  expect(await (await status(req("gmail/sync/status", second.cookie))).json()).toEqual({
+    stage: "idle", fetched: 0, total: null, skipped: 0,
+  });
+  expect((await status(req("gmail/sync/status"))).status).toBe(401);
+  expect((await status(req("gmail/sync/status", "invalid"))).status).toBe(401);
+  release({ result: seed, fetched: 5, capped: false, parseErrors: [] });
+  expect((await pending).status).toBe(200);
+  expect(fetcher).not.toHaveBeenCalled();
+});
+
+it("reports failed syncs without exposing arbitrary error details and permits retry", async () => {
+  const { cookie } = account("one@example.test");
+  const spy = vi.spyOn(service, "syncGmail").mockRejectedValue(new GmailError(503, "gmail_unavailable"));
+  expect((await sync(req("gmail/sync", cookie, { confirmed: true }))).status).toBe(503);
+  expect(await (await status(req("gmail/sync/status", cookie))).json()).toEqual({
+    stage: "failed", fetched: 0, total: null, skipped: 0,
+  });
+  const seed = await loadSeedDemo({ cachePath: "missing-llm-cache.json" });
+  spy.mockResolvedValue({ result: seed, fetched: 0, capped: false, parseErrors: [] });
+  expect((await sync(req("gmail/sync", cookie, { confirmed: true }))).status).toBe(200);
+  expect(await (await status(req("gmail/sync/status", cookie))).json()).toMatchObject({ stage: "complete" });
+});
+
+it("marks aborted syncs failed without publishing a ledger", async () => {
+  const { id, cookie } = account("one@example.test");
+  const seed = await loadSeedDemo({ cachePath: "missing-llm-cache.json" });
+  const abort = new AbortController();
+  const request = new Request(req("gmail/sync", cookie, { confirmed: true }), { signal: abort.signal });
+  vi.spyOn(service, "syncGmail").mockImplementation(async () => {
+    abort.abort();
+    return { result: seed, fetched: 45, capped: false, parseErrors: [] };
+  });
+  expect((await sync(request)).status).toBe(503);
+  expect(await (await status(req("gmail/sync/status", cookie))).json()).toMatchObject({ stage: "failed" });
   expect(withStoreScope(id, getState).orders).toEqual([]);
 });
