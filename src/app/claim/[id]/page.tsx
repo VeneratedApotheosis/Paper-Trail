@@ -26,7 +26,7 @@ export default async function ClaimPage({
           actions={
             <Link
               href="/"
-              className="rounded-sm border border-rule bg-paper px-3 py-1.5 text-sm text-ink hover:bg-paper-raised"
+              className="neu-raised-sm inline-flex items-center justify-center rounded-lg px-5 py-3 text-sm font-bold text-teal-deep transition-[box-shadow,transform] active:scale-[0.99]"
             >
               Back to owed
             </Link>

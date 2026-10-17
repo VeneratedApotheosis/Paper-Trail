@@ -5,7 +5,6 @@ import Link from "next/link";
 import type { Finding, FindingKind, NormalizedOrder } from "@/lib/contracts";
 import type { Draft } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
-import { Chip } from "@/components/ui/Chip";
 import { formatMoney } from "@/lib/format";
 import { merchantName } from "@/lib/view";
 
@@ -17,6 +16,15 @@ const KIND_SUBJECT: Record<FindingKind, string> = {
   return_deadline: "Return request",
   price_drop: "Price adjustment request",
   rewards_gap: "Missing rewards",
+};
+
+// Short human label for the summary line under the title.
+const KIND_LABEL: Record<FindingKind, string> = {
+  refund_overdue: "Refund overdue",
+  refund_short: "Refund short",
+  return_deadline: "Return window closing",
+  price_drop: "Price drop",
+  rewards_gap: "Rewards gap",
 };
 
 // Merchant support address when no drafted recipient exists: support@{domain}.
@@ -40,7 +48,7 @@ function buildFallbackDraft(
   const amount = formatMoney(finding.amountAtStake, finding.currency);
   const quote = finding.evidence[0]?.quote;
 
-  const subject = `${KIND_SUBJECT[finding.kind]} — order ${orderRef}`;
+  const subject = `${KIND_SUBJECT[finding.kind]}, order ${orderRef}`;
   const body = [
     "Hello,",
     "",
@@ -90,8 +98,6 @@ export function ClaimDraft({
   const bodyId = useId();
 
   const amount = formatMoney(finding.amountAtStake, finding.currency);
-  const orderRef = order?.orderRef ?? null;
-  const quote = finding.evidence[0]?.quote ?? null;
 
   const clipboardText = `Subject: ${subject}\n\n${body}`;
   const mailtoHref = `mailto:${recipient}?subject=${encodeURIComponent(
@@ -115,49 +121,33 @@ export function ClaimDraft({
 
   return (
     <div>
-      <Link href="/" className="text-sm text-ink-muted hover:text-ink">
+      <Link
+        href="/"
+        className="text-sm font-medium text-ink-muted transition-colors hover:text-ink"
+      >
         ← Owed
       </Link>
 
       {/* Header */}
-      <header className="mt-3 flex flex-wrap items-start justify-between gap-4 border-b border-rule pb-6">
-        <div className="min-w-0">
-          <p className="col-head">Draft a claim</p>
-          <h1 className="mt-2 font-serif text-3xl text-ink">{merchantName(order)}</h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            {orderRef ? <>Order {orderRef} · </> : null}
-            Review and edit before you send it yourself
-          </p>
-        </div>
-        <Chip tone="owed">{amount}</Chip>
+      <header className="mt-4">
+        <h1 className="font-serif text-3xl text-ink">Claim draft</h1>
+        <p className="mt-2 text-sm text-ink-muted">
+          {KIND_LABEL[finding.kind]}, {merchantName(order)},{" "}
+          <span className="font-serif text-money">{amount}</span>
+        </p>
       </header>
 
-      {/* What this claim is based on — amounts/quote come from the rule, not the LLM */}
-      <section className="mt-6">
-        <h2 className="col-head">What this claim is based on</h2>
-        <dl className="mt-2 max-w-ledger space-y-1 text-sm">
-          {orderRef ? (
-            <div className="flex items-center justify-between text-ink-muted">
-              <dt>Order reference</dt>
-              <dd className="tabular-nums text-ink">{orderRef}</dd>
-            </div>
-          ) : null}
-          <div className="flex items-center justify-between text-ink-muted">
-            <dt>Amount at stake</dt>
-            <dd className="tabular-nums text-owed">{amount}</dd>
-          </div>
-        </dl>
-        {quote ? (
-          <blockquote className="mt-3 border-l-2 border-rule bg-paper-sunk px-3 py-2 text-sm italic text-ink-muted">
-            &ldquo;{quote}&rdquo;
-          </blockquote>
-        ) : null}
-      </section>
-
       {/* The letter — editable, reads like paper */}
-      <section className="mt-8 rounded-lg border border-rule bg-paper-raised p-6 shadow-raised">
-        <div>
-          <label htmlFor={subjectId} className="col-head">
+      <section className="neu-raised mt-8 rounded-xl p-6 md:p-8">
+        <div className="flex items-baseline justify-between gap-4">
+          <p className="eyebrow">To</p>
+          <p className="truncate text-sm text-ink-muted">{recipient}</p>
+        </div>
+
+        <hr className="mt-4 border-0 border-t border-rule/70" />
+
+        <div className="mt-6">
+          <label htmlFor={subjectId} className="eyebrow">
             Subject
           </label>
           <input
@@ -165,12 +155,12 @@ export function ClaimDraft({
             type="text"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
-            className="mt-1 w-full rounded-sm border border-rule bg-paper px-3 py-2 font-serif text-lg text-ink focus-visible:outline-none"
+            className="neu-inset mt-2 w-full rounded-lg bg-transparent px-4 py-3 font-serif text-xl text-ink focus-visible:outline-none"
           />
         </div>
 
-        <div className="mt-5">
-          <label htmlFor={bodyId} className="col-head">
+        <div className="mt-6">
+          <label htmlFor={bodyId} className="eyebrow">
             Message
           </label>
           <textarea
@@ -178,28 +168,24 @@ export function ClaimDraft({
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={14}
-            className="mt-1 w-full resize-y rounded-sm border border-rule bg-paper px-3 py-3 font-serif text-base leading-relaxed text-ink focus-visible:outline-none"
+            className="neu-inset mt-2 w-full resize-y rounded-lg bg-transparent px-4 py-4 font-sans text-base leading-relaxed text-ink focus-visible:outline-none"
           />
         </div>
 
-        <p className="mt-4 text-sm text-ink-muted">
-          <span className="font-medium text-ink">
-            PaperTrail never sends this for you — you send it yourself.
+        <p className="neu-inset mt-6 rounded-lg px-4 py-3 text-sm text-ink-muted">
+          <span className="font-semibold text-ink">
+            PaperTrail never sends this for you.
           </span>{" "}
-          Review the wording, then copy it or open it in your email app.
+          You send it yourself.
         </p>
 
-        <p className="mt-2 text-sm text-ink-faint">
-          To: <span className="tabular-nums text-ink-muted">{recipient}</span>
-        </p>
-
-        <div className="mt-5 flex flex-wrap items-center gap-3">
+        <div className="mt-6 flex flex-wrap items-center gap-3">
           <Button type="button" variant="primary" onClick={handleApprove}>
-            Approve &amp; copy
+            Approve and copy
           </Button>
           <a
             href={mailtoHref}
-            className="inline-flex items-center justify-center gap-2 rounded border border-rule bg-paper-raised px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-paper-sunk"
+            className="neu-raised-sm inline-flex items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-bold text-teal-deep transition-[box-shadow,transform] active:scale-[0.99]"
           >
             Open in email
           </a>
@@ -210,16 +196,16 @@ export function ClaimDraft({
       {approved ? (
         <div
           role="status"
-          className="animate-fade-rise mt-6 rounded-lg border border-saved/30 bg-saved-tint px-4 py-3"
+          className="neu-inset animate-fade-rise mt-6 rounded-xl px-5 py-4"
         >
-          <p className="font-medium text-saved">
+          <p className="font-serif text-lg text-teal-deep">
             {copyOk
-              ? "Approved — copied to clipboard"
-              : "Approved — copy failed, use \u201cOpen in email\u201d or copy manually"}
+              ? "Approved and copied to clipboard"
+              : "Approved. Copy failed, use \u201cOpen in email\u201d or copy manually"}
           </p>
           <p className="mt-1 text-sm text-ink-muted">
-            This approval is logged to your audit trail. You still need to send the
-            email yourself — PaperTrail never sends it for you.
+            This approval is logged to your audit trail. You still send the email
+            yourself. PaperTrail never sends it for you.
           </p>
         </div>
       ) : null}
