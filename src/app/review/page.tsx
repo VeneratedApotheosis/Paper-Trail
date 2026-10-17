@@ -75,16 +75,13 @@ export default function ReviewPage() {
     <AppShell>
       <div className="mb-6">
         <h1 className="font-serif text-3xl text-ink">Needs review</h1>
-        <p className="mt-1 max-w-ledger text-base text-ink-muted">
-          Orders we parsed with low confidence. They are{" "}
-          <span className="font-medium text-ink">excluded from your &ldquo;owed&rdquo; total</span>{" "}
-          until you confirm the details — so the headline number only reflects purchases
-          we&rsquo;re sure about.
+        <p className="mt-2 max-w-ledger text-base text-ink-muted">
+          Held out of your total until you confirm.
         </p>
       </div>
 
       {confirmed.length > 0 ? (
-        <div className="mb-6 flex flex-wrap items-center gap-2 rounded-md border border-saved/30 bg-saved-tint px-4 py-3 text-sm text-saved">
+        <div className="neu-inset mb-6 flex flex-wrap items-center gap-2 rounded-lg px-4 py-3 text-sm text-ink-muted">
           <Chip tone="saved">Confirmed</Chip>
           <span>
             {confirmed.join(", ")} now included in owed totals. Edit logged to audit
@@ -102,7 +99,7 @@ export default function ReviewPage() {
       ) : (
         <>
           <p className="mb-4 text-sm text-ink-muted">
-            <span className="font-medium tabular-nums text-ink">{queue.length}</span>{" "}
+            <span className="font-semibold tabular-nums text-ink">{queue.length}</span>{" "}
             order{queue.length === 1 ? "" : "s"} remaining to review.
           </p>
           <div className="flex flex-col gap-6">
