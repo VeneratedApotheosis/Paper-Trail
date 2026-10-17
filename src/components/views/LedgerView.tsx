@@ -1,0 +1,162 @@
+"use client";
+
+import { type ReactNode, useMemo, useState } from "react";
+import type { NormalizedOrder } from "@/lib/contracts";
+import { AppShell } from "@/components/AppShell";
+import { OrderCard } from "@/components/OrderCard";
+import { EmptyState } from "@/components/states";
+import { Button } from "@/components/ui/Button";
+import { deriveOrderStatus, type OrderDisplayStatus } from "@/lib/view";
+
+const ALL = "all" as const;
+
+// Canonical lifecycle order so status pills never reorder across renders/data.
+const STATUS_ORDER: OrderDisplayStatus[] = [
+  "ordered",
+  "shipped",
+  "delivered",
+  "return in progress",
+  "returned",
+  "refunded",
+  "cancelled",
+];
+
+// Props-only view for the ledger list. All orders arrive as props (typed via
+// @/lib/contracts) and opening an order is a callback, so the page wrapper owns
+// data + navigation. No fetch, no @/lib/api, no routing in here.
+export interface LedgerViewProps {
+  orders: NormalizedOrder[];
+  onOpenOrder: (id: string) => void;
+  onLoadDemo?: () => void;
+}
+
+export function LedgerView({ orders, onOpenOrder, onLoadDemo }: LedgerViewProps) {
+  const [merchant, setMerchant] = useState<string>(ALL);
+  const [status, setStatus] = useState<string>(ALL);
+
+  // Reverse-chronological: newest order first.
+  const sorted = useMemo(
+    () =>
+      [...orders].sort(
+        (a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime(),
+      ),
+    [orders],
+  );
+
+  const merchants = useMemo(
+    () => Array.from(new Set(sorted.map((o) => o.merchant.name))).sort(),
+    [sorted],
+  );
+  const statuses = useMemo(() => {
+    const present = new Set(sorted.map((o) => deriveOrderStatus(o)));
+    return STATUS_ORDER.filter((s) => present.has(s));
+  }, [sorted]);
+
+  const visible = sorted.filter((o) => {
+    if (merchant !== ALL && o.merchant.name !== merchant) return false;
+    if (status !== ALL && deriveOrderStatus(o) !== status) return false;
+    return true;
+  });
+
+  if (orders.length === 0) {
+    return (
+      <AppShell>
+        <EmptyState
+          title="No orders yet"
+          actions={
+            onLoadDemo ? (
+              <Button type="button" onClick={onLoadDemo}>
+                Load demo data
+              </Button>
+            ) : undefined
+          }
+        >
+          Your ledger fills in as we read purchase receipts. Load the synthetic
+          demo inbox to see how every order and finding looks.
+        </EmptyState>
+      </AppShell>
+    );
+  }
+
+  return (
+    <AppShell>
+      <div className="mb-6 flex items-baseline gap-3">
+        <h1 className="font-serif text-3xl text-ink">Ledger</h1>
+        <span className="text-sm text-ink-faint">
+          {visible.length} {visible.length === 1 ? "order" : "orders"}
+        </span>
+      </div>
+
+      <div className="mb-7 space-y-3">
+        <div
+          role="group"
+          aria-label="Filter by status"
+          className="flex flex-wrap gap-2"
+        >
+          <FilterPill active={status === ALL} onClick={() => setStatus(ALL)}>
+            All statuses
+          </FilterPill>
+          {statuses.map((s: OrderDisplayStatus) => (
+            <FilterPill key={s} active={status === s} onClick={() => setStatus(s)}>
+              {s.charAt(0).toUpperCase() + s.slice(1)}
+            </FilterPill>
+          ))}
+        </div>
+        <div
+          role="group"
+          aria-label="Filter by merchant"
+          className="flex flex-wrap gap-2"
+        >
+          <FilterPill active={merchant === ALL} onClick={() => setMerchant(ALL)}>
+            All merchants
+          </FilterPill>
+          {merchants.map((m) => (
+            <FilterPill key={m} active={merchant === m} onClick={() => setMerchant(m)}>
+              {m}
+            </FilterPill>
+          ))}
+        </div>
+      </div>
+
+      {visible.length === 0 ? (
+        <EmptyState title="No matching orders">
+          No orders match these filters. Try clearing the merchant or status filter.
+        </EmptyState>
+      ) : (
+        <div className="space-y-4">
+          {visible.map((order) => (
+            <OrderCard
+              key={order.id}
+              order={order}
+              onOpen={() => onOpenOrder(order.id)}
+            />
+          ))}
+        </div>
+      )}
+    </AppShell>
+  );
+}
+
+// A pill that drives a filter choice. Active = teal accent, inactive = soft raised.
+function FilterPill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`rounded-sm px-4 py-1.5 text-sm font-bold transition-shadow ${
+        active ? "neu-accent" : "neu-raised-sm text-ink-muted hover:text-ink"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
