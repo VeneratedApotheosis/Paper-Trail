@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { ClaimDraft } from "@/components/ClaimDraft";
 import { EmptyState } from "@/components/states";
-import { getDraftForFinding, getFinding, getOrder } from "@/lib/mock/data";
+import { getDraftForFinding, getFinding, getOrder, SIMULATED_PRICE_LABEL } from "@/lib/mock/data";
 
 // Claim draft sheet (#17 — UI only). `id` is a *finding* id (findings link here
 // from the hero FindingCard via /claim/${finding.id}). Data loads here on the
@@ -17,8 +17,9 @@ export default async function ClaimPage({
 }) {
   const { id } = await params;
   const finding = getFinding(id);
+  const order = finding ? getOrder(finding.orderId) : undefined;
 
-  if (!finding) {
+  if (!finding || !order) {
     return (
       <AppShell>
         <EmptyState
@@ -39,12 +40,16 @@ export default async function ClaimPage({
     );
   }
 
-  const order = getOrder(finding.orderId);
   const existingDraft = getDraftForFinding(finding.id);
 
   return (
     <AppShell>
-      <ClaimDraft finding={finding} order={order} existingDraft={existingDraft} />
+      <ClaimDraft
+        finding={finding}
+        order={order}
+        existingDraft={existingDraft}
+        simulatedLabel={SIMULATED_PRICE_LABEL}
+      />
     </AppShell>
   );
 }
