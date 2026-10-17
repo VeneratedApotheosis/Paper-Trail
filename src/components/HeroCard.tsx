@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { animate, useReducedMotion } from "framer-motion";
+import { LinkButton } from "@/components/ui/Button";
 import { formatMoney } from "@/lib/format";
 
-// The one bold moment (design-system.md): the "$X waiting for you" figure in
-// Fraunces, vermilion = owed. Count-up is optional polish and fully respects
-// prefers-reduced-motion — reduced motion shows the final value with no animation.
+// The one bold moment (design-system.md): the "You're owed $X" figure set in
+// Fraunces, deep-teal money, centered on a soft raised card. The count-up is
+// optional polish and fully respects prefers-reduced-motion (reduced motion
+// shows the final value with no animation).
 export function HeroCard({
   total,
   currency,
@@ -33,32 +35,38 @@ export function HeroCard({
   }, [total, reducedMotion]);
 
   const owedMoney = formatMoney(total, currency);
+  // Split dollars from cents so the cents read smaller and muted.
+  const [dollars, cents] = formatMoney(displayed, currency).split(".");
 
   return (
     <section
       aria-labelledby="hero-amount"
-      className="relative overflow-hidden rounded-lg border border-rule bg-paper-raised px-6 py-10 text-center shadow-raised sm:px-10 sm:py-14"
+      className="neu-raised rounded-xl px-6 py-12 text-center sm:px-12 sm:py-16"
     >
-      <p className="col-head mb-4">You&apos;re owed</p>
+      <p className="eyebrow mb-5">You&apos;re owed</p>
       <p
         id="hero-amount"
         aria-label={`${owedMoney} waiting for you`}
-        className="font-serif text-hero font-semibold tracking-tight text-owed tabular-nums"
+        className="font-serif text-hero font-semibold tracking-tight text-money tabular-nums"
       >
-        <span aria-hidden>{formatMoney(displayed, currency)}</span>
+        <span aria-hidden>
+          {dollars}
+          <span className="align-top text-3xl text-ink-muted">.{cents}</span>
+        </span>
       </p>
-      <p className="mx-auto mt-4 max-w-md text-lg text-ink-muted">
-        waiting for you
-        {count > 0 ? (
-          <>
-            {" "}
-            across {count} {count === 1 ? "finding" : "findings"} your inbox turned up.
-          </>
-        ) : (
-          "."
-        )}
+      <p className="mx-auto mt-5 max-w-md text-base text-ink-muted">
+        {count > 0
+          ? `Across ${count} ${count === 1 ? "finding" : "findings"} from your inbox.`
+          : "Nothing to claim right now."}
       </p>
-      <hr className="perf-rule mx-auto mt-10 w-32" />
+      <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+        <LinkButton href="#findings" variant="primary">
+          Draft claims
+        </LinkButton>
+        <LinkButton href="/review" variant="secondary">
+          Review
+        </LinkButton>
+      </div>
     </section>
   );
 }

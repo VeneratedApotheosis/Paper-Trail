@@ -33,7 +33,7 @@ export default function Home() {
           actions={<LinkButton href="/ledger">Browse the ledger</LinkButton>}
         >
           We went through your receipts and found no overdue refunds, closing
-          return windows, or price drops. You&apos;re all squared up — we&apos;ll
+          return windows, or price drops. You&apos;re all squared up. We&apos;ll
           flag anything the moment it appears.
         </EmptyState>
       </AppShell>
@@ -49,7 +49,8 @@ export default function Home() {
           count={summary.findingCount}
         />
 
-        <section aria-label="Open findings" className="space-y-4">
+        <section id="findings" aria-label="Open findings" className="space-y-4">
+          <h2 className="font-serif text-2xl text-ink">Findings</h2>
           {owedFindings.map((finding) => (
             <FindingCard
               key={finding.id}
@@ -62,17 +63,17 @@ export default function Home() {
         {summary.excludedCount > 0 ? (
           <section
             aria-label="Held for review"
-            className="rounded-lg border border-dashed border-rule bg-paper-sunk/60 p-5"
+            className="neu-inset rounded-lg p-6"
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="font-serif text-lg text-ink">Maybe — held until confirmed</h2>
-                <p className="mt-0.5 text-sm text-ink-muted">
+                <h2 className="font-serif text-lg text-ink">Maybe, held until confirmed</h2>
+                <p className="mt-1 text-sm text-ink-muted">
                   {summary.excludedCount}{" "}
                   {summary.excludedCount === 1 ? "finding" : "findings"} worth{" "}
                   {formatMoney(summary.excludedTotal, summary.currency)} need a
-                  quick look before we count them. They&apos;re left out of your
-                  total on purpose.
+                  quick look before we count them. Left out of your total on
+                  purpose.
                 </p>
               </div>
               <LinkButton href="/review" variant="secondary">
@@ -80,11 +81,11 @@ export default function Home() {
               </LinkButton>
             </div>
 
-            <ul className="mt-4 space-y-2">
+            <ul className="mt-5 space-y-3">
               {maybeFindings.map((finding) => (
                 <li
                   key={finding.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-rule bg-paper-raised px-3 py-2"
+                  className="neu-raised-sm flex flex-wrap items-center justify-between gap-2 rounded-sm px-4 py-3"
                 >
                   <span className="text-sm text-ink">
                     {merchantName(getOrder(finding.orderId))}
@@ -92,7 +93,7 @@ export default function Home() {
                   <span className="flex items-center gap-2">
                     {finding.simulated ? <Chip tone="neutral">{SIMULATED_PRICE_LABEL}</Chip> : null}
                     <Chip tone="review">
-                      {formatMoney(finding.amountAtStake, finding.currency)} · needs review
+                      {formatMoney(finding.amountAtStake, finding.currency)} needs review
                     </Chip>
                   </span>
                 </li>

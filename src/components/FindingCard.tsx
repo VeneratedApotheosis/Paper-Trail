@@ -48,23 +48,25 @@ export function FindingCard({
   const explainEntries = Object.entries(finding.explain);
 
   return (
-    <article className="rounded-lg border border-rule bg-paper-raised p-5 shadow-raised">
+    <article className="neu-raised rounded-lg p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="font-serif text-xl text-ink">{KIND_LABELS[finding.kind]}</h3>
           <p className="mt-0.5 text-sm text-ink-muted">{merchant}</p>
         </div>
-        <Chip tone="owed">{formatMoney(finding.amountAtStake, finding.currency)}</Chip>
+        <span className="font-serif text-2xl font-semibold text-money tabular-nums">
+          {formatMoney(finding.amountAtStake, finding.currency)}
+        </span>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         {finding.dueAt ? (
           <Chip tone={overdue ? "owed" : "deadline"}>{countdownLabel(finding.dueAt)}</Chip>
         ) : null}
         {finding.simulated ? <Chip tone="neutral">{SIMULATED_PRICE_LABEL}</Chip> : null}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="mt-5 flex flex-wrap items-center gap-3">
         <LinkButton href={`/claim/${finding.id}`} variant="primary">
           Draft a claim
         </LinkButton>
@@ -73,23 +75,23 @@ export function FindingCard({
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
           aria-controls={panelId}
-          className="rounded px-3 py-2 text-sm font-medium text-ink-muted transition-colors hover:bg-paper-sunk hover:text-ink"
+          className="rounded-sm px-3 py-2 text-sm font-bold text-teal-deep transition-shadow hover:shadow-inset-sm"
         >
           {expanded ? "Hide why" : "Why?"}
         </button>
       </div>
 
       {expanded ? (
-        <div id={panelId} className="animate-fade-rise mt-4 border-t border-rule pt-4">
+        <div id={panelId} className="animate-fade-rise mt-5 space-y-5">
           <p className="text-base text-ink">{finding.summary}</p>
 
-          <div className="mt-4">
-            <p className="col-head mb-2">Evidence from your inbox</p>
+          <div>
+            <p className="eyebrow mb-2">Evidence from your inbox</p>
             <ul className="space-y-2">
               {finding.evidence.map((e, i) => (
                 <li
                   key={`${e.messageId}-${i}`}
-                  className="border-l-2 border-rule bg-paper-sunk px-3 py-2 text-sm italic text-ink-muted"
+                  className="neu-inset rounded-sm px-4 py-3 text-sm italic text-ink-muted"
                 >
                   &ldquo;{e.quote}&rdquo;
                 </li>
@@ -98,8 +100,8 @@ export function FindingCard({
           </div>
 
           {explainEntries.length > 0 ? (
-            <div className="mt-4">
-              <p className="col-head mb-2">How we got the number</p>
+            <div className="neu-inset rounded-sm px-4 py-4">
+              <p className="eyebrow mb-2">How we got the number</p>
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
                 {explainEntries.map(([key, value]) => (
                   <div key={key} className="contents">
