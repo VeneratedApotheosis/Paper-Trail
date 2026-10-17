@@ -82,5 +82,10 @@ export const NormalizedOrderSchema = z.object({
   /** Lowest extraction confidence among contributing emails. */
   confMin: z.number().min(0).max(1),
   needsReview: z.boolean(),
+  /** Human review state, separate from the original model confidence/evidence. */
+  review: z.object({
+    revision: z.string().uuid(),
+    confirmedAt: z.string().datetime({ offset: true }).optional(),
+  }).optional(),
 });
 export type NormalizedOrder = z.infer<typeof NormalizedOrderSchema>;

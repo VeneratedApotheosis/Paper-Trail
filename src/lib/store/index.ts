@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Finding, FindingStatus, NormalizedOrder } from "@/lib/contracts";
 import { createMemoryCache, type ExtractionCache } from "@/lib/ingestion";
@@ -158,7 +159,8 @@ export function setPipelineResult(mode: Exclude<StoreMode, "empty">, asOf: strin
   const store = data();
   store.mode = mode;
   store.asOf = asOf;
-  store.orders = result.orders;
+  // New snapshots invalidate stale review forms, including after a repeat sync.
+  store.orders = result.orders.map(order => ({ ...order, review: { revision: randomUUID() } }));
   store.findings = result.findings;
   store.reviewQueue = result.reviewQueue;
   store.stats = result.stats;
@@ -175,6 +177,22 @@ export function clearLedger(): void {
   store.drafts = [];
   store.reviewQueue = [];
   store.stats = null;
+}
+
+/** Apply a fully validated review result to one visible order, without affecting other orders. */
+export function saveReviewedOrder(order: NormalizedOrder, findings: Finding[]): void {
+  if (!getOrder(order.id)) throw new Error("Review order unavailable");
+  const store = data();
+  const oldIds = new Set(store.findings.filter(f => f.orderId === order.id).map(f => f.id));
+  store.orders = store.orders.map(current => current.id === order.id ? order : current);
+  store.findings = [...store.findings.filter(f => f.orderId !== order.id), ...findings];
+  store.drafts = store.drafts.filter(draft => !oldIds.has(draft.findingId));
+  store.reviewQueue = store.reviewQueue.filter(item => item.orderId !== order.id &&
+    !(!item.orderId && order.messageIds.includes(item.emailId) &&
+      !store.orders.some(other => other.id !== order.id && other.needsReview && other.messageIds.includes(item.emailId))));
+  if (order.needsReview) store.reviewQueue.push({ orderId: order.id,
+    emailId: order.messageIds[0] ?? order.id, stage: "match", reason: "Corrected order awaiting human confirmation" });
+  if (store.stats) store.stats = { ...store.stats, findings: store.findings.length, needsReview: store.reviewQueue.length };
 }
 
 /** Adds or replaces a claim draft by id. */

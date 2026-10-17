@@ -35,7 +35,7 @@ export function deriveOrderStatus(order: NormalizedOrder): OrderDisplayStatus {
 }
 
 export function orderNeedsReview(order: NormalizedOrder): boolean {
-  return order.needsReview || order.confMin < CONFIDENCE_THRESHOLD;
+  return order.needsReview || (order.confMin < CONFIDENCE_THRESHOLD && !order.review?.confirmedAt);
 }
 
 // Is this finding eligible for the headline owed total? Excludes needs-review
