@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { makeOrder, makeEvent } from "@/lib/rules/test-helpers";
 import { defaultRules, runRules } from "@/lib/rules";
-import { getOrder, getState, resetStore, setPipelineResult, upsertDraft, excludeMerchant, withStoreScope } from "@/lib/store";
+import { getOrder, getState, resetStore, setPipelineResult, setFindingStatus, upsertDraft, excludeMerchant, withStoreScope, clearLedger } from "@/lib/store";
 import { buildLedgerResponse } from "@/lib/api/ledger";
 import { orderNeedsReview } from "@/lib/view";
 import { seedPriceFeed } from "@/lib/demo/seed";
@@ -25,6 +25,71 @@ export function loadReviewFixture(orders?: NormalizedOrder[]) {
 }
 beforeEach(() => resetStore());
 describe("human review", () => {
+  it.each(["open", "drafted", "resolved", "dismissed"] as const)(
+    "preserves %s through repeated edits and confirmation while recomputing amounts", status => {
+      const original = loadReviewFixture();
+      const first = confirmReviewedOrder(original.id, original.review!.revision, now);
+      const finding = first.findings[0];
+      setFindingStatus(finding.id, status);
+      const edited = editReviewedOrder(original.id, first.revision, { field: "total", value: 40 }, now);
+      const again = editReviewedOrder(original.id, edited.revision, { field: "orderRef", value: "SYNTHETIC-CORRECTION" }, now);
+      expect(getState().findings).toEqual([]);
+      expect(buildLedgerResponse().summary.owedTotal).toBe(0);
+      const confirmed = confirmReviewedOrder(original.id, again.revision, now);
+      const rebuilt = confirmed.findings.find(item => item.id === finding.id)!;
+      expect(rebuilt.status).toBe(status);
+      expect(rebuilt.amountAtStake).toBeLessThan(finding.amountAtStake);
+      expect(getState().findings).toContainEqual(rebuilt);
+      expect(buildLedgerResponse().summary.owedTotal).toBe(status === "open" || status === "drafted" ? rebuilt.amountAtStake : 0);
+      expect(confirmReviewedOrder(original.id, confirmed.revision, now)).toEqual(confirmed);
+    },
+  );
+  it("keeps existing statuses on direct confirmation after a replacement snapshot", () => {
+    const original = loadReviewFixture();
+    const first = confirmReviewedOrder(original.id, original.review!.revision, now);
+    setFindingStatus(first.findings[0].id, "resolved");
+    const state = getState();
+    // A new source snapshot may contain findings alongside an order needing review.
+    setPipelineResult("upload", now.toISOString(), { orders: [{ ...first.order, needsReview: true }],
+      findings: state.findings, reviewQueue: [], stats: state.stats! });
+    const order = getOrder(original.id)!;
+    const confirmed = confirmReviewedOrder(order.id, order.review!.revision, now);
+    expect(confirmed.findings[0].status).toBe("resolved");
+  });
+  it.each([resetStore, clearLedger])("does not restore pending status history after reset (%#)", reset => {
+    const original = loadReviewFixture();
+    const first = confirmReviewedOrder(original.id, original.review!.revision, now);
+    setFindingStatus(first.findings[0].id, "dismissed");
+    editReviewedOrder(original.id, first.revision, { field: "total", value: 40 }, now);
+    reset();
+    const replacement = loadReviewFixture();
+    const next = confirmReviewedOrder(replacement.id, replacement.review!.revision, now);
+    expect(next.findings[0].id).toBe(first.findings[0].id);
+    expect(next.findings[0].status).toBe("open");
+  });
+  it("does not carry a disappeared finding's status into a new review cycle", () => {
+    const original = loadReviewFixture();
+    const first = confirmReviewedOrder(original.id, original.review!.revision, now);
+    setFindingStatus(first.findings[0].id, "resolved");
+    const edited = editReviewedOrder(original.id, first.revision, { field: "total", value: 40 }, now);
+    // Inject a clock before the refund deadline so the deterministic rule no
+    // longer produces this finding, then advance it for the next review cycle.
+    expect(confirmReviewedOrder(original.id, edited.revision, new Date("2026-09-11T12:00:00Z")).findings).toEqual([]);
+    const changed = editReviewedOrder(original.id, edited.revision, { field: "total", value: 100 }, now);
+    expect(confirmReviewedOrder(original.id, changed.revision, now).findings[0].status).toBe("open");
+  });
+  it("isolates pending finding statuses for accounts with identical order/finding IDs", () => {
+    const prepare = (scope: string, status: "drafted" | "resolved") => withStoreScope(scope, () => {
+      resetStore();
+      const order = loadReviewFixture();
+      const confirmed = confirmReviewedOrder(order.id, order.review!.revision, now);
+      setFindingStatus(confirmed.findings[0].id, status);
+      return editReviewedOrder(order.id, confirmed.revision, { field: "total", value: 40 }, now);
+    });
+    const first = prepare("first", "resolved"), second = prepare("second", "drafted");
+    expect(withStoreScope("second", () => confirmReviewedOrder(second.order.id, second.revision, now).findings[0].status)).toBe("drafted");
+    expect(withStoreScope("first", () => confirmReviewedOrder(first.order.id, first.revision, now).findings[0].status)).toBe("resolved");
+  });
   it("keeps edits out of totals until confirmation without inflating model confidence", () => {
     const original = loadReviewFixture();
     const edited = editReviewedOrder(original.id, original.review!.revision, { field: "lineItemUnitPrice", lineItemId: "li-jacket", value: 90 }, now);

@@ -1,11 +1,21 @@
 import { randomUUID } from "node:crypto";
-import { NormalizedOrderSchema, type NormalizedOrder } from "@/lib/contracts";
+import { NormalizedOrderSchema, type FindingStatus, type NormalizedOrder } from "@/lib/contracts";
 import { seedPriceFeed } from "@/lib/demo/seed";
 import { defaultRules, runRules } from "@/lib/rules";
 import { isExcludedMerchant } from "@/lib/pipeline/run";
 import { appendAudit, getExcludedMerchants, getOrder, getState, saveReviewedOrder } from "@/lib/store";
 import { orderNeedsReview } from "@/lib/view";
 import type { ReviewEdit } from "./schema";
+
+// Pending edits intentionally emit no findings. Keep only their prior statuses,
+// keyed by the actual stored order snapshot (not IDs shared across accounts).
+// Weak keys release history after replacement/deletion; globalThis keeps it
+// shared across Next's edit/confirm route bundles and development hot reloads.
+const HISTORY_KEY = Symbol.for("papertrail.review.pendingStatuses");
+const holder = globalThis as typeof globalThis & {
+  [HISTORY_KEY]?: WeakMap<NormalizedOrder, Map<string, FindingStatus>>;
+};
+const pendingStatuses = holder[HISTORY_KEY] ??= new WeakMap<NormalizedOrder, Map<string, FindingStatus>>();
 
 export class ReviewError extends Error {
   constructor(public readonly status: number, message: string) { super(message); }
@@ -32,7 +42,7 @@ function applyEdit(order: NormalizedOrder, edit: ReviewEdit): NormalizedOrder {
     }
   }
 }
-function commitReview(order: NormalizedOrder, action: "edit" | "confirm", at: Date, field?: string) {
+function commitReview(original: NormalizedOrder, order: NormalizedOrder, action: "edit" | "confirm", at: Date, field?: string) {
   const parsed = NormalizedOrderSchema.safeParse(order);
   const amounts = [order.total, order.subtotal, order.tax, order.shipping, order.discount];
   if (!parsed.success || amounts.some(amount => amount !== null && (!Number.isFinite(amount) || amount < 0)) ||
@@ -41,12 +51,18 @@ function commitReview(order: NormalizedOrder, action: "edit" | "confirm", at: Da
   }
   if (isExcludedMerchant(order, getExcludedMerchants())) throw new ReviewError(409, "This merchant is excluded.");
   const state = getState();
+  const previousStatuses = new Map(pendingStatuses.get(original));
+  for (const finding of state.findings) {
+    if (finding.orderId === order.id) previousStatuses.set(finding.id, finding.status);
+  }
   // Demo uses its fixed as-of and simulated feed. Live/upload data never gets seed prices.
   const ruleNow = state.mode === "demo" && state.asOf ? new Date(state.asOf) : at;
   const findings = runRules([parsed.data], defaultRules, {
     now: ruleNow, ...(state.mode === "demo" ? { priceFeed: seedPriceFeed } : {}),
-  });
+  }).map(finding => ({ ...finding, status: previousStatuses.get(finding.id) ?? finding.status }));
   saveReviewedOrder(parsed.data, findings);
+  pendingStatuses.delete(original);
+  if (action === "edit") pendingStatuses.set(parsed.data, previousStatuses);
   appendAudit({ at: at.toISOString(), type: "approval",
     detail: action === "edit" ? `Review edit saved: order ${order.id}, field ${field}, revision ${order.review?.revision}`
       : `Review confirmed: order ${order.id}, revision ${order.review?.revision}` });
@@ -55,7 +71,7 @@ function commitReview(order: NormalizedOrder, action: "edit" | "confirm", at: Da
 export function editReviewedOrder(id: string, revision: string, edit: ReviewEdit, at: Date = new Date()) {
   const original = currentOrder(id, revision);
   const order = { ...applyEdit(original, edit), needsReview: true, review: { revision: randomUUID() } };
-  return commitReview(order, "edit", at, edit.field);
+  return commitReview(original, order, "edit", at, edit.field);
 }
 export function confirmReviewedOrder(id: string, revision: string, at: Date = new Date()) {
   const original = currentOrder(id, revision);
@@ -65,5 +81,5 @@ export function confirmReviewedOrder(id: string, revision: string, at: Date = ne
   }
   const order = { ...original, needsReview: false,
     review: { revision, confirmedAt: at.toISOString() } };
-  return commitReview(order, "confirm", at);
+  return commitReview(original, order, "confirm", at);
 }
