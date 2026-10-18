@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { ConsentExplainer } from "@/components/ConsentExplainer";
+import { ConsentExplainer, type ConsentExample } from "@/components/ConsentExplainer";
 import { ErrorState, TokenExpired } from "@/components/states";
 import { Button } from "@/components/ui/Button";
 
@@ -16,9 +16,11 @@ export interface ConnectViewProps {
   onConnect: () => void;
   onTryDemo: () => void;
   demoLoading?: boolean;
+  // Optional synthetic example for the "What you'll see" card; the card renders only when this is supplied.
+  example?: ConsentExample;
 }
 
-export function ConnectView({ errorState, onConnect, onTryDemo, demoLoading }: ConnectViewProps) {
+export function ConnectView({ errorState, onConnect, onTryDemo, demoLoading, example }: ConnectViewProps) {
   // Shared recovery actions for the error states: retry the connect flow or fall
   // back to synthetic demo data (both are callbacks the wrapper wires).
   const recoveryActions = (
@@ -39,7 +41,8 @@ export function ConnectView({ errorState, onConnect, onTryDemo, demoLoading }: C
   );
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-paper px-6 py-16 sm:py-20">
+    <main className="flex min-h-screen flex-col items-center justify-start gap-5 bg-paper px-5 py-6 xl:justify-center xl:px-12 xl:py-20">
+      <p className="w-full max-w-md font-serif text-[1.375rem] font-semibold leading-7 text-ink xl:hidden">PaperTrail</p>
       {errorState === "access_denied" ? (
         <ErrorState
           title="Gmail wasn't connected"
@@ -56,7 +59,7 @@ export function ConnectView({ errorState, onConnect, onTryDemo, demoLoading }: C
           actions={recoveryActions}
         />
       ) : (
-        <ConsentExplainer onConnect={onConnect} onTryDemo={onTryDemo} demoLoading={demoLoading} />
+        <ConsentExplainer onConnect={onConnect} onTryDemo={onTryDemo} demoLoading={demoLoading} example={example} />
       )}
     </main>
   );

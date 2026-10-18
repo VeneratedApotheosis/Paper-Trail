@@ -1,5 +1,6 @@
-import { UploadButton, type SyncMode } from "@/components/SyncPreview";
+﻿import { UploadButton, type SyncMode } from "@/components/SyncPreview";
 import { EmptyState } from "@/components/states";
+import { SyncLayout, SyncRail, insetTile, mainCard, stepStates } from "@/components/SyncRail";
 import { Button } from "@/components/ui/Button";
 
 // Counts from a finished Gmail sync (POST /api/gmail/sync) or file import (POST /api/upload). `scanned` is messages
@@ -33,42 +34,100 @@ function scannedSentence(mode: SyncMode, result: SyncResultInfo): string {
   return `Fetched ${plural(result.scanned, "message")}${aside}`;
 }
 
-function headline(result: SyncResultInfo): string {
-  if (result.findings > 0) return `Found ${plural(result.findings, "thing")} worth a look`;
-  if (result.orders > 0) return `Added ${plural(result.orders, "order")} to your ledger`;
-  return `${plural(result.needsReview, "receipt")} need${result.needsReview === 1 ? "s" : ""} a quick check`;
-}
-
-// The run produced something the ledger shows (orders or needs-review items). The wrapper usually opens the ledger
-// right away; the button covers a slow navigation.
-export function SyncResult({
-  mode,
-  result,
-  onOpenLedger,
-}: {
-  mode: SyncMode;
-  result: SyncResultInfo;
-  onOpenLedger: () => void;
-}) {
-  const review = result.needsReview > 0 ? `, ${result.needsReview} to review` : "";
+function Tile({ value, label, note }: { value: number; label: string; note: string }) {
   return (
-    <div className="mx-auto max-w-ledger">
-      <div className="neu-raised rounded-xl px-8 py-12 text-center">
-        <p className="eyebrow">{mode === "gmail" ? "Sync complete" : "Import complete"}</p>
-        <h1 className="mt-2 font-serif text-2xl text-ink">{headline(result)}</h1>
-        <p className="mx-auto mt-3 max-w-md text-base text-ink-muted">
-          {scannedSentence(mode, result)}. Found {plural(result.orders, "order")}{review}.
-        </p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Button type="button" onClick={onOpenLedger}>
-            Open what you&apos;re owed
-          </Button>
-        </div>
-      </div>
+    <div className={`${insetTile} flex flex-1 flex-col gap-1`}>
+      <p className="font-serif text-[2.5rem] font-semibold leading-[2.75rem] tabular-nums text-ink xl:text-[3.5rem] xl:leading-[3.75rem] xl:tracking-[-0.02em]">{value}</p>
+      <p className="text-sm font-semibold text-ink">{label}</p>
+      <p className="hidden text-[0.75rem] leading-4 text-ink-muted xl:block">{note}</p>
     </div>
   );
 }
 
+// The run produced something the ledger shows (orders or needs-review items). The wrapper usually opens the ledger
+// right away; the button covers a slow navigation. Every number is a count from the finished run; "Review the N items"
+// shows only when the wrapper gives `onOpenReview`.
+export function SyncResult({
+  mode,
+  result,
+  onOpenLedger,
+  onOpenReview,
+  windowDays,
+}: {
+  mode: SyncMode;
+  result: SyncResultInfo;
+  onOpenLedger: () => void;
+  onOpenReview?: () => void;
+  windowDays?: number;
+}) {
+  const gmail = mode === "gmail";
+  const capped = gmail && result.capped;
+  const intro = gmail
+    ? `Here is what PaperTrail found in ${windowDays ? `the last ${windowDays} days of ` : ""}your inbox.`
+    : `${scannedSentence(mode, result)}.`;
+
+  return (
+    <SyncLayout
+      mode={mode}
+      title={gmail ? "Sync finished" : "Import finished"}
+      intro={intro}
+      rail={
+        <SyncRail
+          states={stepStates("result")}
+          windowDays={windowDays}
+          maxMessages={gmail ? result.maxMessages : undefined}
+          redactionOff={false}
+          stepsOnPhone={false}
+        />
+      }
+    >
+      <section aria-label="What we found" className={mainCard}>
+        <p className="eyebrow">What we found</p>
+        <div className="flex flex-col gap-3 xl:gap-4">
+          <div className="flex gap-3 xl:gap-4">
+            <Tile value={result.scanned} label={gmail ? "Emails scanned" : "Emails read"} note="Read in this sync" />
+            <Tile value={result.orders} label="Purchases found" note="Added to Purchases" />
+          </div>
+          <div className="flex gap-3 xl:gap-4">
+            <Tile value={result.needsReview} label="Need a quick check" note="Not in what you are owed" />
+            <Tile value={result.findings} label="Findings" note="Money you can get back" />
+          </div>
+        </div>
+        {result.needsReview > 0 ? (
+          <p className="text-sm text-ink-muted">
+            The {result.needsReview} {result.needsReview === 1 ? "item that needs" : "items that need"} a quick check{" "}
+            {result.needsReview === 1 ? "is" : "are"} not counted in what you are owed.
+          </p>
+        ) : null}
+        {capped || result.parseErrors > 0 ? (
+          <div className="flex flex-col items-start gap-2">
+            {capped ? (
+              <>
+                <span className="neu-inset inline-flex h-6 items-center rounded-full px-3 text-[0.6875rem] font-semibold text-ink-muted">
+                  Capped at {result.maxMessages ?? result.scanned} emails
+                </span>
+                <p className="text-sm text-ink">More emails matched than the limit, so the oldest ones were not read.</p>
+              </>
+            ) : null}
+            {result.parseErrors > 0 ? (
+              <p className="text-sm text-ink">{plural(result.parseErrors, "email")} could not be parsed.</p>
+            ) : null}
+          </div>
+        ) : null}
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:gap-4">
+          <Button type="button" onClick={onOpenLedger} className="!min-h-[48px] !rounded-full xl:min-w-52">
+            Open Owed to you
+          </Button>
+          {onOpenReview && result.needsReview > 0 ? (
+            <Button type="button" variant="secondary" onClick={onOpenReview} className="!min-h-[48px] !rounded-full xl:min-w-48">
+              Review the {result.needsReview} {result.needsReview === 1 ? "item" : "items"}
+            </Button>
+          ) : null}
+        </div>
+      </section>
+    </SyncLayout>
+  );
+}
 // Nothing looked like a purchase. An invitation to act, not a dead end: imports offer another file or the demo;
 // Gmail goes back to the preview. Without a result (dev toggle) it shows the wording only, no counts.
 export function SyncNoReceipts({

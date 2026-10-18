@@ -1,4 +1,4 @@
-import * as React from "react";
+﻿import * as React from "react";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -37,7 +37,8 @@ describe("SyncView fixtures", () => {
     const text = render(fixtures.syncViewGmailPreviewFixture);
     expect(text).toContain(fixtures.syncViewGmailPreviewFixture.preview!.query);
     expect(text).toContain("50 of about 120 matching");
-    expect(text).toContain("Last 90 days, up to 50 messages per run");
+    expect(text).toContain("Last 90 days, up to 50 emails");
+    expect(text).toContain("Show the search");
     expect(text).toContain("Start sync");
     expect(text).not.toContain("Import .eml");
     expect(text).not.toContain("Try demo data");
@@ -54,6 +55,12 @@ describe("SyncView fixtures", () => {
     expect(text).not.toContain("Messages to fetch");
   });
 
+  it("keeps the Gmail search reachable behind the toggle", () => {
+    const html = renderToStaticMarkup(createElement(SyncView, fixtures.syncViewGmailPreviewFixture));
+    expect(html).toMatch(/role="switch"[^>]*aria-checked="false"/);
+    expect(html).toMatch(/<div id="[^"]+" hidden=""[^>]*>[\s\S]*newer_than/);
+  });
+
   it("shows the dev toggle only with showDevToggle", () => {
     expect(render(fixtures.syncViewFixture)).toContain("Dev: show the no-receipts screen");
     expect(render({ ...fixtures.syncViewFixture, showDevToggle: false })).not.toContain("Dev:");
@@ -63,10 +70,11 @@ describe("SyncView fixtures", () => {
     expect(render(fixtures.syncViewSyncingStartFixture)).toContain("Starting the sync");
     const listing = render(fixtures.syncViewSyncingListingFixture);
     expect(listing).toContain("Listing matching messages in Gmail");
-    expect(listing).not.toContain("messages fetched");
+    expect(listing).not.toContain("emails fetched");
     const fetching = render(fixtures.syncViewSyncingFetchingFixture);
-    expect(fetching).toContain("21 / 50 messages fetched");
-    expect(fetching).toContain("1 message skipped");
+    expect(fetching).toContain("21 of 50 emails fetched");
+    expect(fetching).toContain("Skipped");
+    expect(fetching).toContain("21 of 50 opened so far. 1 skipped.");
     expect(renderToStaticMarkup(createElement(SyncView, fixtures.syncViewSyncingFetchingFixture))).toContain(
       'aria-valuenow="42"',
     );
@@ -78,14 +86,21 @@ describe("SyncView fixtures", () => {
 
   it("result shows the real counts and opens the ledger", () => {
     const gmail = render(fixtures.syncViewGmailResultFixture);
-    expect(gmail).toContain("Found 3 things worth a look");
-    expect(gmail).toContain(
-      "Fetched 50 messages (stopped at the 50-message limit; 1 could not be parsed). Found 9 orders, 2 to review.",
-    );
-    expect(gmail).toContain("Open what you're owed");
+    expect(gmail).toContain("Sync finished");
+    expect(gmail).toMatch(/50 Emails scanned/);
+    expect(gmail).toMatch(/9 Purchases found/);
+    expect(gmail).toMatch(/2 Need a quick check/);
+    expect(gmail).toMatch(/3 Findings/);
+    expect(gmail).toContain("Capped at 50 emails");
+    expect(gmail).toContain("1 email could not be parsed.");
+    expect(gmail).toContain("The 2 items that need a quick check are not counted in what you are owed.");
+    expect(gmail).toContain("Open Owed to you");
+    expect(gmail).toContain("Review the 2 items");
+    expect(render({ ...fixtures.syncViewGmailResultFixture, onOpenReview: undefined })).not.toContain("Review the");
     const imported = render(fixtures.syncViewImportResultFixture);
-    expect(imported).toContain("Import complete");
-    expect(imported).toContain("Read 2 emails from 2 files. Found 1 order.");
+    expect(imported).toContain("Import finished");
+    expect(imported).toContain("Read 2 emails from 2 files.");
+    expect(imported).not.toContain("Capped");
   });
 
   it("no receipts shows the real counts with the right next step", () => {
@@ -106,8 +121,12 @@ describe("SyncView fixtures", () => {
     expect(reconnect).toContain("Reconnect Gmail, then start the sync again.");
     expect(reconnect).toContain("Reconnect Gmail");
     expect(reconnect).not.toContain("Try again");
+    expect(reconnect).toContain("Back to the preview");
+    expect(reconnect).toContain("Technical details");
+    expect(reconnect).toContain("access token expired");
+    expect(render(errors.timeout)).not.toContain("Technical details");
     expect(render(errors.access_denied)).toMatch(/Reconnect Gmail.*Try again/);
-    expect(render(errors.already_running)).toMatch(/Open what you're owed.*Back to sync/);
+    expect(render(errors.already_running)).toMatch(/Open Owed to you.*Back to the preview/);
     for (const kind of ["timeout", "rate_limited", "unreachable", "failed"] as const) {
       expect(render(errors[kind])).toContain("Try again");
     }

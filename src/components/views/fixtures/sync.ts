@@ -1,4 +1,4 @@
-import type { SyncViewProps } from "@/components/views/SyncView";
+﻿import type { SyncViewProps } from "@/components/views/SyncView";
 
 // Sample props for previewing SyncView in isolation, one per phase. Standalone synthetic data (not from @/lib/mock)
 // so the view stays decoupled from the data layer. Callbacks are no-ops.
@@ -74,6 +74,7 @@ export const syncViewLoadingDemoFixture: SyncViewProps = { ...imported, phase: "
 export const syncViewGmailResultFixture: SyncViewProps = {
   ...gmail,
   phase: "opening",
+  onOpenReview: noop,
   result: { scanned: 50, parseErrors: 1, capped: true, maxMessages: 50, orders: 9, needsReview: 2, findings: 3 },
 };
 
@@ -105,6 +106,7 @@ export const syncViewErrorFixtures = {
     title: "Your Gmail connection expired",
     what: "PaperTrail needs read-only permission again before it can sync.",
     fix: "Reconnect Gmail, then start the sync again.",
+    detail: "gmail.users.messages.list returned 401: access token expired",
   }),
   already_running: gmailError({
     kind: "already_running",

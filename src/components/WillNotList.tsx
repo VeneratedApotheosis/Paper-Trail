@@ -9,19 +9,16 @@ const items = [
 
 export function WillNotList() {
   return (
-    <section
-      aria-labelledby="will-never-heading"
-      className="neu-inset rounded-lg px-6 py-6 sm:px-7 sm:py-7"
-    >
+    <section aria-labelledby="will-never-heading" className="neu-inset rounded-lg p-5 xl:p-6">
       <p id="will-never-heading" className="eyebrow">
         PaperTrail will never
       </p>
-      <ul role="list" className="mt-4 space-y-3">
+      <ul role="list" className="mt-3 space-y-3">
         {items.map((item) => (
-          <li key={item} className="flex gap-3 text-base text-ink">
+          <li key={item} className="flex gap-2.5 text-sm text-ink">
             <span
               aria-hidden="true"
-              className="mt-[0.55rem] h-1.5 w-1.5 flex-none rounded-full bg-teal-deep"
+              className="mt-[0.4375rem] h-1.5 w-1.5 flex-none rounded-full bg-teal-deep"
             />
             <span>{item}</span>
           </li>

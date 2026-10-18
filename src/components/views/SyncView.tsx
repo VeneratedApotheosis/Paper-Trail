@@ -1,11 +1,12 @@
-"use client";
+﻿"use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { AppShell } from "@/components/AppShell";
 import { SyncPreview, UploadButton, type SyncMode, type SyncPreviewInfo } from "@/components/SyncPreview";
 import { SyncProgress, type SyncProgressInfo } from "@/components/SyncProgress";
 import { SyncNoReceipts, SyncResult, type SyncResultInfo } from "@/components/SyncResult";
-import { EmptyState, ErrorState, HeroSkeleton } from "@/components/states";
+import { SyncLayout, SyncRail, errorChip, errorIntro, insetTile, mainCard, stepStates } from "@/components/SyncRail";
+import { EmptyState, HeroSkeleton } from "@/components/states";
 import { Button } from "@/components/ui/Button";
 
 export type { SyncMode, SyncPreviewInfo, SyncProgressInfo, SyncResultInfo };
@@ -34,6 +35,8 @@ export interface SyncErrorInfo {
   title: string;
   what: string;
   fix: string;
+  /** Optional raw reason from the server, shown under "Technical details" when present. */
+  detail?: string;
 }
 
 // Props-only view for /sync (issue #25, real data per #101). Fully controlled: the wrapper owns the phase, the preview
@@ -53,6 +56,8 @@ export interface SyncViewProps {
   onRetry: () => void;
   onOpenLedger: () => void;
   onReconnect?: () => void;
+  /** "Review the N items" on the result screen; omit to hide it. */
+  onOpenReview?: () => void;
   /** Design/dev only: a checkbox that swaps in the no-receipts screen. The app never sets it. */
   showDevToggle?: boolean;
 }
@@ -64,10 +69,11 @@ export function SyncView(props: SyncViewProps) {
 
   return (
     <AppShell demo={mode === "gmail" ? false : undefined}>
-      <div className="space-y-6">
+      {/* data-layout="wide" lets the shell use the full desktop width (#133); below xl it is one column. */}
+      <div data-layout="wide" className="mx-auto max-w-ledger space-y-6 xl:max-w-none">
         <SyncPhaseContent {...props} phase={phase} result={showDevToggle && devNoReceipts ? null : props.result} />
         {showDevToggle ? (
-          <label className="neu-inset mx-auto flex max-w-ledger items-center gap-3 rounded-lg px-4 py-3 text-sm text-ink-muted">
+          <label className="neu-inset mx-auto flex min-h-[44px] max-w-ledger items-center gap-3 rounded-lg px-4 py-3 text-sm text-ink-muted">
             <input
               type="checkbox"
               checked={devNoReceipts}
@@ -97,6 +103,7 @@ function SyncPhaseContent({
   onRetry,
   onOpenLedger,
   onReconnect,
+  onOpenReview,
 }: SyncViewProps) {
   switch (phase) {
     case "loading":
@@ -108,7 +115,14 @@ function SyncPhaseContent({
         <HeroSkeleton />
       );
     case "syncing":
-      return <SyncProgress progress={progress} />;
+      return (
+        <SyncProgress
+          progress={progress}
+          maxMessages={preview?.maxMessages}
+          windowDays={preview?.windowDays}
+          redactionOff={preview?.redaction === "off"}
+        />
+      );
     case "uploading":
       return <EmptyState title="Importing your files…">
           {preview?.redaction === "off" ? "Receipt text is sent to the AI as is (redaction is off)." : "Each email is redacted before any AI call."}
@@ -117,7 +131,7 @@ function SyncPhaseContent({
       return <EmptyState title="Loading the synthetic demo inbox…" />;
     case "opening":
       return result ? (
-        <SyncResult mode={mode} result={result} onOpenLedger={onOpenLedger} />
+        <SyncResult mode={mode} result={result} onOpenLedger={onOpenLedger} onOpenReview={onOpenReview} windowDays={preview?.windowDays} />
       ) : (
         <EmptyState title="Opening what you're owed…" />
       );
@@ -134,10 +148,10 @@ function SyncPhaseContent({
       );
     case "error":
       return (
-        <ErrorState
-          title={error?.title ?? "Sync did not complete"}
-          what={error?.what}
-          fix={error?.fix ?? "Try again."}
+        <SyncErrorScreen
+          mode={mode}
+          error={error}
+          preview={preview}
           actions={
             <SyncErrorActions
               mode={mode}
@@ -155,6 +169,84 @@ function SyncPhaseContent({
   }
 }
 
+const pill = "!min-h-[48px] !rounded-full";
+
+// The failure screen: what happened, how to fix it, and one clear next step. `detail` (technical details) shows only
+// when the wrapper has a real reason to show.
+function SyncErrorScreen({
+  mode,
+  error,
+  preview,
+  actions,
+}: {
+  mode: SyncMode;
+  error: SyncErrorInfo | null;
+  preview: SyncPreviewInfo | null;
+  actions: ReactNode;
+}) {
+  const kind = error?.kind ?? "failed";
+  const gmail = mode === "gmail";
+  return (
+    <SyncLayout
+      mode={mode}
+      title={gmail ? "Sync stopped" : "Import stopped"}
+      intro={gmail ? errorIntro(kind) : "The import did not finish."}
+      rail={
+        <SyncRail
+          states={stepStates("error")}
+          windowDays={preview?.windowDays}
+          maxMessages={gmail ? preview?.maxMessages : undefined}
+          redactionOff={preview?.redaction === "off"}
+          stepsOnPhone={false}
+        />
+      }
+    >
+      <section role="alert" className={mainCard}>
+        <div className="flex flex-col items-start gap-3">
+          <span className="neu-inset inline-flex h-6 items-center rounded-full px-3 text-[0.6875rem] font-semibold text-ink-muted">
+            {errorChip(kind)}
+          </span>
+          <h2 className="font-serif text-[1.625rem] leading-8 tracking-[-0.01em] text-ink xl:text-[2.5rem] xl:leading-[3rem]">
+            {error?.title ?? "Sync did not complete"}
+          </h2>
+        </div>
+        <div className="flex flex-col gap-3 xl:flex-row xl:gap-4">
+          {error?.what ? (
+            <div className={`${insetTile} flex flex-1 flex-col gap-1.5`}>
+              <p className="text-sm font-bold text-teal-deep">What happened</p>
+              <p className="text-sm text-ink xl:text-base">{error.what}</p>
+            </div>
+          ) : null}
+          <div className={`${insetTile} flex flex-1 flex-col gap-1.5`}>
+            <p className="text-sm font-bold text-teal-deep">How to fix it</p>
+            <p className="text-sm text-ink xl:text-base">{error?.fix ?? "Try again."}</p>
+          </div>
+        </div>
+        {error?.detail ? (
+          <div className="flex flex-col gap-2">
+            <p className="eyebrow">Technical details</p>
+            <code className="block break-words font-mono text-[0.75rem] leading-5 text-ink">{error.detail}</code>
+          </div>
+        ) : null}
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:gap-4">{actions}</div>
+      </section>
+
+      <section aria-label="Safe to try again" className="neu-raised hidden flex-col gap-1 rounded-lg p-6 xl:flex">
+        <h2 className="pb-2 font-serif text-xl text-ink">Safe to try again</h2>
+        <dl>
+          <div className="flex items-center gap-4 border-t border-rule py-3.5">
+            <dt className="w-[7.5rem] shrink-0 text-sm font-bold text-ink">Your inbox</dt>
+            <dd className="text-sm text-ink-muted">Nothing was changed or deleted. PaperTrail only reads.</dd>
+          </div>
+          <div className="flex items-center gap-4 border-t border-rule pt-3.5">
+            <dt className="w-[7.5rem] shrink-0 text-sm font-bold text-ink">Your account</dt>
+            <dd className="text-sm text-ink-muted">Nothing was sent. PaperTrail never sends email.</dd>
+          </div>
+        </dl>
+      </section>
+    </SyncLayout>
+  );
+}
 // One clear next step per failure: reconnect for an expired or denied grant, open the ledger when another sync is
 // already running, otherwise try again. A failed import or demo load keeps the loaded preview, so it offers the import
 // actions directly; without a preview (it failed to load) "Try again" reloads it.
@@ -173,17 +265,26 @@ function SyncErrorActions({
   hasPreview: boolean;
 } & Pick<SyncViewProps, "onUpload" | "onTryDemo" | "onRetry" | "onOpenLedger" | "onReconnect">) {
   const reconnect = onReconnect ? (
-    <Button type="button" onClick={onReconnect}>
+    <Button type="button" className={pill} onClick={onReconnect}>
       Reconnect Gmail
     </Button>
   ) : null;
 
-  if (kind === "reconnect") return reconnect;
+  if (kind === "reconnect") {
+    return (
+      <>
+        {reconnect}
+        <Button type="button" variant="secondary" className={pill} onClick={onRetry}>
+          Back to the preview
+        </Button>
+      </>
+    );
+  }
   if (kind === "access_denied") {
     return (
       <>
         {reconnect}
-        <Button type="button" variant="secondary" onClick={onRetry}>
+        <Button type="button" variant="secondary" className={pill} onClick={onRetry}>
           Try again
         </Button>
       </>
@@ -192,11 +293,11 @@ function SyncErrorActions({
   if (kind === "already_running") {
     return (
       <>
-        <Button type="button" onClick={onOpenLedger}>
-          Open what you&apos;re owed
+        <Button type="button" className={pill} onClick={onOpenLedger}>
+          Open Owed to you
         </Button>
-        <Button type="button" variant="secondary" onClick={onRetry}>
-          Back to sync
+        <Button type="button" variant="secondary" className={pill} onClick={onRetry}>
+          Back to the preview
         </Button>
       </>
     );
@@ -206,7 +307,7 @@ function SyncErrorActions({
       <>
         {onUpload ? <UploadButton onUpload={onUpload} /> : null}
         {onTryDemo ? (
-          <Button type="button" variant="secondary" onClick={onTryDemo}>
+          <Button type="button" variant="secondary" className={pill} onClick={onTryDemo}>
             Try demo data
           </Button>
         ) : null}
@@ -214,7 +315,7 @@ function SyncErrorActions({
     );
   }
   return (
-    <Button type="button" onClick={onRetry}>
+    <Button type="button" className={pill} onClick={onRetry}>
       Try again
     </Button>
   );
