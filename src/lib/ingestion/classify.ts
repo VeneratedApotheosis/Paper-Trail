@@ -73,7 +73,8 @@ const ORDER_CONFIRMATION_WORDING =
 const ORDER_TOTAL_OR_ITEMS = /\border total\b|\bsubtotal\b|\bgrand total\b|^[ \t]*items\b|\bresumen del pedido\b/m;
 
 /** Concrete purchase details, not promotional headings such as "Items you might like". */
-const PURCHASE_TOTAL = /\b(?:order total|subtotal|grand total|total(?: paid)?|total del pedido)\s*:?\s*(?:[a-z]{3}\s*)?[$€£]?\s*\d/;
+// ":" or "|": table-aware HTML-to-text (#116) renders label/value cells as "Order total | $134.45".
+const PURCHASE_TOTAL = /\b(?:order total|subtotal|grand total|total(?: paid)?|total del pedido)\s*[:|]?\s*(?:[a-z]{3}\s*)?[$€£]?\s*\d/;
 const ITEM_QUANTITY = /\b(?:qty|quantity)\s*:?\s*\d|\bx\s*\d|\b\d+\s*x\b/;
 const ITEM_PRICE = /[$€£]\s*\d|\b\d[\d,.]*\s*(?:usd|eur|gbp|cad|mxn)\b/;
 
