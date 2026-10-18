@@ -1,6 +1,5 @@
 import { SyncConfirmContent, SyncNoticeContent, type AppShellSync } from "@/components/ShellSyncControl";
 import { Button } from "@/components/ui/Button";
-import { Chip, type ChipTone } from "@/components/ui/Chip";
 
 // The Gmail accounts card of the Account screen (issue #115): every linked account with its state, last sync and its own
 // Sync, Reconnect and Disconnect, plus "Add another Gmail account" and "Sync all". Props-only like AccountView: every
@@ -36,21 +35,41 @@ export interface GmailAccountsSectionProps {
   onCancelDisconnect: () => void;
 }
 
-const STATUS_COPY: Record<AccountRowStatus, { chip: string; tone: ChipTone; text: string | null }> = {
-  connected: { chip: "Connected", tone: "saved", text: null },
+// `dot` marks the state without colour: a filled teal dot for connected, a ring for expired, none for disconnected.
+const STATUS_COPY: Record<AccountRowStatus, { chip: string; tone: string; dot: "filled" | "ring" | null; text: string | null }> = {
+  connected: { chip: "Connected", tone: "text-teal-deep", dot: "filled", text: null },
   expired: {
     chip: "Expired, needs reconnect",
-    tone: "review",
+    tone: "text-ink",
+    dot: "ring",
     text: "Google ended PaperTrail's read-only access to this account. Its purchases are still here. Reconnect to read new receipts.",
   },
   disconnected: {
     chip: "Disconnected",
-    tone: "neutral",
+    tone: "text-ink-muted",
+    dot: null,
     text: "PaperTrail no longer reads this account. Its purchases are kept. Reconnect to read new receipts again.",
   },
 };
 
 const destructiveText = "!text-danger";
+
+function StatusPill({ status }: { status: AccountRowStatus }) {
+  const copy = STATUS_COPY[status];
+  return (
+    <span
+      className={`neu-inset inline-flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[0.6875rem] font-semibold leading-[0.875rem] ${copy.tone}`}
+    >
+      {copy.dot === "filled" ? <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-teal" /> : null}
+      {copy.dot === "ring" ? <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full border-[1.5px] border-solid border-ink" /> : null}
+      {copy.chip}
+    </span>
+  );
+}
+
+// Per-account buttons sit in fixed-width lanes from xl so Sync, Disconnect and Reconnect line up row to row.
+const laneWide = "flex-1 xl:w-[9.875rem] xl:flex-none";
+const laneNarrow = "flex-1 xl:w-[7.5rem] xl:flex-none";
 
 export function GmailAccountsSection({
   accounts,
@@ -71,42 +90,77 @@ export function GmailAccountsSection({
   const confirmForAll = sync?.confirm && (sync.targetAccountId ?? null) === null ? sync.confirm : null;
 
   return (
-    <section aria-labelledby="gmail-heading" className="neu-raised rounded-xl p-6">
-      <p className="eyebrow">Gmail accounts</p>
-      <h2 id="gmail-heading" className="sr-only">
+    <section aria-labelledby="gmail-heading" className="neu-raised rounded-lg p-5 xl:p-6">
+      <h2 id="gmail-heading" className="font-serif text-xl text-ink xl:text-[1.375rem] xl:leading-7">
         Gmail accounts
       </h2>
-      <p className="mt-3 max-w-prose font-sans text-sm text-ink-muted">
+      <p className="mt-4 max-w-prose font-sans text-sm text-ink-muted">
         PaperTrail can read receipts from the connected mailboxes below. Access is read only: it never sends, deletes or
         changes your mail. Every purchase shows which account it came from.
       </p>
 
-      <ul className="mt-5 space-y-3" aria-label="Linked Gmail accounts">
+      <ul className="mt-4 space-y-4" aria-label="Linked Gmail accounts">
         {accounts.map((row) => {
           const copy = STATUS_COPY[row.status];
           const confirming = disconnectStep !== "idle" && disconnectAccountId === row.id;
           const confirmHere = sync?.confirm && sync.targetAccountId === row.id ? sync.confirm : null;
           return (
-            <li key={row.id} data-testid="account-row" className="neu-inset rounded-lg p-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="min-w-0 break-all font-sans text-base font-semibold text-ink" data-testid="account-label">
-                  {row.label}
-                </span>
-                <Chip tone={copy.tone}>{copy.chip}</Chip>
-              </div>
-              <p className="mt-2 font-sans text-sm text-ink-muted" data-testid="account-last-sync">
-                {row.lastSync ? (
-                  <span title={row.lastSync.absolute}>Last synced {row.lastSync.relative}</span>
-                ) : (
-                  "Never synced"
+            <li key={row.id} data-testid="account-row" className="neu-inset rounded-[18px] p-4 xl:p-5">
+              <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:gap-4">
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                  <span className="min-w-0 break-all font-sans text-[0.9375rem] font-semibold leading-5 text-ink" data-testid="account-label">
+                    {row.label}
+                  </span>
+                  <div className="flex flex-col items-start gap-2.5 xl:flex-row xl:items-center xl:gap-3">
+                    <StatusPill status={row.status} />
+                    <p className="font-sans text-sm text-ink-muted" data-testid="account-last-sync">
+                      {row.lastSync ? (
+                        <span title={row.lastSync.absolute}>Last synced {row.lastSync.relative}</span>
+                      ) : (
+                        "Never synced"
+                      )}
+                    </p>
+                  </div>
+                  {row.syncing ? (
+                    <p role="status" className="font-sans text-sm font-semibold text-teal-deep" data-testid="account-sync-detail">
+                      {row.syncDetail ?? "Syncing"}
+                    </p>
+                  ) : null}
+                  {copy.text ? <p className="max-w-prose font-sans text-sm text-ink-muted">{copy.text}</p> : null}
+                </div>
+
+                {confirming ? null : (
+                  <div className="flex gap-3 pt-1.5 xl:shrink-0 xl:justify-end xl:pt-0">
+                    {row.status === "connected" && canSync ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className={laneWide}
+                        aria-label={`Sync this account: ${row.label}`}
+                        onClick={() => sync?.onSyncAccount?.(row.id)}
+                        disabled={busy}
+                      >
+                        {row.syncing ? "Syncing" : "Sync this account"}
+                      </Button>
+                    ) : null}
+                    {row.status === "connected" ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className={laneNarrow}
+                        aria-label={`Disconnect ${row.label}`}
+                        onClick={() => onRequestDisconnect(row.id)}
+                      >
+                        Disconnect
+                      </Button>
+                    ) : (
+                      <Button type="button" className={laneWide} aria-label={`Reconnect ${row.label}`} onClick={() => onReconnectAccount(row.id)}>
+                        Reconnect
+                      </Button>
+                    )}
+                  </div>
                 )}
-              </p>
-              {row.syncing ? (
-                <p role="status" className="mt-1 font-sans text-sm font-semibold text-teal-deep" data-testid="account-sync-detail">
-                  {row.syncDetail ?? "Syncing"}
-                </p>
-              ) : null}
-              {copy.text ? <p className="mt-2 max-w-prose font-sans text-sm text-ink-muted">{copy.text}</p> : null}
+              </div>
 
               {confirming ? (
                 <div className="neu-raised-sm mt-4 rounded-lg p-4" role="group" aria-label={`Confirm disconnecting ${row.label}`}>
@@ -130,30 +184,7 @@ export function GmailAccountsSection({
                     </Button>
                   </div>
                 </div>
-              ) : (
-                <div className="mt-4 flex flex-wrap gap-3">
-                  {row.status === "connected" && canSync ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      aria-label={`Sync this account: ${row.label}`}
-                      onClick={() => sync?.onSyncAccount?.(row.id)}
-                      disabled={busy}
-                    >
-                      {row.syncing ? "Syncing" : "Sync this account"}
-                    </Button>
-                  ) : null}
-                  {row.status === "connected" ? (
-                    <Button type="button" variant="ghost" aria-label={`Disconnect ${row.label}`} onClick={() => onRequestDisconnect(row.id)}>
-                      Disconnect
-                    </Button>
-                  ) : (
-                    <Button type="button" aria-label={`Reconnect ${row.label}`} onClick={() => onReconnectAccount(row.id)}>
-                      Reconnect
-                    </Button>
-                  )}
-                </div>
-              )}
+              ) : null}
 
               {confirmHere ? (
                 <div className="neu-raised-sm mt-4 rounded-lg p-4" role="group" aria-label={`Confirm syncing ${row.label}`}>
@@ -165,7 +196,7 @@ export function GmailAccountsSection({
         })}
       </ul>
 
-      <div className="mt-5 flex flex-wrap gap-3">
+      <div className="mt-4 flex flex-col gap-3 xl:flex-row">
         {connected >= 2 && canSync ? (
           <Button type="button" onClick={() => sync?.onSyncAccount?.(null)} disabled={busy}>
             {syncingAll ? "Syncing all accounts" : "Sync all accounts"}
