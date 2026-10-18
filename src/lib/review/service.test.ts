@@ -74,8 +74,9 @@ describe("human review", () => {
     const edited = editReviewedOrder(original.id, first.revision, { field: "total", value: 40 }, now);
     // Inject a clock before the refund deadline so the deterministic rule no
     // longer produces this finding, then advance it for the next review cycle.
-    expect(confirmReviewedOrder(original.id, edited.revision, new Date("2026-09-11T12:00:00Z")).findings).toEqual([]);
-    const changed = editReviewedOrder(original.id, edited.revision, { field: "total", value: 100 }, now);
+    const absent = confirmReviewedOrder(original.id, edited.revision, new Date("2026-09-11T12:00:00Z"));
+    expect(absent.findings).toEqual([]);
+    const changed = editReviewedOrder(original.id, absent.revision, { field: "total", value: 100 }, now);
     expect(confirmReviewedOrder(original.id, changed.revision, now).findings[0].status).toBe("open");
   });
   it("isolates pending finding statuses for accounts with identical order/finding IDs", () => {
@@ -136,6 +137,15 @@ describe("human review", () => {
     const again = confirmReviewedOrder(original.id, first.revision, now);
     expect(again).toEqual(first);
     expect(getState().audit).toHaveLength(1);
+    expect(first.revision).not.toBe(original.review!.revision);
+    expect(confirmReviewedOrder(original.id, original.review!.revision, now)).toEqual(first);
+    expect(getState().audit).toHaveLength(1);
+    expect(() => editReviewedOrder(original.id, original.review!.revision, { field: "total", value: 25 }, now)).toThrow("Order changed");
+    const changed = editReviewedOrder(original.id, first.revision, { field: "total", value: 25 }, now);
+    expect(() => confirmReviewedOrder(original.id, original.review!.revision, now)).toThrow("Order changed");
+    expect(() => confirmReviewedOrder(original.id, first.revision, now)).toThrow("Order changed");
+    expect(getOrder(original.id)?.review?.revision).toBe(changed.revision);
+    expect(getOrder(original.id)?.needsReview).toBe(true);
   });
   it("rejects unknown, excluded, clean, or unrelated line-item edits without mutation", () => {
     const original = loadReviewFixture();

@@ -16,6 +16,11 @@ const holder = globalThis as typeof globalThis & {
   [HISTORY_KEY]?: WeakMap<NormalizedOrder, Map<string, FindingStatus>>;
 };
 const pendingStatuses = holder[HISTORY_KEY] ??= new WeakMap<NormalizedOrder, Map<string, FindingStatus>>();
+const RECEIPTS_KEY = Symbol.for("papertrail.review.confirmReceipts");
+const receiptsHolder = globalThis as typeof globalThis & { [RECEIPTS_KEY]?: WeakMap<NormalizedOrder, string> };
+// Retry receipts belong to the exact confirmed snapshot. Editing/replacing it
+// invalidates the receipt, so an old confirmation cannot confirm newer changes.
+const confirmReceipts = receiptsHolder[RECEIPTS_KEY] ??= new WeakMap<NormalizedOrder, string>();
 
 export class ReviewError extends Error {
   constructor(public readonly status: number, message: string) { super(message); }
@@ -74,12 +79,17 @@ export function editReviewedOrder(id: string, revision: string, edit: ReviewEdit
   return commitReview(original, order, "edit", at, edit.field);
 }
 export function confirmReviewedOrder(id: string, revision: string, at: Date = new Date()) {
-  const original = currentOrder(id, revision);
-  // Same revision confirmation is idempotent; retries do not create extra approvals.
-  if (original.review?.confirmedAt && !original.needsReview) {
-    return { order: original, findings: getState().findings.filter(f => f.orderId === id), revision };
+  const current = getOrder(id);
+  // Both the returned revision and the immediately preceding confirmation
+  // request can be retried, but never used to edit the confirmed snapshot.
+  if (current?.review?.confirmedAt && !current.needsReview &&
+      (current.review.revision === revision || confirmReceipts.get(current) === revision)) {
+    return { order: current, findings: getState().findings.filter(f => f.orderId === id), revision: current.review.revision };
   }
+  const original = currentOrder(id, revision);
   const order = { ...original, needsReview: false,
-    review: { revision, confirmedAt: at.toISOString() } };
-  return commitReview(original, order, "confirm", at);
+    review: { revision: randomUUID(), confirmedAt: at.toISOString() } };
+  const result = commitReview(original, order, "confirm", at);
+  confirmReceipts.set(result.order, revision);
+  return result;
 }
