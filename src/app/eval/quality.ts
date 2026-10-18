@@ -31,7 +31,7 @@ function experimentSide(side: ExperimentResult["current"]): NonNullable<QualityS
 
 export function qualityViewProps(input: QualityViewInput): QualitySectionProps {
   const { evaluation, experiment } = input;
-  const currentModel = evaluation?.model ?? "claude-haiku-5-5";
+  const currentModel = evaluation?.model ?? "claude-sonnet-5-5";
   const field = evaluation?.extraction.status === "ok" ? evaluation.extraction : null;
   return {
     loading: input.loading,

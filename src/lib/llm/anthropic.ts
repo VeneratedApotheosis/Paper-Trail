@@ -17,7 +17,7 @@ import {
 
 export const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 export const ANTHROPIC_VERSION = "2023-06-01";
-export const DEFAULT_LLM_MODEL = "claude-haiku-5-5";
+export const DEFAULT_LLM_MODEL = "claude-sonnet-5-5";
 export const LLM_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_TOKENS = 2048;
 

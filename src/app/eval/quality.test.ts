@@ -11,8 +11,8 @@ const input = (evaluation: QualityEvalResponse | null) => ({
 describe("qualityViewProps", () => {
   it("handles missing data", () => {
     const props = qualityViewProps(input(null));
-    expect(props).toMatchObject({ latest: null, history: [], skipped: [], labelEval: null, currentModel: "claude-haiku-5-5" });
-    expect(props.modelOptions[0]).toBe("claude-haiku-5-5");
+    expect(props).toMatchObject({ latest: null, history: [], skipped: [], labelEval: null, currentModel: "claude-sonnet-5-5" });
+    expect(props.modelOptions[0]).toBe("claude-sonnet-5-5");
     expect(props.modelOptions).toContain("claude-sonnet-5-5");
     expect(props.promptOptions.map((option) => option.id)).toEqual(["default", "conservative", "itemized"]);
     expect(props.experimentWarning).toMatch(/calls Claude/);

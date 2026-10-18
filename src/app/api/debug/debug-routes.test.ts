@@ -43,7 +43,7 @@ describe("GET /api/debug/status", () => {
     expect(response.status).toBe(200);
     expect(text).not.toContain(SYNTHETIC_KEY);
     expect(text).not.toContain("sk-ant");
-    expect(JSON.parse(text)).toEqual({ llmConfigured: true, model: "claude-haiku-5-5" });
+    expect(JSON.parse(text)).toEqual({ llmConfigured: true, model: "claude-sonnet-5-5" });
   });
 
   it("reports no key and the configured model", async () => {
