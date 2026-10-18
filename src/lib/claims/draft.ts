@@ -320,7 +320,11 @@ export function draftClaim(
     return { ok: false, reason: "invalid_finding", message: `Cannot draft ${finding.id}: ${parts.error}.` };
   }
 
-  const signedName = nonBlank(order.customerName) ?? nonBlank(opts.profileName) ?? "Customer";
+  const knownName = (value: string | null | undefined) => {
+    const name = nonBlank(value);
+    return name && !/\[(?:NAME|EMAIL|ADDRESS)_\d+\]/i.test(name) ? name : undefined;
+  };
+  const signedName = knownName(order.customerName) ?? knownName(opts.profileName) ?? "Customer";
   const recipient = resolveRecipient(order, opts.supportEmail);
   const greeting = `Hello ${order.merchant.name} support team,`;
   const body = [greeting, ...parts.paragraphs].join("\n\n") + claimClosing(signedName);

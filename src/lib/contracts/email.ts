@@ -27,7 +27,7 @@ export const RawEmailSchema = z.object({
 export type RawEmail = z.infer<typeof RawEmailSchema>;
 
 /** Kinds of PII replaced before any LLM call (AGENTS.md hard rule #3). */
-export const RedactionKindSchema = z.enum(["pan", "phone", "address", "email"]);
+export const RedactionKindSchema = z.enum(["pan", "phone", "address", "email", "name"]);
 export type RedactionKind = z.infer<typeof RedactionKindSchema>;
 
 /** A RawEmail after redaction. Only this shape may be sent to an LLM. */

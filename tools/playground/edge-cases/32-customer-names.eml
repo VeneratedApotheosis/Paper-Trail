@@ -1,0 +1,14 @@
+From: Northwind <orders@northwind.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Order confirmation #32
+Date: Sat, 17 Oct 2026 12:00:00 +0000
+Message-ID: <32-customer-names.eml@edge-cases.example>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+X-PT-Synthetic: true
+X-PT-Expect: class=order; keep=true; redacts=name
+
+Dear Sam Rivera,
+Order #NW-3002 total $29.99
+Customer name: Sam Rivera
+Thank you Sam for shopping with Northwind.

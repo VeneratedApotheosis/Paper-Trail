@@ -67,9 +67,9 @@ The QA launcher accepts `PT_API_PORT` and `--no-open`. It is a development tool,
 
 PaperTrail uses Gmail API message listing and full-message retrieval with a receipt-focused query, shown before sync. It walks nested MIME parts, ignores attachments, and selects plain text or converts the richer HTML body to text. Conversion runs as text processing: it executes no email JavaScript and loads no remote email resources.
 
-The local deterministic classifier handles receipt types and phishing/marketing exclusions. Before Claude extraction, `redact()` replaces recognized card numbers, phone numbers, street addresses and email addresses with tokens. The prompt includes the sender domain, date, and redacted subject/body, not full From/To headers. Claude output is Zod-validated, retried once after invalid output, and otherwise routed to Review. The matcher groups extracted events into orders; pure rules compute every amount and deadline.
+The local deterministic classifier handles receipt types and phishing/marketing exclusions. Before Claude extraction, `redact()` replaces recognized card numbers, phone numbers, street/postal addresses, email addresses and recognized customer names with tokens. The prompt includes the sender domain, date, and redacted subject/body, not full From/To headers. Claude output is Zod-validated, retried once after invalid output, and otherwise routed to Review. The matcher groups extracted events into orders; pure rules compute every amount and deadline.
 
-Redaction currently has known gaps for international phone/address formats and customer names ([#94](https://github.com/VeneratedApotheosis/Paper-Trail/issues/94)). It is pattern-based, not a guarantee that every piece of personal information is removed. Raw full email bodies are processed in memory rather than persisted; extracted fields and bounded evidence quotes are retained.
+Redaction covers the international/contextual phone, postal-line and customer-name cases added in [#94](https://github.com/VeneratedApotheosis/Paper-Trail/issues/94). It remains pattern-based, not a guarantee that every piece of personal information is removed. Raw full email bodies are processed in memory rather than persisted; extracted fields and bounded evidence quotes are retained.
 
 ## Data, trust and limitations
 
@@ -78,7 +78,7 @@ Redaction currently has known gaps for international phone/address formats and c
 - **Storage:** purchase state, findings, drafts, review items, extraction cache and app audit are in process memory, scoped separately for signed-in accounts. Anonymous demo/upload visitors share the anonymous store. A server restart loses this state; SQLite auth persistence does not make the ledger persistent.
 - **Disconnect:** clears local Gmail credentials and attempts Google revocation, retaining the signed-in identity and existing purchases.
 - **Delete everything:** purges the active store, removes the account identity/credentials when signed in, clears cookies, and attempts Google revocation. The receipt reports the actual purge counts and whether revocation was confirmed. A persistent `oauth.deleted` row retains no subject identity.
-- **Audit:** Gmail fetches, provider attempts (including failures), approvals and deletes are recorded. SQLite auth audit and the app audit endpoint remain separate. Cached/gold extractions currently also appear under the legacy `llm_call` category; [#40](https://github.com/VeneratedApotheosis/Paper-Trail/issues/40) tracks correcting that label. Their details distinguish them from live calls.
+- **Audit:** Gmail fetches, provider attempts (including failures), approvals and deletes are recorded. SQLite auth audit and the app audit endpoint remain separate. Cached/gold extractions are counted by source in pipeline statistics; only real provider attempts produce `llm_call` rows.
 - **Review:** confidence below 0.7 or missing required purchase facts prevents inclusion in owed totals. Rules depend on the policy evidence/defaults available; users should check the original merchant terms.
 
 ## Architecture and project structure

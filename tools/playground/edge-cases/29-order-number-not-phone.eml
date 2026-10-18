@@ -4,7 +4,7 @@ Subject: Order received: 112-4455-6677
 Date: Sat, 03 Oct 2026 12:00:00 +0000
 Message-ID: <29-order-number-not-phone@edge-cases.example>
 MIME-Version: 1.0
-X-PT-Expect: class=order; keep=true; redacts=phone
+X-PT-Expect: class=order; keep=true; redacts=phone,name
 X-PT-Synthetic: true
 Content-Type: text/plain; charset=utf-8
 

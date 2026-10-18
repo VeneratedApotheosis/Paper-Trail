@@ -82,6 +82,16 @@ describe("rephraseDraft", () => {
     expect(request.system).not.toContain("Sam Synthetic");
   });
 
+  it("redacts customer names and contact details added inside the body before any provider call", async () => {
+    const draft = templateDraft();
+    draft.body = "My name is Sam Synthetic. Phone: +44 20 7946 0958.\n" + draft.body;
+    const llm = new FakeLlm(() => ({ body: REWORDED_CONTENT }));
+    await rephraseDraft(draft, { llm });
+    expect(llm.requests[0].user).not.toMatch(/Sam Synthetic|7946|0958/);
+    expect(llm.requests[0].user).toContain("[NAME_1]");
+    expect(llm.requests[0].user).toContain("[PHONE_1]");
+  });
+
   it("rejects a rewording that changes an amount", async () => {
     const draft = templateDraft();
     const llm = new FakeLlm(() => ({ body: REWORDED_CONTENT.replace("$113.00", "$131.00") }));

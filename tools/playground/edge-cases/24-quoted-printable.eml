@@ -4,7 +4,7 @@ Subject: Your Voltline order #VL-55120 has shipped
 Date: Sat, 03 Oct 2026 09:00:00 +0000
 Message-ID: <24-quoted-printable@edge-cases.example>
 MIME-Version: 1.0
-X-PT-Expect: class=shipped; keep=true; redacts=none; contains=deliberately long so that the quoted-printable
+X-PT-Expect: class=shipped; keep=true; redacts=name; contains=deliberately long so that the quoted-printable
 X-PT-Synthetic: true
 Content-Type: text/plain; charset=utf-8
 Content-Transfer-Encoding: quoted-printable

@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
+import { customerNames, namePattern } from "./names";
 import type { RawEmail, RedactedEmail, RedactionKind } from "@/lib/contracts";
 
 /**
  * PII redaction (AGENTS.md hard rule #3): runs before any LLM call.
- * Replaces card numbers, phone numbers, street addresses and email addresses with numbered tokens
- * (`[PAN_1]`, `[PHONE_1]`, `[ADDRESS_1]`, `[EMAIL_1]`). The same value maps to the same token within one email
+ * Replaces card numbers, phone numbers, street addresses, email addresses and customer names with numbered tokens
+ * (`[PAN_1]`, `[PHONE_1]`, `[ADDRESS_1]`, `[EMAIL_1]`, `[NAME_1]`). The same value maps to the same token within one email
  * (subject and body share the numbering). Last-4 mentions ("ending in 4242") are kept: last4 is allowed.
  */
 
@@ -13,6 +14,7 @@ const TOKEN_LABEL: Record<RedactionKind, string> = {
   phone: "PHONE",
   address: "ADDRESS",
   email: "EMAIL",
+  name: "NAME",
 };
 
 const EMAIL_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g;
@@ -26,6 +28,11 @@ const PAN_PATTERN = /(?<![\w#-])(?<!\d[ -])\d(?:[ -]?\d){12,18}(?![\w-])(?![ -]\
  */
 const PHONE_PATTERN =
   /(?<![\w#-])(?<!\d[ .-])(?:(?:\+?1[ .-]?)?(?:\(\d{3}\)[ .-]?|\d{3}[ .-])\d{3}[ .-]\d{4}|\d{3}[.-]\d{4})(?![\w-])(?![ .-]\d)/g;
+
+const INTERNATIONAL_PHONE = /(?<![\w#])\+[1-9](?:[ \t().-]*\d){6,14}(?![\w]|[ \t().-]*\d)/g;
+const BARE_PHONE = /(?<![\w#-])\d{10,11}(?![\w-])/g;
+const INTERNATIONAL_ADDRESS = /\b(?:\d{1,6}[ \t]+(?:rue|avenue|boulevard|chemin|route|allée|allee)[ \t]+[\p{L}][\p{L} .’'-]{1,65}|[\p{L}.’'-]*(?:straße|strasse|weg|platz|gasse)[ \t]+\d{1,6}[a-z]?)(?![\p{L}\d])/giu;
+const POSTAL_LINE = /^(?:(?:[\p{L}][\p{L} .’'-]*[ \t]+)?[A-Z]{1,2}\d[A-Z\d]?[ \t]*\d[A-Z]{2}|[\p{L}][\p{L} .’'-]*,?[ \t]+[A-Z]{2}[ \t]+\d{5}(?:-\d{4})?|(?:[\p{L}][\p{L} .’'-]*,?[ \t]+)?(?:[A-Z]{2}[ \t]+)?[A-Z]\d[A-Z][ -]?\d[A-Z]\d|\d{4,6}[ \t]+[\p{L}][\p{L} .’'-]*)(?:,?[ \t]+(?:USA|United States|Canada|France|Germany|Deutschland))?$/iu;
 
 const STREET_SUFFIX =
   "Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Way|Court|Ct|Place|Pl|Terrace|Ter|Circle|Cir|Parkway|Pkwy|Highway|Hwy";
@@ -90,9 +97,12 @@ class Redactor {
     phone: new Map(),
     address: new Map(),
     email: new Map(),
+    name: new Map(),
   };
 
-  readonly counts: Record<RedactionKind, number> = { pan: 0, phone: 0, address: 0, email: 0 };
+  readonly counts: Record<RedactionKind, number> = { pan: 0, phone: 0, address: 0, email: 0, name: 0 };
+
+  constructor(private readonly names: readonly string[]) {}
 
   private token(kind: RedactionKind, key: string): string {
     const known = this.tokens[kind];
@@ -105,9 +115,13 @@ class Redactor {
     return token;
   }
 
-  /** Order matters: emails first (they contain digits/words), then PANs, phones, addresses. */
+  /** Order matters: emails and names first; international phones before PANs, then local phones and addresses. */
   redactText(text: string): string {
     let out = text.replace(EMAIL_PATTERN, (match) => this.token("email", match.toLowerCase()));
+    for (const name of this.names) {
+      out = out.replace(namePattern(name), () => this.token("name", name.toLowerCase()));
+    }
+    out = out.replace(INTERNATIONAL_PHONE, match => this.token("phone", normalizePhone(match)));
     out = out.replace(PAN_PATTERN, (match: string, offset: number, whole: string) => {
       const digits = match.replace(/\D/g, "");
       if (!passesLuhn(digits) || isLabeledReference("pan", whole, offset)) return match;
@@ -117,9 +131,27 @@ class Redactor {
       if (isLabeledReference("phone", whole, offset)) return match;
       return this.token("phone", normalizePhone(match));
     });
+    out = out.replace(BARE_PHONE, (match: string, offset: number, whole: string) => {
+      const lineEnd = whole.indexOf("\n", offset);
+      const after = whole.slice(offset + match.length, lineEnd < 0 ? undefined : lineEnd).slice(0, 30);
+      if (!PII_CONTEXT.phone.test(lineContextBefore(whole, offset) + after) || isLabeledReference("phone", whole, offset)) return match;
+      return this.token("phone", normalizePhone(match));
+    });
+    out = out.replace(INTERNATIONAL_ADDRESS, match => this.token("address", match.toLowerCase().trim()));
     out = out.replace(ADDRESS_PATTERN, (match) =>
       this.token("address", match.toLowerCase().replace(/[\s.,]+/g, " ").trim()),
     );
+    // Keep monetary/order lines intact; postal lines and postal tails after a street token are PII.
+    out = out.split("\n").map(line => {
+      const tokenEnd = /\[ADDRESS_\d+\]/.exec(line);
+      if (tokenEnd) {
+        const start = tokenEnd.index + tokenEnd[0].length;
+        const tail = line.slice(start).replace(/^[, \t]+/, "").trim();
+        if (POSTAL_LINE.test(tail)) return line.slice(0, start) + " " + this.token("address", tail.toLowerCase());
+      }
+      const trimmed = line.trim();
+      return POSTAL_LINE.test(trimmed) ? this.token("address", trimmed.toLowerCase()) : line;
+    }).join("\n");
     return out;
   }
 }
@@ -131,11 +163,11 @@ export function hashRedactedText(text: string): string {
 
 /**
  * Redacts the subject and body of one email and drops `html`.
- * `redactions` counts replaced occurrences per kind (all four kinds always present).
+ * `redactions` counts replaced occurrences per kind (all kinds always present).
  * Headers (`from`, `to`) are passed through unchanged.
  */
 export function redact(email: RawEmail): RedactedEmail {
-  const redactor = new Redactor();
+  const redactor = new Redactor(customerNames(email));
   const subject = redactor.redactText(email.subject);
   const text = redactor.redactText(email.text);
   const withoutHtml: RawEmail = { ...email };

@@ -127,6 +127,9 @@ function validateToolInput(
   });
   if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
   const extraction = parsed.data;
+  extraction.fields.customerName = null;
+  delete extraction.evidence.customerName;
+  delete extraction.confidence.customerName;
   return { ok: true, extraction: { ...extraction, confMin: computeConfMin(extraction.fields, extraction.confidence) } };
 }
 

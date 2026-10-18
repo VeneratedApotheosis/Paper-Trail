@@ -172,7 +172,7 @@ describe("runDebugPipeline with a (fake) LLM", () => {
     expect(requests[0].user).toContain("[PAN_1]");
     expect(result.extraction.status).toBe("ok");
     expect(result.audit).toHaveLength(1);
-    expect(result.audit[0]).toMatchObject({ type: "llm_call", model: "fake-model", redactedTokenCount: 1 });
+    expect(result.audit[0]).toMatchObject({ type: "llm_call", model: "fake-model", redactedTokenCount: 2 });
     expect(audited).toEqual(result.audit);
     expect(result.orders).toHaveLength(1);
     expect(result.orders[0]).toMatchObject({ orderRef: "VL-55120", total: 97.19, currency: "USD", needsReview: false });

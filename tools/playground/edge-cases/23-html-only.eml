@@ -4,7 +4,7 @@ Subject: Order confirmed: #LB-61902
 Date: Thu, 08 Oct 2026 19:00:00 +0000
 Message-ID: <23-html-only@edge-cases.example>
 MIME-Version: 1.0
-X-PT-Expect: class=order; keep=true; redacts=none; contains=Order total
+X-PT-Expect: class=order; keep=true; redacts=name; contains=Order total
 X-PT-Synthetic: true
 Content-Type: multipart/alternative; boundary="PT-BOUNDARY-23"
 

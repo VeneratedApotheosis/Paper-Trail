@@ -18,10 +18,10 @@ function email(text: string, subject = "Your Northwind order #NW-1001"): RawEmai
 
 describe("redact", () => {
   it("returns a contract-valid RedactedEmail without html", () => {
-    const result = redact(email("Thanks for your order, Sam."));
+    const result = redact(email("Thanks for your order."));
     expect(RedactedEmailSchema.parse(result)).toBeTruthy();
     expect("html" in result).toBe(false);
-    expect(result.redactions).toEqual({ pan: 0, phone: 0, address: 0, email: 0 });
+    expect(result.redactions).toEqual({ pan: 0, phone: 0, address: 0, email: 0, name: 0 });
   });
 
   it("redacts Luhn-valid card numbers with spaces, dashes, or none", () => {
@@ -73,7 +73,7 @@ describe("redact", () => {
       ),
     );
     expect(result.text).toBe(
-      ["Call [PHONE_1]", "Desk [PHONE_2]", "Mobile [PHONE_3]", "Intl [PHONE_4]", "Alt [PHONE_5]", "Phone no: [PHONE_6]"].join(
+      ["Call [PHONE_3]", "Desk [PHONE_4]", "Mobile [PHONE_5]", "Intl [PHONE_1]", "Alt [PHONE_2]", "Phone no: [PHONE_6]"].join(
         "\n",
       ),
     );
@@ -96,7 +96,7 @@ describe("redact", () => {
     );
     expect(result.text).toBe(
       [
-        "Ship to: Sam Rivera, [ADDRESS_1]",
+        "Ship to: [NAME_1], [ADDRESS_1]",
         "Billing: [ADDRESS_2]",
         "Store: [ADDRESS_3]",
         "Return to [ADDRESS_4]",
@@ -128,7 +128,7 @@ describe("redact", () => {
     ].join("\n");
     const result = redact(email(text));
     expect(result.text).toBe(text);
-    expect(result.redactions).toEqual({ pan: 0, phone: 0, address: 0, email: 0 });
+    expect(result.redactions).toEqual({ pan: 0, phone: 0, address: 0, email: 0, name: 0 });
   });
 
   it("maps the same value to the same token across subject and body", () => {
@@ -142,7 +142,7 @@ describe("redact", () => {
     expect(result.text).toBe(
       "Call [PHONE_1] or [PHONE_1]. Card [PAN_1], again [PAN_1]. Email [EMAIL_1] or [EMAIL_1]. Other: [PHONE_2]",
     );
-    expect(result.redactions).toEqual({ pan: 2, phone: 4, address: 0, email: 2 });
+    expect(result.redactions).toEqual({ pan: 2, phone: 4, address: 0, email: 2, name: 0 });
   });
 
   it("redacts PII in the subject line", () => {
@@ -165,5 +165,36 @@ describe("redact", () => {
     expect(result.from).toBe('"Northwind Outfitters" <orders@northwind.example>');
     expect(result.threadId).toBe("t1");
     expect(result.labels).toEqual(["INBOX"]);
+  });
+});
+
+describe("international and name privacy", () => {
+  it.each(["+44 20 7946 0958", "+33 1 23 45 67 89", "+442079460958", "+44 (0)20 7946 0958", "Phone: 4155550142", "Mobile: 14155550142", "4155550142 (phone)"])("redacts phone %s", phone => {
+    expect(redact(email(phone)).text.replace(/\[PHONE_\d+\]/g, "")).not.toMatch(/\d/);
+    expect(redact(email(phone)).redactions.phone).toBe(1);
+  });
+  it("preserves bare order ids, SKUs and amounts without phone context", () => {
+    const text = "Order: 4155550142\nSKU: 14155550142\nTotal: 199.95\nDate: 2026-10-17";
+    expect(redact(email(text)).text).toBe(text);
+  });
+  it.each([
+    "Hauptstrasse 5, 10115 Berlin", "12 rue de Rivoli, 75001 Paris",
+    "742 Maple Ave\nSpringfield, IL 62704", "12 Maple Street\nToronto, ON M5V 2T6",
+    "742 Maple Ave\n10115 Berlin", "12 Maple Street\nLondon SW1A 2AA",
+  ])("redacts street and postal line: %s", address => {
+    const text = redact(email(`${address}\nOrder #NW-1001\nTotal: $59.99`)).text;
+    expect(text).not.toMatch(/Maple|Berlin|Paris|London|Toronto|62704|M5V|SW1A|10115|75001/);
+    expect(text).toContain("Order #NW-1001\nTotal: $59.99");
+  });
+  it("redacts known full/first names in subject and body with truthful counts", () => {
+    const result = redact(email("Hi Sam,\nCustomer: Sam Rivera\nShip to:\nSam Rivera\nSam bought a Trail Runner for $20.", "Sam Rivera receipt"));
+    expect(result.subject + result.text).not.toMatch(/Sam|Rivera/);
+    expect(result.redactions.name).toBe(5);
+    expect(result.text).toContain("Trail Runner for $20");
+  });
+  it.each(["Dear Élodie Martin,", "Customer name: Maya Chen", "Ship to:\nMaya Chen\n12 Maple Street"])("finds customer names without a recipient display name: %s", text => {
+    const result = redact({ ...email(text), to: "customer@mail.example" });
+    expect(result.redactions.name).toBeGreaterThan(0);
+    expect(result.text).not.toMatch(/Élodie|Martin|Maya|Chen/);
   });
 });

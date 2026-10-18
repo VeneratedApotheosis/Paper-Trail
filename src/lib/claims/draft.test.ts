@@ -175,6 +175,7 @@ describe("draftClaim signature and recipient", () => {
     expect(fromProfile.body.endsWith("Thank you,\nProfile Person")).toBe(true);
 
     expect(draftOf(noCustomer).signedName).toBe("Customer");
+    expect(draftOf({ ...fixture, order: { ...fixture.order, customerName: "[NAME_1]" } }).signedName).toBe("Customer");
     expect(draftOf({ ...fixture, order: { ...fixture.order, customerName: "  " } }).signedName).toBe("Customer");
   });
 

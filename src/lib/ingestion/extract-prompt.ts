@@ -11,12 +11,13 @@ export const EXTRACTION_TOOL_NAME = "record_extraction";
 
 export const EXTRACTION_SYSTEM_PROMPT = [
   "You extract structured purchase data from one shopping email for a personal receipt ledger.",
-  "Personal data in the email is replaced by tokens like [PAN_1], [PHONE_1], [ADDRESS_1], [EMAIL_1]; never try to reconstruct them.",
+  "Personal data in the email is replaced by tokens like [PAN_1], [PHONE_1], [ADDRESS_1], [EMAIL_1], [NAME_1]; never try to reconstruct them.",
   "Rules:",
   "- Extract only what the email explicitly states. Use null when a value is unknown or not stated. Never guess.",
   "- Never compute, infer, convert, or sum amounts. Copy each amount exactly as written, as a plain number in major units (19.99).",
   "- currency is the ISO 4217 code (USD, EUR, GBP) only when the email states or clearly shows it; otherwise null.",
   "- date is ISO 8601 (YYYY-MM-DD or full datetime): the order/event date stated in the email body, else the email date.",
+  "- customerName must be null. Customer names are private; never infer or reconstruct them from tokens.",
   "- last4 is the 4 card digits only when the email shows them (e.g. 'ending in 4242'); otherwise null.",
   "- eventAmount is the refund, price adjustment, or store credit amount stated in refund/adjustment/credit emails.",
   "- returnWindowDays, refundSlaDays, priceAdjustDays and policyQuote only when the email itself states the policy.",
@@ -61,7 +62,7 @@ const FIELD_PROPERTIES: Record<ExtractedFieldName, Record<string, unknown>> = {
     additionalProperties: false,
   },
   last4: { type: ["string", "null"], pattern: "^\\d{4}$" },
-  customerName: { ...nullableString, description: "Name the email addresses the customer by" },
+  customerName: { ...nullableString, description: "Always null; customer names are redacted before extraction" },
   eventAmount: { ...nullableNumber, description: "Refund / price adjustment / store credit amount as written" },
   returnWindowDays: nullablePositiveInteger,
   refundSlaDays: nullablePositiveInteger,

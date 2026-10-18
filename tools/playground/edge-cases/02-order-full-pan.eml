@@ -4,7 +4,7 @@ Subject: Your Voltline order #VL-55120 is confirmed
 Date: Fri, 02 Oct 2026 09:15:00 +0000
 Message-ID: <02-order-full-pan@edge-cases.example>
 MIME-Version: 1.0
-X-PT-Expect: class=order; keep=true; redacts=pan; contains=Order total
+X-PT-Expect: class=order; keep=true; redacts=pan,name; contains=Order total
 X-PT-Synthetic: true
 Content-Type: text/plain; charset=utf-8
 

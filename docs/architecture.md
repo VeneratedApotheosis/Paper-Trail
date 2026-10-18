@@ -37,9 +37,9 @@ The classifier sees the raw email locally to recognize forwarded sender domains 
 
 ## 3. Redaction, extraction and caching
 
-`src/lib/ingestion/redact.ts` tokenizes recognized email addresses, Luhn-valid card numbers, separated US phone formats and US-style street addresses in subject/body, preserving labeled order/tracking references and last-four mentions. HTML is dropped. Token numbering is shared within an email; `textHash` is SHA-256 of the redacted body.
+`src/lib/ingestion/redact.ts` tokenizes recognized email addresses, Luhn-valid card numbers, international and contextual bare phones, street/postal addresses and recognized customer names in subject/body, preserving labeled order/tracking references and last-four mentions. HTML is dropped. Token numbering is shared within an email; `textHash` is SHA-256 of the redacted body.
 
-This is pattern-based redaction. International phones/addresses, postal lines and customer names are known gaps tracked in [#94](https://github.com/VeneratedApotheosis/Paper-Trail/issues/94). Do not describe it as complete anonymization. The existing extraction schema still includes `customerName`.
+This is pattern-based redaction, not complete anonymization. `names.ts` uses recipient display names and customer/shipping/salutation hints. The extraction prompt requests null customer names; validated model output drops reconstructed names/evidence. Claims use a known name when supplied and “Customer” when none is available or a redaction placeholder remains.
 
 `extract-prompt.ts` sends only the sender domain, email date, redacted subject and text to the forced `record_extraction` tool. `extract.ts` validates the response with the canonical Zod schema, retries invalid output once, and routes persistent invalid output to Review. Provider exceptions are audited, then handled by the pipeline; Gmail applies its stricter fail-the-replacement policy. Confidence is the minimum across present extracted fields.
 
@@ -47,7 +47,7 @@ This is pattern-based redaction. International phones/addresses, postal lines an
 
 `src/lib/ingestion/cache.ts` supplies memory/file caches keyed by `textHash`. Valid results are cached; cache hits reuse fields with the current classification. Uploads layer the scoped memory cache over the read-only seed cache; Gmail uses its scoped memory cache. Demo mode falls back to `extractionFromGoldLabel` in `src/lib/pipeline/gold.ts` when recorded seed outputs are absent. Gold labels are precomputed data, not model measurements.
 
-Current audit producers still emit legacy `llm_call` rows for cache/gold extraction with distinguishing detail strings. [#40](https://github.com/VeneratedApotheosis/Paper-Trail/issues/40) tracks removing this misleading category use. Extraction-origin statistics are the appropriate way to distinguish those paths from provider requests.
+Only real provider attempts emit `llm_call` audit rows. Cache/gold provenance remains in pipeline extraction-origin statistics, including offline demo runs.
 
 ## 4. Matching, rules, review and claims
 
@@ -65,7 +65,7 @@ Rules take an injected `now` and price feed. Monetary amounts, due dates, thresh
 
 `src/lib/review/**` and `/api/review/**` support validated edits and confirmation, with revisions for stale requests. Confirmation reruns rules while preserving existing finding statuses by id. Low-confidence orders do not contribute money until confirmed. Unreadable messages without an order are shown separately rather than fabricated as editable purchases.
 
-`src/lib/claims/draft.ts` builds templates from deterministic finding/order facts. It currently chooses the receipt customer name, then an optional profile-name argument, then “Customer”; wiring an account-profile signature is part of #94. Optional rephrasing (`rephrase.ts`) excludes the signature, Zod-validates wording, checks facts/numbers and falls back to the template on failure.
+`src/lib/claims/draft.ts` builds templates from deterministic finding/order facts. It currently chooses the receipt customer name, then an optional profile-name argument, then “Customer”; no new account display-name source is required. Optional rephrasing (`rephrase.ts`) excludes the signature, Zod-validates wording, checks facts/numbers and falls back to the template on failure.
 
 `src/lib/api/claims.ts` and `/api/claims/**` handle draft/read/edit/approve operations; `/api/findings/[id]/status` handles resolution/dismissal. Drafts and approvals survive pipeline reruns for surviving findings; changed facts produce a warning. An approval writes audit state and returns clipboard/mailto handoff information. The claim view uses the server approval state and mailto URL, hides email handoff after unsaved edits, and never sends email. “Claim sent” state represents user-approved handoff, not delivery confirmation.
 

@@ -4,7 +4,7 @@ Subject: Your order #FC-2210 has been cancelled
 Date: Sun, 11 Oct 2026 06:00:00 +0000
 Message-ID: <18-cancel@edge-cases.example>
 MIME-Version: 1.0
-X-PT-Expect: class=cancel; keep=true; redacts=none
+X-PT-Expect: class=cancel; keep=true; redacts=name
 X-PT-Synthetic: true
 Content-Type: text/plain; charset=utf-8
 

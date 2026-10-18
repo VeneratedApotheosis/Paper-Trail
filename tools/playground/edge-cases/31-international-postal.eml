@@ -1,0 +1,16 @@
+From: Northwind <orders@northwind.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Order confirmation #31
+Date: Sat, 17 Oct 2026 12:00:00 +0000
+Message-ID: <31-international-postal.eml@edge-cases.example>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+X-PT-Synthetic: true
+X-PT-Expect: class=order; keep=true; redacts=address,name
+
+Customer: Sam Rivera
+Order #NW-3001 total $39.99
+Ship to: Hauptstrasse 5, 10115 Berlin
+Billing: 12 rue de Rivoli, 75001 Paris
+Return address: 12 Maple Street
+Toronto, ON M5V 2T6

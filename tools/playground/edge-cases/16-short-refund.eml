@@ -4,7 +4,7 @@ Subject: Refund issued for order #LB-60455
 Date: Thu, 15 Oct 2026 10:00:00 +0000
 Message-ID: <16-short-refund@edge-cases.example>
 MIME-Version: 1.0
-X-PT-Expect: class=refund; keep=true; redacts=none
+X-PT-Expect: class=refund; keep=true; redacts=name
 X-PT-Synthetic: true
 Content-Type: text/plain; charset=utf-8
 

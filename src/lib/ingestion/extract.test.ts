@@ -90,6 +90,15 @@ function auditLog() {
   return { entries, audit: (entry: ExtractionAuditEntry) => entries.push(entry) };
 }
 
+it("redacts customer names before the provider and ignores reconstructed names", async () => {
+  const llm = scriptedLlm(VALID_TOOL_INPUT);
+  const result = await extract(EMAIL, ORDER, { llm });
+  expect(llm.requests[0].user).not.toMatch(/Sam|Rivera/);
+  expect(llm.requests[0].user).toContain("[NAME_1]");
+  expect(result).toMatchObject({ ok: true, extraction: { fields: { customerName: null } } });
+  if (result.ok) expect(result.extraction.evidence.customerName).toBeUndefined();
+});
+
 describe("extract: request content", () => {
   it("sends only the redacted subject/body, sender domain and date through the Anthropic client", async () => {
     const bodies: string[] = [];

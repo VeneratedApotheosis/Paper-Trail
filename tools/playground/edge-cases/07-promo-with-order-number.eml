@@ -4,7 +4,7 @@ Subject: A little thank-you: 20% off your next glow-up
 Date: Wed, 07 Oct 2026 16:00:00 +0000
 Message-ID: <07-promo-with-order-number@edge-cases.example>
 MIME-Version: 1.0
-X-PT-Expect: class=marketing; keep=true; redacts=none
+X-PT-Expect: class=marketing; keep=true; redacts=name
 X-PT-Synthetic: true
 Content-Type: text/plain; charset=utf-8
 

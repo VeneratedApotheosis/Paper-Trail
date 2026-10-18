@@ -15,7 +15,7 @@ Each file states what should happen, e.g. `X-PT-Expect: class=refund; keep=true;
 |---|---|
 | `class` | Expected `classify()` label. `a\|b` accepts either (e.g. a newsletter may be `marketing` or `not_receipt`). |
 | `keep` | Expected `isReceiptLike()` decision (the prefilter uploads use). |
-| `redacts` | Redaction kinds (`pan`, `phone`, `address`, `email`) that must be replaced; every other kind must stay at 0. `none` = nothing. |
+| `redacts` | Redaction kinds (`pan`, `phone`, `address`, `email`, `name`) that must be replaced; every other kind must stay at 0. `none` = nothing. |
 | `contains` | Optional text the parsed plain-text body must contain (checks base64 / quoted-printable / HTML decoding). |
 
 Known classifier bugs are marked `it.fails` in the test (see `KNOWN_FAILURES` there) and are listed below as
@@ -25,7 +25,7 @@ Known classifier bugs are marked `it.fails` in the test (see `KNOWN_FAILURES` th
 
 | File | Tests | Expectation |
 |---|---|---|
-| `01-plain-order.eml` | Plain order confirmation with line items, totals, last-4 and a stated return policy | order, kept, nothing redacted (last-4 is allowed) |
+| `01-plain-order.eml` | Plain order confirmation with line items, totals, last-4 and a stated return policy | order, kept, customer name redacted; last-4 is allowed |
 | `02-order-full-pan.eml` | Full test card number in the body | order, `[PAN_1]` replaces the card number |
 | `03-phone-address-redaction.eml` | Ship-to street address + support phone; tracking number must survive | shipped, phone + address redacted |
 | `04-forwarded-receipt.eml` | Receipt forwarded by the user ("Fwd:", inner From/Subject block) | order (from the inner message), inner sender email redacted |
@@ -54,3 +54,9 @@ Known classifier bugs are marked `it.fails` in the test (see `KNOWN_FAILURES` th
 | `27-extremely-long-body.eml` | ~90 KB body with a phone number at the very end | order, the trailing phone is still redacted |
 | `28-newsletter.eml` | Non-receipt newsletter | marketing or not_receipt, dropped by the prefilter |
 | `29-order-number-not-phone.eml` | Order number shaped like digits (`112-4455-6677`) next to a real phone | order, only the phone is redacted |
+
+| `30-international-phones.eml` | International and contextual bare phones; reference preserved | phone + name redacted |
+| `31-international-postal.eml` | German/French streets and Canadian postal line | address + name redacted |
+| `32-customer-names.eml` | Recipient, greeting and customer labels | name redacted before extraction |
+
+Names from recipient display headers and explicit customer/greeting labels are tokenized in subject/body. Existing fixture headers list name redactions where applicable. International fixtures are synthetic examples, including the fictional customer Sam Rivera.

@@ -4,7 +4,7 @@ Subject: Your Grandmart order #GM-30551 has shipped
 Date: Sat, 03 Oct 2026 14:00:00 +0000
 Message-ID: <03-phone-address-redaction@edge-cases.example>
 MIME-Version: 1.0
-X-PT-Expect: class=shipped; keep=true; redacts=phone,address
+X-PT-Expect: class=shipped; keep=true; redacts=phone,address,name
 X-PT-Synthetic: true
 Content-Type: text/plain; charset=utf-8
 

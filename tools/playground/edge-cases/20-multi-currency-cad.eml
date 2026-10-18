@@ -4,7 +4,7 @@ Subject: Order confirmation #NWC-4410
 Date: Mon, 05 Oct 2026 20:00:00 +0000
 Message-ID: <20-multi-currency-cad@edge-cases.example>
 MIME-Version: 1.0
-X-PT-Expect: class=order; keep=true; redacts=none; contains=CA$
+X-PT-Expect: class=order; keep=true; redacts=name; contains=CA$
 X-PT-Synthetic: true
 Content-Type: text/plain; charset=utf-8
 
