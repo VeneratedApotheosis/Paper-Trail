@@ -6,6 +6,7 @@ import { DEMO_COOKIE } from "@/middleware";
 import { loadSeedDemo } from "@/lib/demo";
 import { createSyncCollector } from "@/lib/quality/collector";
 import { classOverridesFor } from "@/lib/quality/labels";
+import { demoPromotionTexts } from "@/lib/promotions/demo";
 import { recordSyncPromotions } from "@/lib/promotions/state";
 import { recordSyncQuality } from "@/lib/quality/state";
 import { appendAudit, beginStoreWork, clearLedger, currentStoreScope, getExcludedMerchants, getState, setPipelineResult } from "@/lib/store";
@@ -29,7 +30,7 @@ async function handlePOST(_request: Request): Promise<Response> {
   setPipelineResult("demo", result.asOf, result);
   const collected = collector.finish(result);
   recordSyncQuality(collected);
-  recordSyncPromotions(collected, { useClaude: false }); // the demo is offline: rules only
+  recordSyncPromotions({ ...collected, texts: [...collected.texts, ...demoPromotionTexts()] }, { useClaude: false }); // the demo is offline: rules only
   const body: PipelineRunResponse = buildPipelineRunResponse();
   return Response.json(body);
 }
