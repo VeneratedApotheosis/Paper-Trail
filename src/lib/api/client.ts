@@ -14,6 +14,10 @@ import type {
   FindingStatusRequest,
   FindingStatusResponse,
   FindingStatusUpdate,
+  GmailFailure,
+  GmailPreviewResponse,
+  GmailSyncResponse,
+  GmailSyncStatus,
   LedgerResponse,
   MerchantExcludeResponse,
   OrderResponse,
@@ -78,6 +82,37 @@ export function getAccount(): Promise<AccountResponse> {
 /** Revokes the Google grant and clears stored tokens + mailbox; the synced ledger and the sign-in are kept. */
 export function disconnectGmail(): Promise<DisconnectResponse> {
   return request("/api/auth/disconnect", { method: "POST" });
+}
+
+/** What the UI branches on after a failed Gmail call: HTTP status, the route's `code`, and its message (status 0 = offline). */
+export function toGmailFailure(error: unknown): GmailFailure {
+  if (error instanceof ApiError) {
+    return { status: error.status, code: error.body?.code ?? null, error: error.body?.error ?? null };
+  }
+  return { status: 0, code: null, error: null };
+}
+
+/**
+ * GET /api/gmail/preview: the exact search and how many messages a sync would read (50 at most). Needs a live Gmail
+ * grant: 401 `token_expired` otherwise. Never reads message bodies.
+ */
+export function getGmailPreview(): Promise<GmailPreviewResponse> {
+  return request("/api/gmail/preview");
+}
+
+/**
+ * POST /api/gmail/sync `{ confirmed: true }`: runs the whole sync in one request (240 s budget; 504 `sync_timeout`
+ * after that) and replaces the ledger on success. Call it only after the user confirmed the preview. Other failures:
+ * 401 `token_expired`, 409 `sync_already_running`, 429 `gmail_rate_limited`, 403 `gmail_access_denied`.
+ * A sync changes the ledger, audit log and account: `invalidate()` afterwards (even on failure).
+ */
+export function syncGmail(): Promise<GmailSyncResponse> {
+  return request("/api/gmail/sync", sendJson("POST", { confirmed: true }));
+}
+
+/** GET /api/gmail/sync/status: live progress of the sync running for this account (poll while one runs). */
+export function getGmailSyncStatus(): Promise<GmailSyncStatus> {
+  return request("/api/gmail/sync/status");
 }
 
 export function getLedger(): Promise<LedgerResponse> {

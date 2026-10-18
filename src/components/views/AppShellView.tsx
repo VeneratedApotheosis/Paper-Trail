@@ -1,6 +1,15 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { DemoBanner } from "@/components/DemoBanner";
+import { ShellSyncControl, type AppShellSync } from "@/components/ShellSyncControl";
+
+export type {
+  AppShellSync,
+  AppShellSyncConfirm,
+  AppShellSyncNotice,
+  AppShellSyncProgress,
+  AppShellSyncState,
+} from "@/components/ShellSyncControl";
 
 // Props-only shared chrome. Desktop: a soft left sidebar. Mobile: a neumorphic
 // bottom tab bar. Active nav state is derived from the `activePath` PROP (no
@@ -32,15 +41,18 @@ export interface AppShellViewProps {
   // Shown next to the demo label when extractions came from seed labels, not an LLM.
   precomputedExtractionLabel?: string;
   onLeaveDemo?: () => void;
+  // Global "Sync emails" button in the header (issue #112). Omit to render the shell without it (isolated previews).
+  sync?: AppShellSync;
   // Called with the nav item's href when the user is about to open it (hover, focus, touch), so the wrapper can warm data.
   onNavIntent?: (href: string) => void;
 }
 
 const defaultNav: AppShellNavItem[] = [
-  { href: "/", label: "Owed" },
-  { href: "/ledger", label: "Ledger" },
+  { href: "/", label: "Owed to you" },
+  { href: "/ledger", label: "Purchases" },
   { href: "/review", label: "Review" },
   { href: "/trust", label: "Trust" },
+  { href: "/account", label: "Account" },
 ];
 
 const DEFAULT_DEMO_LABEL = "Demo data \u2014 synthetic, not real purchases";
@@ -58,6 +70,7 @@ export function AppShellView({
   demoLabel = DEFAULT_DEMO_LABEL,
   precomputedExtractionLabel,
   onLeaveDemo,
+  sync,
   onNavIntent,
 }: AppShellViewProps) {
   const showDemoBanner = mode === "demo";
@@ -110,19 +123,28 @@ export function AppShellView({
             onLeaveDemo={onLeaveDemo}
           />
         ) : null}
-        {/* Mobile masthead */}
-        <header className="flex items-center justify-between px-5 py-4 md:hidden">
-          <Link href="/" className="font-serif text-lg font-semibold text-ink">
+        {/* Masthead: wordmark + account on mobile; on desktop only the sync control (fixed height, no layout shift) */}
+        <header
+          className={`relative mx-auto flex min-h-[4.25rem] w-full max-w-ledger items-center justify-between gap-3 px-5 py-3 md:justify-end md:px-10 md:pt-6 ${
+            sync ? "" : "md:hidden"
+          }`}
+        >
+          <Link href="/" className="font-serif text-lg font-semibold text-ink md:hidden">
             PaperTrail
           </Link>
-          {account ? (
-            <div className="neu-raised-sm flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-ink-muted">
-              {account.initials}
-            </div>
-          ) : null}
+          <div className="flex items-center gap-3">
+            {sync ? <ShellSyncControl sync={sync} /> : null}
+            {account ? (
+              <div className="neu-raised-sm flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-ink-muted md:hidden">
+                {account.initials}
+              </div>
+            ) : null}
+          </div>
         </header>
 
-        <main className="mx-auto w-full max-w-ledger flex-1 px-5 pb-28 pt-2 md:px-10 md:py-10">
+        <main
+          className={`mx-auto w-full max-w-ledger flex-1 px-5 pb-28 pt-2 md:px-10 md:pb-10 ${sync ? "md:pt-4" : "md:pt-10"}`}
+        >
           {children}
         </main>
 
@@ -138,7 +160,7 @@ export function AppShellView({
                 onMouseEnter={() => onNavIntent?.(item.href)}
                 onFocus={() => onNavIntent?.(item.href)}
                 onTouchStart={() => onNavIntent?.(item.href)}
-                className={`rounded-sm px-4 py-2 text-xs font-bold transition-shadow ${
+                className={`rounded-sm px-2.5 py-2 text-xs font-bold transition-shadow ${
                   active ? "neu-inset text-teal-deep" : "text-ink-muted"
                 }`}
               >

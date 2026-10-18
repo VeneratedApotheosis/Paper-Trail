@@ -6,6 +6,7 @@
 // Reads go through the shared cache (cache.ts, issue #108): repeat visits render cached data at once and refresh in the
 // background; mutations (useAction, or `invalidate()` at a call site) refresh what they changed.
 import {
+  getAccount,
   getAudit,
   getClaim,
   getFinding,
@@ -14,6 +15,7 @@ import {
   getSessionStatus,
 } from "@/lib/api/client";
 import type {
+  AccountResponse,
   ClaimResponse,
   FindingResponse,
   LedgerResponse,
@@ -50,6 +52,11 @@ export function useClaim(findingId: string): AsyncState<ClaimResponse> {
 /** Gmail connection status. `connected: false` is normal in demo mode and is not an error. */
 export function useSession(): AsyncState<SessionStatus> {
   return useCached(CACHE_KEYS.session, getSessionStatus);
+}
+
+/** Gmail connection, mailbox, last sync time and counts for the current account (also works for anonymous users). */
+export function useAccount(): AsyncState<AccountResponse> {
+  return useCached(CACHE_KEYS.account, getAccount);
 }
 
 /** Warms the cache for a page the user is about to open (nav link hover/focus). Fresh data is left alone. */

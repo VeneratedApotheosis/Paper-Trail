@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PipelineStats } from "@/lib/pipeline/run";
-import type { GmailSyncResponse } from "./gmailApi";
+import type { GmailSyncResponse } from "@/lib/api/types";
 import {
   gmailErrorCopy,
   gmailProgress,

@@ -1,6 +1,6 @@
 import type { SyncErrorInfo, SyncProgressInfo, SyncResultInfo } from "@/components/views/SyncView";
 import type { PipelineStats } from "@/lib/pipeline/run";
-import type { GmailFailure, GmailSyncResponse, GmailSyncStatus } from "./gmailApi";
+import type { GmailFailure, GmailSyncResponse, GmailSyncStatus } from "@/lib/api/types";
 
 // Pure response -> SyncView props mapping for /sync (#73, #104). Every number shown comes from a real response
 // (prefilter, Gmail preview/status/sync, upload); nothing is simulated.

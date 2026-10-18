@@ -1,17 +1,27 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SyncView, type SyncErrorInfo, type SyncResultInfo } from "@/components/views/SyncView";
-import { invalidate, useAsync } from "@/hooks";
-import { getGmailPreview, getGmailSyncStatus, syncGmail, type GmailSyncStatus } from "./gmailApi";
+import { useAsync, useGmailSyncStatus } from "@/hooks";
+import { runGmailSync } from "@/hooks/syncRun";
+import { getGmailPreview, toGmailFailure } from "@/lib/api/client";
+import type { GmailFailure, GmailPreviewResponse } from "@/lib/api/types";
 import { gmailErrorCopy, gmailProgress, gmailSyncOutcome } from "./syncOutcome";
 
 // /sync with a connected Gmail account (#73): GET /api/gmail/preview, then POST /api/gmail/sync {confirmed:true} only
 // after the user clicks Start. The POST runs the whole sync in one request; while it is pending the page polls
 // GET /api/gmail/sync/status and shows only those real counts. Success opens "/"; failures keep the prior ledger.
 
-const STATUS_POLL_MS = 1000;
+/** The preview request, resolved either way so a failure keeps its HTTP status and `code` (401 token_expired -> reconnect). */
+type PreviewResult = { ok: true; data: GmailPreviewResponse } | { ok: false; failure: GmailFailure };
+
+function loadPreview(): Promise<PreviewResult> {
+  return getGmailPreview().then(
+    (data): PreviewResult => ({ ok: true, data }),
+    (caught: unknown): PreviewResult => ({ ok: false, failure: toGmailFailure(caught) }),
+  );
+}
 
 type Screen =
   | { name: "preview" }
@@ -22,48 +32,29 @@ type Screen =
 
 export function GmailSync() {
   const router = useRouter();
-  const preview = useAsync(() => getGmailPreview(), []);
+  const preview = useAsync(loadPreview, []);
   const [screen, setScreen] = useState<Screen>({ name: "preview" });
-  const [status, setStatus] = useState<GmailSyncStatus | null>(null);
   const inFlight = useRef(false);
-  const syncing = screen.name === "syncing";
-
-  useEffect(() => {
-    if (!syncing) return;
-    let active = true;
-    const timer = setInterval(() => {
-      void getGmailSyncStatus().then((result) => {
-        if (active && result.ok) setStatus(result.data);
-      });
-    }, STATUS_POLL_MS);
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, [syncing]);
-
+  const status = useGmailSyncStatus(screen.name === "syncing");
   const previewData = preview.data?.ok ? preview.data.data : null;
 
   async function startSync() {
     if (inFlight.current) return;
     inFlight.current = true;
-    setStatus(null);
     setScreen({ name: "syncing" });
     try {
-      const result = await syncGmail();
-      // A sync (even a failed or partial one) can change the ledger, audit log and mode: refresh every cached read.
-      await invalidate();
-      if (!result.ok) {
-        setScreen({ name: "failed", error: gmailErrorCopy(result.failure, "sync") });
-        return;
-      }
-      const outcome = gmailSyncOutcome(result.data, previewData?.maxMessages ?? null);
+      // runGmailSync refreshes every cached read afterwards, even after a failed or partial sync, and lets the
+      // header "Sync emails" button know a sync is running.
+      const response = await runGmailSync();
+      const outcome = gmailSyncOutcome(response, previewData?.maxMessages ?? null);
       if (outcome.kind === "open_ledger") {
         setScreen({ name: "opening", result: outcome.result });
         router.push("/");
       } else {
         setScreen({ name: "no_receipts", result: outcome.result });
       }
+    } catch (caught: unknown) {
+      setScreen({ name: "failed", error: gmailErrorCopy(toGmailFailure(caught), "sync") });
     } finally {
       inFlight.current = false;
     }

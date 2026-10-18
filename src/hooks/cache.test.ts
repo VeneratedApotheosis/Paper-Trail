@@ -199,8 +199,10 @@ describe("shared read cache", () => {
       orderA: controlledLoader<string>(),
       orderB: controlledLoader<string>(),
       session: controlledLoader<string>(),
+      account: controlledLoader<string>(),
     };
     subscribe(CACHE_KEYS.ledger, vi.fn(), loaders.ledger.load);
+    subscribe(CACHE_KEYS.account, vi.fn(), loaders.account.load);
     subscribe(CACHE_KEYS.order("a"), vi.fn(), loaders.orderA.load);
     subscribe(CACHE_KEYS.order("b"), vi.fn(), loaders.orderB.load);
     subscribe(CACHE_KEYS.session, vi.fn(), loaders.session.load);
@@ -209,10 +211,12 @@ describe("shared read cache", () => {
     expect(loaders.orderA.load).toHaveBeenCalledTimes(2);
     expect(loaders.orderB.load).toHaveBeenCalledTimes(2);
     expect(loaders.ledger.load).toHaveBeenCalledTimes(1);
+    expect(loaders.account.load).toHaveBeenCalledTimes(1);
 
     void invalidate();
     expect(loaders.ledger.load).toHaveBeenCalledTimes(2);
     expect(loaders.session.load).toHaveBeenCalledTimes(2);
+    expect(loaders.account.load).toHaveBeenCalledTimes(2);
   });
 
   it("reports an error from an invalidate refetch while keeping the data", async () => {

@@ -31,6 +31,7 @@ export function AppShell({ demo, children }: { demo?: boolean; children: ReactNo
       demoLabel={shell?.demoLabel}
       precomputedExtractionLabel={shell?.precomputedExtractionLabel}
       onLeaveDemo={mode === "demo" ? shell?.onLeaveDemo : undefined}
+      sync={shell?.sync}
       onNavIntent={shell ? warmDataFor : undefined}
     >
       {children}

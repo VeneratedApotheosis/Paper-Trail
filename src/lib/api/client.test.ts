@@ -5,12 +5,16 @@ import {
   getAccount,
   getClaim,
   getFinding,
+  getGmailPreview,
+  getGmailSyncStatus,
   getOrder,
   getSessionStatus,
   regenerateClaim,
   safeDecode,
   saveClaim,
   setFindingStatus,
+  syncGmail,
+  toGmailFailure,
 } from "./client";
 import { encodeIdSegment } from "./ids";
 
@@ -90,5 +94,38 @@ describe("account client", () => {
     await disconnectGmail();
     expect(requestedPaths()).toEqual(["/api/account", "/api/auth/disconnect"]);
     expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: "POST" });
+  });
+});
+
+describe("Gmail client", () => {
+  it("reads the preview and the sync status, and posts the confirmed sync", async () => {
+    await getGmailPreview();
+    await getGmailSyncStatus();
+    await syncGmail();
+    expect(requestedPaths()).toEqual(["/api/gmail/preview", "/api/gmail/sync/status", "/api/gmail/sync"]);
+    expect(fetchMock.mock.calls[2][1]).toMatchObject({ method: "POST", body: JSON.stringify({ confirmed: true }) });
+  });
+
+  it("throws an ApiError that keeps the route's status and code", async () => {
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ error: "Gmail sync did not complete. Try again.", code: "sync_timeout" }, { status: 504 }),
+    );
+    const failure = await syncGmail().catch((caught: unknown) => toGmailFailure(caught));
+    expect(failure).toEqual({ status: 504, code: "sync_timeout", error: "Gmail sync did not complete. Try again." });
+  });
+
+  it("maps a network failure or an unreadable body to status 0 / null fields", async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    expect(await getGmailPreview().catch((caught: unknown) => toGmailFailure(caught))).toEqual({
+      status: 0,
+      code: null,
+      error: null,
+    });
+    fetchMock.mockResolvedValueOnce(new Response("oops", { status: 502 }));
+    expect(await getGmailPreview().catch((caught: unknown) => toGmailFailure(caught))).toEqual({
+      status: 502,
+      code: null,
+      error: null,
+    });
   });
 });

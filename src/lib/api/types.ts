@@ -1,6 +1,8 @@
 import type { ClaimDraft } from "@/lib/claims";
 import type { Finding, NormalizedOrder } from "@/lib/contracts";
 import type { PipelineStats, ReviewQueueItem } from "@/lib/pipeline/run";
+import type { GmailSyncProgress } from "@/lib/gmail/progress";
+import type { GmailSyncResult, previewGmail } from "@/lib/gmail/service";
 import type { DeleteAllResult, StoreMode } from "@/lib/store";
 import type { AuditEntry, OwedSummary } from "@/lib/types";
 
@@ -17,6 +19,8 @@ export const API_LABELS = {
 export interface ApiErrorBody {
   error: string;
   details?: unknown;
+  /** Machine-readable reason on Gmail routes: token_expired, sync_already_running, sync_timeout, gmail_rate_limited, ... */
+  code?: string;
 }
 
 /** Owed summary as served by the API (`computeOwed` in src/lib/rules/owed.ts): the claim-sent fields are always set. */
@@ -173,4 +177,20 @@ export interface DisconnectResponse {
   disconnected: true;
   /** Google confirmed the revocation. False when no grant existed or Google was unreachable (credentials are cleared anyway). */
   revokedToken: boolean;
+}
+
+/** GET /api/gmail/preview: { query, estimatedMessages, messagesToFetch, countIsEstimate, windowDays, maxMessages }. */
+export type GmailPreviewResponse = Awaited<ReturnType<typeof previewGmail>>;
+
+/** POST /api/gmail/sync: the PipelineRunResponse plus { fetched, capped, parseErrors }. */
+export type GmailSyncResponse = PipelineRunResponse & Omit<GmailSyncResult, "result">;
+
+/** GET /api/gmail/sync/status: transient in-process progress of the running sync (stage idle when none ran recently). */
+export type GmailSyncStatus = GmailSyncProgress;
+
+/** A failed Gmail call reduced to what the UI branches on. `status` 0 means no HTTP response (network failure). */
+export interface GmailFailure {
+  status: number;
+  code: string | null;
+  error: string | null;
 }

@@ -27,6 +27,8 @@ export const STALE_MS = 5_000;
 export const CACHE_KEYS = {
   ledger: "ledger",
   session: "session",
+  /** GET /api/account: Gmail connection, mailbox, last sync time, counts (issue #110). */
+  account: "account",
   audit: "audit",
   order: (id: string) => `order:${id}`,
   finding: (id: string) => `finding:${id}`,

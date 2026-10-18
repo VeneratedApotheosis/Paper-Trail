@@ -78,7 +78,31 @@ answer `401 { code: "token_expired", reconnectUrl }` otherwise. Tampered / expir
 and their cookies cleared on every route.
 
 Client: `getAccount()`, `disconnectGmail()`. After `disconnectGmail`, a Gmail sync, or `deleteAll`, refetch the account
-and the ledger (shared-cache invalidation point).
+and the ledger (shared-cache invalidation point). UI: `useAccount()` (cache key `account`), the `/account` page and the
+header "Sync emails" button (#110, #112) read it.
+
+## Gmail routes (issues #38, #103, #112)
+
+Details and error codes: `docs/gmail-sync.md`. All three need the signed-in session cookie; the data routes above do not
+need a live Gmail grant, these do (401 `token_expired` + `reconnectUrl` otherwise). Error bodies are
+`{ error, code? }` (`ApiErrorBody.code`).
+
+| Method + path | Request | Response (200) | Errors (`code`) |
+|---|---|---|---|
+| `GET /api/gmail/preview` | none | `GmailPreviewResponse` `{ query, estimatedMessages, messagesToFetch, countIsEstimate, windowDays: 90, maxMessages: 50 }` | 401 `token_expired`, 429 `gmail_rate_limited`, 502 / 503 |
+| `POST /api/gmail/sync` | `{ "confirmed": true }`, same-origin | `GmailSyncResponse` = `PipelineRunResponse` (`mode: "gmail"`) + `{ fetched, capped, parseErrors }` | 400 not confirmed, 401 `token_expired`, 403 `gmail_access_denied` / cross-origin, 409 `sync_already_running` (or data deleted meanwhile, nothing saved), 422 `no_parseable_messages`, 429 `gmail_rate_limited`, 504 `sync_timeout`, 502 / 503 |
+| `GET /api/gmail/sync/status` | none | `GmailSyncStatus` `{ stage: "idle" \| "listing" \| "fetching" \| "processing" \| "complete" \| "failed", fetched, total: number \| null, skipped }` (in-process, kept 15 minutes) | 401 `token_expired` |
+
+- A sync reads at most **50** messages (`maxMessages`, last 90 days) and has a **240 s** budget: when it runs out the
+  route answers **504 `sync_timeout`** and publishes nothing (the previous ledger is unchanged).
+- The sync is one request. While it runs, poll `/api/gmail/sync/status` (about every 1.5 s) for live counts;
+  `stage` `complete` / `failed` may be left over from an earlier run, so only the in-flight stages say anything about
+  the current one. `GET /api/account` also reports `syncing: true` while one runs for the account.
+- Client: `getGmailPreview()`, `syncGmail()` (sends `{ confirmed: true }`, so call it only after the user confirmed the
+  preview), `getGmailSyncStatus()`; all throw `ApiError` (`status`, `body.error`, `body.code`) and
+  `toGmailFailure(error)` reduces any thrown value to `{ status, code, error }` (`status: 0` = network failure).
+  `runGmailSync()` in `@/hooks/syncRun` wraps `syncGmail()` for UI use: one sync at a time per tab, and the shared cache
+  is refreshed afterwards even when it fails.
 
 ## Owed summary and finding status (issue #77, Option A)
 
@@ -208,7 +232,8 @@ or DB failures throw (fail closed). The JSON routes (`withAccountStore`) answer 
 **Client component** -> `@/hooks` (`src/hooks/**`), built on `@/lib/api/client`:
 - Reads return `{ data, error, loading, refetch }`: `useLedger()`, `useOrder(id)`, `useFinding(id)`, `useAudit()`
   (entries newest first), `useClaim(findingId)`, `useSession()` (`SessionStatus` from `GET /api/auth/session`;
-  `connected: false` is normal in demo mode).
+  `connected: false` is normal in demo mode), `useAccount()` (`AccountResponse` from `GET /api/account`),
+  `useGmailSyncStatus(active)` (polls `GET /api/gmail/sync/status` every 1.5 s, only while `active`).
 - Mutations return `{ run, pending, error }`; `run(...)` resolves to the response or `null` on failure:
   `useLoadDemo()`, `useSetFindingStatus()`, `useSaveClaim()`, `useApproveClaim()`, or `useAction(anyClientFn)`.
   A successful `run` invalidates the shared read cache and waits for the refetch, so no `refetch()` call is needed.
@@ -216,7 +241,7 @@ or DB failures throw (fail closed). The JSON routes (`withAccountStore`) answer 
   (`loading` is true only while nothing is cached) and refresh in the background when it is older than 5 s; requests for
   the same endpoint are deduplicated (page and app shell share one). After a mutation that does not go through
   `useAction` (Gmail sync, review confirm), call `invalidate(keys?)` from `@/hooks`: keys are `ledger`, `session`,
-  `audit`, `order`, `finding`, `claim` (a kind matches every `kind:id`); no argument invalidates everything.
+  `account`, `audit`, `order`, `finding`, `claim` (a kind matches every `kind:id`); no argument invalidates everything.
   Mounted reads refetch immediately and keep their data on screen; unmounted ones are dropped.
 
 Ids: pass `params.id` as is. Next 15 hands it over still percent-encoded and real ids contain `:`; the helpers and

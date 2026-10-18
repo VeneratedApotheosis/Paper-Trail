@@ -2,16 +2,17 @@
 
 // App shell state for every page (issue #75): which data the app is showing (store mode), the honest labels, and a
 // neutral account line. Loaded once in layout.tsx; <AppShell> reads it, so views that render <AppShell> stay
-// props-only and unchanged. The ledger and session come from the shared read cache (cache.ts, issue #108): mounting
-// <AppShell> costs no request, and every mutation (useAction, `invalidate()`) refetches them, so the banner and
+// props-only and unchanged. The ledger, session and account come from the shared read cache (cache.ts, issue #108): mounting
+// <AppShell> costs one shared request each, and every mutation (useAction, `invalidate()`) refetches them, so the banner and
 // account follow demo loads, uploads, syncs and deletes immediately.
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import type { AppShellAccount, AppShellMode } from "@/components/views/AppShellView";
+import type { AppShellAccount, AppShellMode, AppShellSync } from "@/components/views/AppShellView";
 import { resetDemo } from "@/lib/api/client";
 import type { LedgerResponse, SessionStatus } from "@/lib/api/types";
 import { invalidate } from "./cache";
-import { useLedger, useSession } from "./data";
+import { useAccount, useLedger, useSession } from "./data";
+import { useGmailSyncControl } from "./gmailSyncControl";
 
 export interface ShellState {
   mode: AppShellMode;
@@ -25,6 +26,8 @@ export interface ShellStateValue extends ShellState {
   onLeaveDemo: () => void;
   /** Refetches mode, labels and Gmail status (ledger and session cache keys). */
   refresh: () => void;
+  /** The header "Sync emails" button (issue #112): state, progress, confirm and result. */
+  sync: AppShellSync;
 }
 
 // Never a person's name: the session API exposes no mailbox address, so accounts describe the data source.
@@ -78,6 +81,9 @@ export function ShellStateProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const ledger = useLedger();
   const session = useSession();
+  const account = useAccount();
+  const navigate = useCallback((href: string) => router.push(href), [router]);
+  const sync = useGmailSyncControl(account.data, navigate);
 
   const refresh = useCallback(() => {
     void invalidate(["ledger", "session"]);
@@ -94,8 +100,8 @@ export function ShellStateProvider({ children }: { children: ReactNode }) {
   }, [refresh, router]);
 
   const value = useMemo<ShellStateValue>(
-    () => ({ ...deriveShellState(ledger.data, session.data), onLeaveDemo, refresh }),
-    [ledger.data, session.data, onLeaveDemo, refresh],
+    () => ({ ...deriveShellState(ledger.data, session.data), onLeaveDemo, refresh, sync }),
+    [ledger.data, session.data, onLeaveDemo, refresh, sync],
   );
 
   return <ShellStateContext.Provider value={value}>{children}</ShellStateContext.Provider>;
