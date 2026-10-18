@@ -361,3 +361,19 @@ Windows tips:
 - **Every ~4 hours:** 5-minute human sync. Check the board (section 3) together and re-pick from the waves table.
 - **Before sleeping / handing off:** push everything; post `PROGRESS` or `UNCLAIMED` on every issue you hold.
 - **Feature freeze (h24):** only bug fixes, eval, demo polish, and README after this point.
+
+### Work delegated to Devin (`kenan-devin-*`)
+Devin gets **self-contained, well-specified, test-verifiable** work: it runs autonomously in its own sandbox, so each task
+names exact files, acceptance criteria and a command that proves it. It never gets design judgment, product decisions,
+or files in flight by other owners. Kenan assigns and reviews; label the issue `devin`.
+
+| Task | Why Devin fits | Issue |
+|---|---|---|
+| PWA setup: manifest, service worker, icons, offline shell | Mechanical, checklist-driven, Lighthouse proves it | #44 |
+| Typed Gmail client functions + Gmail routes in `docs/api.md` | Docs + types from existing code | #103 |
+| Security: origin checks on state-changing routes, upload and LLM-call caps (parked, localhost demo) | Well-bounded hardening, each guard has a test | #90, #91 |
+| Wishlist price comparison and rewards tracker stubs (L3 stretch) | Isolated new modules on existing contracts | #27, #19 |
+| Test hardening: flaky `multi-account.test.ts`, e2e specs for Promotions, Not a purchase, Claims sent, tracking groups | Writes and runs Playwright/vitest loops until green | new issue |
+| Dedup Phase 2 tests and docs refresh (`docs/dedup.md`, `docs/api.md`, `docs/gmail-sync.md`) | Reads code, writes accurate docs | new issue |
+
+Not for Devin: visual design (Alex/Paper), classifier and prompt tuning on the real inbox (needs Kenan's labels), contracts changes, OAuth live checks.

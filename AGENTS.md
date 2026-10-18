@@ -78,7 +78,7 @@ e2e/                # Playwright specs
 | Person | GitHub | Owns |
 |---|---|---|
 | Kenan | `VeneratedApotheosis` | Repo owner, scope decisions. **Data + routing:** pages (thin wrappers), middleware, hooks, backend (via `kenan-pi-*` agents) |
-| Alex | `ptatoo` | **How it looks:** design system, styles, visual components and views (Paper) |
+| Alex | `ptatoo` | (back 2026-10-18 after a computer failure; works in Paper sessions as `alex-paper-*`) **How it looks:** design system, styles, visual components and views (Paper) |
 | Ethan Lowe | `ethanwlowe7-cmyk` | **On the team but inactive (no time to code, 2026-10-17).** All his claims are stale; don't wait on them or assign him work |
 | Chelsea | `chelsearwang` | part-time via Codex (2026-10-17): she prompts occasionally; **chelsea-codex** works the issues reserved for her (assigned to `chelsearwang`; queue 2: #40, #101, #111, #78, #118, #94, #119). Claims on those are valid; anything else of hers is stale. Her former area (auth, Gmail, review, DB) stays Kenan's |
 
