@@ -120,9 +120,22 @@ function data(): StoreData {
   if (scope) {
     let store = scopes.get(scope);
     if (!store) { store = emptyData(); scopes.set(scope, store); }
-    return store;
+    return withCurrentFields(store);
   }
-  return (holder[STORE_KEY] ??= emptyData());
+  return withCurrentFields((holder[STORE_KEY] ??= emptyData()));
+}
+
+/**
+ * The store lives on globalThis so it survives dev hot reloads. After a git pull the running server can hold data
+ * created by older code that lacks newer fields; fill those in with their empty defaults instead of crashing.
+ */
+const checkedStores = new WeakSet<object>();
+function withCurrentFields(store: StoreData): StoreData {
+  if (checkedStores.has(store)) return store;
+  checkedStores.add(store);
+  const record = store as unknown as Record<string, unknown>;
+  for (const [key, value] of Object.entries(emptyData())) if (record[key] === undefined) record[key] = value;
+  return store;
 }
 
 /** Drops all store data, including the audit log and the OAuth hook. Tests only. */
