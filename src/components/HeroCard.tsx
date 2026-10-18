@@ -60,7 +60,7 @@ export function HeroCard({
       </p>
       <p className="mx-auto mt-5 max-w-md text-base text-ink-muted">
         {count > 0
-          ? `Across ${count} ${count === 1 ? "finding" : "findings"} from your inbox.`
+          ? `${count} ${count === 1 ? "way" : "ways"} to get money back, found in your inbox.`
           : "Nothing to claim right now."}
       </p>
       <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
@@ -74,7 +74,7 @@ export function HeroCard({
             </Button>
           </>
         ) : (
-          // No findings count toward the total (only needs-review items remain),
+          // Nothing counts toward the total (only items needing a quick check remain),
           // so there is nothing to draft; point the one action at review.
           <Button type="button" variant="primary" onClick={onReview}>
             Review these

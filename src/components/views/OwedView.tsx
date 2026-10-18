@@ -4,6 +4,7 @@ import type { Finding, FindingStatus } from "@/lib/contracts";
 import type { OwedSummary } from "@/lib/types";
 import { AppShell } from "@/components/AppShell";
 import { HeroCard } from "@/components/HeroCard";
+import { OwedIntro } from "@/components/OwedIntro";
 import { FindingCard } from "@/components/FindingCard";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
@@ -29,6 +30,9 @@ export interface OwedViewProps {
   onOpenClaim: (findingId: string) => void;
   onOpenReview: () => void;
   onBrowseLedger: () => void;
+  // The page passes onLoadDemo and onConnectGmail only for an empty store: they turn the empty
+  // screen into the first-run intro with both ways to start.
+  onConnectGmail?: () => void;
   onLoadDemo?: () => void;
   // When supplied, claim-sent rows expose "Mark resolved" / "Dismiss".
   onSetStatus?: (findingId: string, status: FindingStatus) => void;
@@ -43,6 +47,7 @@ export function OwedView({
   onOpenClaim,
   onOpenReview,
   onBrowseLedger,
+  onConnectGmail,
   onLoadDemo,
   onSetStatus,
 }: OwedViewProps) {
@@ -53,27 +58,27 @@ export function OwedView({
     maybeItems.length === 0 &&
     claimSentItems.length === 0;
 
+  if (isEmpty && (onConnectGmail || onLoadDemo)) {
+    return (
+      <AppShell>
+        <OwedIntro onConnectGmail={onConnectGmail} onLoadDemo={onLoadDemo} />
+      </AppShell>
+    );
+  }
+
   if (isEmpty) {
     return (
       <AppShell>
         <EmptyState
           title="Nothing owed right now"
           actions={
-            <>
-              {onLoadDemo ? (
-                <Button type="button" onClick={onLoadDemo}>
-                  Load demo data
-                </Button>
-              ) : null}
-              <Button type="button" variant="secondary" onClick={onBrowseLedger}>
-                Browse the ledger
-              </Button>
-            </>
+            <Button type="button" variant="secondary" onClick={onBrowseLedger}>
+              Browse purchases
+            </Button>
           }
         >
-          We went through your receipts and found no overdue refunds, closing
-          return windows, or price drops. You are all squared up. We will flag
-          anything the moment it appears.
+          We found no late refunds, closing return windows or price drops in
+          your receipts. Sync again later to check new receipts.
         </EmptyState>
       </AppShell>
     );
@@ -98,16 +103,34 @@ export function OwedView({
           onReview={onOpenReview}
         />
 
-        {claimSentTotal > 0 ? (
-          <p className="-mt-4 text-center text-sm text-ink-muted">
-            Includes {formatMoney(claimSentTotal, summary.currency)} you&apos;ve already claimed,
-            counted until it&apos;s resolved.
+        <div className="-mt-4 space-y-1 text-center text-sm text-ink-muted">
+          <p>
+            Includes refunds, deadlines and price drops we&apos;re confident about, plus claims
+            you&apos;ve sent that haven&apos;t been paid yet.
           </p>
-        ) : null}
+          {claimSentTotal > 0 ? (
+            <p>
+              {formatMoney(claimSentTotal, summary.currency)} of it is from claims you&apos;ve
+              sent. It stays counted until you mark it resolved.
+            </p>
+          ) : null}
+          {summary.excludedCount > 0 ? (
+            <p>
+              <button
+                type="button"
+                onClick={onOpenReview}
+                className="font-bold text-teal-deep underline underline-offset-2"
+              >
+                {summary.excludedCount} {summary.excludedCount === 1 ? "item needs" : "items need"} a
+                quick check first
+              </button>
+            </p>
+          ) : null}
+        </div>
 
         {owedItems.length > 0 ? (
-          <section id="findings" aria-label="Open findings" className="space-y-4">
-            <h2 className="font-serif text-2xl text-ink">Findings</h2>
+          <section id="findings" aria-label="Money you can get back" className="space-y-4">
+            <h2 className="font-serif text-2xl text-ink">Money you can get back</h2>
             {owedItems.map(({ finding, merchant }) => (
               <FindingCard
                 key={finding.id}
@@ -164,15 +187,15 @@ export function OwedView({
         ) : null}
 
         {maybeItems.length > 0 ? (
-          <section aria-label="Held for review" className="neu-inset rounded-lg p-6">
+          <section aria-label="Needs a quick check" className="neu-inset rounded-lg p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="font-serif text-lg text-ink">Maybe, held until confirmed</h2>
+                <h2 className="font-serif text-lg text-ink">Needs a quick check</h2>
                 <p className="mt-1 text-sm text-ink-muted">
-                  {summary.excludedCount}{" "}
-                  {summary.excludedCount === 1 ? "finding" : "findings"} worth{" "}
-                  {formatMoney(summary.excludedTotal, summary.currency)} need a quick
-                  look before we count them. Left out of your total on purpose.
+                  {summary.excludedCount} {summary.excludedCount === 1 ? "item" : "items"} worth{" "}
+                  {formatMoney(summary.excludedTotal, summary.currency)}{" "}
+                  {summary.excludedCount === 1 ? "isn't" : "aren't"} counted in your total
+                  until you check {summary.excludedCount === 1 ? "it" : "them"}.
                 </p>
               </div>
               <Button type="button" variant="secondary" onClick={onOpenReview}>
@@ -190,7 +213,7 @@ export function OwedView({
                   <span className="flex items-center gap-2">
                     {finding.simulated ? <Chip tone="neutral">{simulatedLabel}</Chip> : null}
                     <Chip tone="review">
-                      {formatMoney(finding.amountAtStake, finding.currency)} needs review
+                      {formatMoney(finding.amountAtStake, finding.currency)} not counted yet
                     </Chip>
                   </span>
                 </li>

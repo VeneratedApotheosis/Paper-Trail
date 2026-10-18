@@ -26,7 +26,7 @@ export interface TrustViewProps {
 
 // What the app keeps. Lean copy, no em dashes.
 const STORES = [
-  "Normalized ledger rows and the findings our rules derive from them.",
+  "Your purchases as we read them from receipts, and the refunds and deadlines we find from them.",
   "Short evidence quotes from each email, so every number can be traced.",
   "An audit entry for every Gmail fetch, LLM call, approval and deletion.",
 ];

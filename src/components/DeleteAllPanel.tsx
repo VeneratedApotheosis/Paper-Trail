@@ -113,9 +113,9 @@ export function DeleteAllPanel({ onDeleteAll, deleteReceipt }: DeleteAllPanelPro
   if (deleteReceipt) {
     const receipt: Array<[string, string]> = [
       ["Gmail access", "OAuth token revoked"],
-      ["Orders purged", String(deleteReceipt.ordersPurged)],
-      ["Findings purged", String(deleteReceipt.findingsPurged)],
-      ["Audit entries purged", String(deleteReceipt.auditEntriesPurged)],
+      ["Purchases erased", String(deleteReceipt.ordersPurged)],
+      ["Refunds and deadlines erased", String(deleteReceipt.findingsPurged)],
+      ["Audit entries erased", String(deleteReceipt.auditEntriesPurged)],
       ["Completed", formatDate(deleteReceipt.completedAt)],
     ];
     return (
@@ -143,8 +143,8 @@ export function DeleteAllPanel({ onDeleteAll, deleteReceipt }: DeleteAllPanelPro
     <div className="neu-raised-sm rounded-xl p-6">
       <p className="font-sans text-base text-ink">
         <strong className="text-ink">Delete everything.</strong> This revokes PaperTrail&apos;s
-        Gmail access and permanently erases all stored data: orders, findings, drafts and the audit
-        log. This cannot be undone.
+        Gmail access and permanently erases all stored data: purchases, the refunds and deadlines
+        we found, drafts and the audit log. This cannot be undone.
       </p>
 
       {stage === "idle" ? (

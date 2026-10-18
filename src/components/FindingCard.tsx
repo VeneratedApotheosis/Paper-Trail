@@ -3,8 +3,10 @@
 import { useId, useState } from "react";
 import type { Finding, FindingKind } from "@/lib/contracts";
 import { Button } from "@/components/ui/Button";
+import { ConfidenceChip } from "@/components/ConfidenceChip";
 import { Chip } from "@/components/ui/Chip";
-import { countdownLabel, daysUntil, formatDate, formatMoney } from "@/lib/format";
+import { explainConfidence, explainRows } from "@/components/findingExplain";
+import { countdownLabel, daysUntil, formatMoney } from "@/lib/format";
 
 // Human headline per rule kind (rules R1–R4, deepdive §4).
 const KIND_LABELS: Record<FindingKind, string> = {
@@ -14,24 +16,6 @@ const KIND_LABELS: Record<FindingKind, string> = {
   price_drop: "Price dropped",
   rewards_gap: "Rewards missed",
 };
-
-// Turn an explain key like "refundSlaDays" into "Refund sla days".
-function humanizeKey(key: string): string {
-  const spaced = key.replace(/([A-Z])/g, " $1").replace(/[_-]+/g, " ").trim();
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
-
-// explain values are rule inputs (ISO dates, numbers, strings); render them
-// readably without inventing structure the contract doesn't guarantee.
-function renderValue(value: unknown): string {
-  if (typeof value === "number") return String(value);
-  if (typeof value === "boolean") return value ? "yes" : "no";
-  if (typeof value === "string") {
-    if (/^\d{4}-\d{2}-\d{2}T/.test(value)) return formatDate(value);
-    return value;
-  }
-  return JSON.stringify(value);
-}
 
 export function FindingCard({
   finding,
@@ -48,7 +32,8 @@ export function FindingCard({
   const panelId = useId();
 
   const overdue = finding.dueAt !== null && daysUntil(finding.dueAt) < 0;
-  const explainEntries = Object.entries(finding.explain);
+  const explainEntryRows = explainRows(finding.explain, finding.currency);
+  const confidence = explainConfidence(finding.explain);
 
   return (
     <article className="neu-raised rounded-lg p-6">
@@ -93,8 +78,15 @@ export function FindingCard({
       >
         <p className="text-base text-ink">{finding.summary}</p>
 
+        {confidence !== null ? (
+          <p className="flex flex-wrap items-center gap-2 text-sm text-ink-muted">
+            How well we read your emails:
+            <ConfidenceChip confidence={confidence} />
+          </p>
+        ) : null}
+
         <div>
-          <p className="eyebrow mb-2">Evidence from your inbox</p>
+          <p className="eyebrow mb-2">What your emails say</p>
           <ul className="space-y-2">
             {finding.evidence.map((e, i) => (
               <li
@@ -107,14 +99,14 @@ export function FindingCard({
           </ul>
         </div>
 
-        {explainEntries.length > 0 ? (
+        {explainEntryRows.length > 0 ? (
           <div className="neu-inset rounded-sm px-4 py-4">
             <p className="eyebrow mb-2">How we got the number</p>
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-              {explainEntries.map(([key, value]) => (
-                <div key={key} className="contents">
-                  <dt className="text-ink-muted">{humanizeKey(key)}</dt>
-                  <dd className="text-ink tabular-nums">{renderValue(value)}</dd>
+              {explainEntryRows.map(({ label, value }, index) => (
+                <div key={`${label}-${index}`} className="contents">
+                  <dt className="text-ink-muted">{label}</dt>
+                  <dd className="text-ink tabular-nums">{value}</dd>
                 </div>
               ))}
             </dl>

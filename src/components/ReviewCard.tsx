@@ -4,12 +4,8 @@ import { useState, type ReactNode } from "react";
 import type { NormalizedOrder } from "@/lib/contracts";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
-import {
-  CONFIDENCE_THRESHOLD,
-  confidencePercent,
-  formatDate,
-  formatMoney,
-} from "@/lib/format";
+import { ConfidenceTip } from "@/components/ConfidenceChip";
+import { formatDate, formatMoney } from "@/lib/format";
 import { merchantName } from "@/lib/view";
 
 // One editable field change bubbled up to the page (which owns the queue state).
@@ -78,7 +74,10 @@ export function ReviewCard({
             Order {order.orderRef ?? "not found"}
           </p>
         </div>
-        <Chip tone="review">{confidencePercent(order.confMin)} sure</Chip>
+        <Chip tone="review">
+          Needs a quick check
+          <ConfidenceTip confidence={order.confMin} align="end" />
+        </Chip>
       </header>
 
       <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -211,27 +210,28 @@ export function ReviewCard({
       </div>
 
       <div className="mt-5 neu-inset rounded-lg p-4">
-        <FieldLabel>Why it needs review</FieldLabel>
+        <FieldLabel>Why it needs a quick check</FieldLabel>
         <p className="mt-2 text-sm text-ink-muted">
-          Parsed at{" "}
-          <span className="font-semibold text-teal-deep">
-            {confidencePercent(order.confMin)}
-          </span>{" "}
-          confidence, below the {confidencePercent(CONFIDENCE_THRESHOLD)} bar. Drawn
-          from {order.messageIds.length} email
-          {order.messageIds.length === 1 ? "" : "s"} via{" "}
+          We&apos;re not sure we read this order correctly. It comes from{" "}
+          {order.messageIds.length} email
+          {order.messageIds.length === 1 ? "" : "s"} from{" "}
           <span className="text-ink">{order.merchant.domain ?? "an unknown sender"}</span>.
-          Check the parsed values, fix anything wrong, then confirm.
+          Check the values, fix anything wrong, then confirm.
         </p>
       </div>
 
-      <footer className="mt-5 flex flex-wrap items-center gap-3">
+      <p className="mt-5 text-sm text-ink-muted">
+        After you confirm, we check this order for late refunds, return deadlines and price
+        drops and add anything we find to what you&apos;re owed.
+      </p>
+
+      <footer className="mt-4 flex flex-wrap items-center gap-3">
         <Button onClick={() => onConfirm(order.id)}>Confirm</Button>
         <Button variant="secondary" onClick={() => setIsEditing((v) => !v)}>
           {isEditing ? "Done" : "Edit"}
         </Button>
         <span className="text-sm text-ink-faint">
-          {edited ? "Edit logged to audit (stubbed)" : "Held out of totals until confirmed"}
+          {edited ? "Your edits are saved when you confirm" : "Not counted in what you're owed until you confirm"}
         </span>
       </footer>
     </article>

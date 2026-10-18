@@ -72,7 +72,7 @@ export const orderDetailViewFixture: OrderDetailViewProps = {
           quote: "Refunds are issued within 10 business days of carrier receipt.",
         },
       ],
-      explain: { refundSlaDays: 10, policySource: "email_text", confidence: 0.9 },
+      explain: { slaDays: 10, slaSource: "email_text", expectedAmount: 98, confidence: 0.9 },
       simulated: false,
     },
     {
@@ -93,7 +93,7 @@ export const orderDetailViewFixture: OrderDetailViewProps = {
           quote: "Price adjustments honored within 14 days of purchase.",
         },
       ],
-      explain: { priceAdjustDays: 14, priceSource: "mock" },
+      explain: { windowDays: 14, priceSource: "mock", drop: 12, confidence: 0.93 },
       simulated: true,
     },
   ],

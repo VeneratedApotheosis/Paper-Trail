@@ -21,22 +21,22 @@ export function ReviewView({ items, onConfirm, onEditField }: ReviewViewProps) {
   return (
     <>
       <div className="mb-6">
-        <h1 className="font-serif text-3xl text-ink">Needs review</h1>
+        <h1 className="font-serif text-3xl text-ink">Needs a quick check</h1>
         <p className="mt-2 max-w-ledger text-base text-ink-muted">
-          Held out of your total until you confirm.
+          We weren&apos;t sure we read these orders correctly. They aren&apos;t counted in what
+          you&apos;re owed until you confirm them.
         </p>
       </div>
 
       {items.length === 0 ? (
-        <EmptyState title="Nothing to review">
-          No orders fell below the confidence threshold. New low-confidence
-          purchases will appear here for a quick check.
+        <EmptyState title="Nothing needs a quick check">
+          Orders we aren&apos;t sure about will show up here.
         </EmptyState>
       ) : (
         <>
           <p className="mb-4 text-sm text-ink-muted">
             <span className="font-semibold tabular-nums text-ink">{items.length}</span>{" "}
-            order{items.length === 1 ? "" : "s"} remaining to review.
+            order{items.length === 1 ? "" : "s"} left to check.
           </p>
           <div className="flex flex-col gap-6">
             {items.map((order) => (

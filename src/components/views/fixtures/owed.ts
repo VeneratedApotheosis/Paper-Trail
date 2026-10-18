@@ -29,7 +29,7 @@ export const owedViewFixture: OwedViewProps = {
         ruleVersion: "R1@1",
         summary: "Return received 16 days ago; the refund is past the 10 day window.",
         evidence: [{ messageId: "m1", quote: "Refunds are issued within 10 business days of carrier receipt." }],
-        explain: { refundSlaDays: 10 },
+        explain: { slaDays: 10, slaSource: "default", confidence: 0.88 },
         simulated: false,
       },
     },
@@ -47,7 +47,7 @@ export const owedViewFixture: OwedViewProps = {
         ruleVersion: "R2@1",
         summary: "Return window for the cast-iron skillet closes in 2 days.",
         evidence: [{ messageId: "m2", quote: "Items may be returned within 14 days of delivery." }],
-        explain: { returnWindowDays: 14, windowAnchor: "delivery" },
+        explain: { windowDays: 14, anchorType: "delivery", confidence: 0.95 },
         simulated: false,
       },
     },
@@ -67,7 +67,7 @@ export const owedViewFixture: OwedViewProps = {
         ruleVersion: "R4@1",
         summary: "Refund was $64 short of the returned amount; claim approved and sent.",
         evidence: [{ messageId: "m4", quote: "Refund issued: $120.00 for a $184.00 return." }],
-        explain: { expectedRefund: 184, actualRefund: 120 },
+        explain: { expectedAmount: 184, refundedAmount: 120, confidence: 0.92 },
         simulated: false,
       },
     },
@@ -98,4 +98,22 @@ export const owedViewFixture: OwedViewProps = {
   onBrowseLedger: noop,
   onLoadDemo: noop,
   onSetStatus: noop,
+};
+
+// Empty store: OwedView shows the first-run intro with both ways to start.
+export const owedViewEmptyFixture: OwedViewProps = {
+  ...owedViewFixture,
+  summary: {
+    currency: "USD",
+    owedTotal: 0,
+    findingCount: 0,
+    claimSentCount: 0,
+    claimSentTotal: 0,
+    excludedCount: 0,
+    excludedTotal: 0,
+  },
+  owedItems: [],
+  maybeItems: [],
+  claimSentItems: [],
+  onConnectGmail: noop,
 };

@@ -24,8 +24,8 @@ export function ConsentExplainer({ onConnect, onTryDemo, demoLoading }: ConsentE
             See what your inbox says you&apos;re owed.
           </h1>
           <p className="max-w-md text-lg text-ink-muted">
-            Connect Gmail read-only and PaperTrail turns every receipt into a ledger
-            row, then flags overdue refunds, closing return windows, and price drops.
+            Connect Gmail read-only and PaperTrail lists every receipt as a
+            purchase, then flags overdue refunds, closing return windows, and price drops.
             It reads receipts, never your private mail.
           </p>
           {/* Criterion 2: the trust list. */}

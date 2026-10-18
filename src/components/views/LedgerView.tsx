@@ -21,7 +21,7 @@ const STATUS_ORDER: OrderDisplayStatus[] = [
   "cancelled",
 ];
 
-// Props-only view for the ledger list. All orders arrive as props (typed via
+// Props-only view for the purchases list. All orders arrive as props (typed via
 // @/lib/contracts) and opening an order is a callback, so the page wrapper owns
 // data + navigation. No fetch, no @/lib/api, no routing in here.
 export interface LedgerViewProps {
@@ -62,17 +62,17 @@ export function LedgerView({ orders, onOpenOrder, onLoadDemo }: LedgerViewProps)
     return (
       <AppShell>
         <EmptyState
-          title="No orders yet"
+          title="No purchases yet"
           actions={
             onLoadDemo ? (
               <Button type="button" onClick={onLoadDemo}>
-                Load demo data
+                Try demo data
               </Button>
             ) : undefined
           }
         >
-          Your ledger fills in as we read purchase receipts. Load the synthetic
-          demo inbox to see how every order and finding looks.
+          Your purchases appear here as we read your receipt emails. Try the demo
+          data to see how purchases and refunds we find look.
         </EmptyState>
       </AppShell>
     );
@@ -81,9 +81,9 @@ export function LedgerView({ orders, onOpenOrder, onLoadDemo }: LedgerViewProps)
   return (
     <AppShell>
       <div className="mb-6 flex items-baseline gap-3">
-        <h1 className="font-serif text-3xl text-ink">Ledger</h1>
+        <h1 className="font-serif text-3xl text-ink">Purchases</h1>
         <span className="text-sm text-ink-faint">
-          {visible.length} {visible.length === 1 ? "order" : "orders"}
+          {visible.length} {visible.length === 1 ? "purchase" : "purchases"}
         </span>
       </div>
 
@@ -119,8 +119,8 @@ export function LedgerView({ orders, onOpenOrder, onLoadDemo }: LedgerViewProps)
       </div>
 
       {visible.length === 0 ? (
-        <EmptyState title="No matching orders">
-          No orders match these filters. Try clearing the merchant or status filter.
+        <EmptyState title="No matching purchases">
+          No purchases match these filters. Try clearing the merchant or status filter.
         </EmptyState>
       ) : (
         <div className="space-y-4">

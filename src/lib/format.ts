@@ -52,3 +52,25 @@ export function isNeedsReview(confMin: number): boolean {
 export function confidencePercent(conf: number): string {
   return `${Math.round(conf * 100)}%`;
 }
+
+// Plain-language reading of an extraction confidence (0..1). Never an odds-of-payout
+// figure: it only says how sure we are we read the email correctly (#106).
+export type ConfidenceLevel = "clear" | "probably_right" | "needs_check";
+
+const CLEAR_CONFIDENCE = 0.9;
+
+export function confidenceLevel(conf: number): ConfidenceLevel {
+  if (isNeedsReview(conf)) return "needs_check";
+  return conf >= CLEAR_CONFIDENCE ? "clear" : "probably_right";
+}
+
+const CONFIDENCE_LABELS: Record<ConfidenceLevel, string> = {
+  clear: "Clear",
+  probably_right: "Probably right",
+  needs_check: "Needs a quick check",
+};
+
+// ">= 90%": "Clear", 70-89%: "Probably right", below 70%: "Needs a quick check".
+export function confidenceLabel(conf: number): string {
+  return CONFIDENCE_LABELS[confidenceLevel(conf)];
+}

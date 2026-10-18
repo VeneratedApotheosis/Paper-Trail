@@ -28,6 +28,11 @@ function splitFindings(ledger: LedgerResponse): { owedItems: OwedFindingItem[]; 
   };
 }
 
+// Full navigation (not router.push): the route starts the Google OAuth redirect (same as ConnectClient).
+function startGmailConnect() {
+  window.location.href = "/api/auth/google";
+}
+
 export default function Home() {
   const router = useRouter();
   const ledger = useLedger();
@@ -77,6 +82,7 @@ export default function Home() {
       onOpenClaim={(id) => router.push(`/claim/${encodeIdSegment(id)}`)}
       onOpenReview={() => router.push("/review")}
       onBrowseLedger={() => router.push("/ledger")}
+      onConnectGmail={data.mode === "empty" ? startGmailConnect : undefined}
       onLoadDemo={data.mode === "empty" ? handleLoadDemo : undefined}
     />
   );

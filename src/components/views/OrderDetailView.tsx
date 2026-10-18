@@ -2,9 +2,10 @@
 
 import type { Finding, FindingKind, NormalizedOrder, OrderEvent } from "@/lib/contracts";
 import { AppShell } from "@/components/AppShell";
+import { ConfidenceChip } from "@/components/ConfidenceChip";
 import { Chip } from "@/components/ui/Chip";
 import { StatusChip } from "@/components/StatusChip";
-import { confidencePercent, formatDate, formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { deriveOrderStatus, merchantName, orderNeedsReview } from "@/lib/view";
 
 // Props-only detail view for one order. All data arrives as props (typed via
@@ -61,7 +62,7 @@ export function OrderDetailView({
         onClick={onBack}
         className="text-sm font-medium text-ink-muted hover:text-ink"
       >
-        ← Ledger
+        ← Purchases
       </button>
 
       {/* Summary card */}
@@ -70,7 +71,7 @@ export function OrderDetailView({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <StatusChip status={deriveOrderStatus(order)} />
-              {needsReview ? <Chip tone="review">Needs review</Chip> : null}
+              {needsReview ? <Chip tone="review">Needs a quick check</Chip> : null}
             </div>
             <h1 className="mt-3 font-serif text-3xl text-ink">{merchantName(order)}</h1>
             <p className="mt-1 text-sm text-ink-faint">
@@ -137,13 +138,13 @@ export function OrderDetailView({
         </div>
       </section>
 
-      {/* Findings on this order */}
+      {/* Money you can get back on this order */}
       {findings.length > 0 ? (
         <section
           className="neu-raised mt-6 rounded-lg px-6 py-6"
-          aria-label="Findings on this order"
+          aria-label="Money you can get back on this order"
         >
-          <h2 className="eyebrow">Findings</h2>
+          <h2 className="eyebrow">Money you can get back</h2>
           <ul className="mt-4 space-y-6">
             {findings.map((finding) => (
               <li key={finding.id}>
@@ -178,6 +179,9 @@ export function OrderDetailView({
       {/* Event timeline */}
       <section className="neu-raised mt-6 rounded-lg px-6 py-6">
         <h2 className="eyebrow">Timeline</h2>
+        <p className="mt-2 text-sm text-ink-muted">
+          Each step comes from one email. The quote shows where we read it.
+        </p>
         <ol className="mt-4 space-y-6">
           <li className="flex gap-4">
             <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-teal" aria-hidden />
@@ -200,7 +204,7 @@ export function OrderDetailView({
                       {formatMoney(event.amount, currency)}
                     </span>
                   ) : null}
-                  <Chip tone="neutral">{confidencePercent(event.conf)} confidence</Chip>
+                  <ConfidenceChip confidence={event.conf} />
                 </div>
                 {event.evidence ? (
                   <blockquote className="neu-inset mt-3 rounded-sm px-4 py-3 text-sm italic text-ink-muted">
