@@ -4,7 +4,7 @@ import { gmailErrorResponse, gmailRequest } from "@/lib/gmail/http";
 import { GmailError } from "@/lib/gmail/client";
 import { syncGmail } from "@/lib/gmail/service";
 import { createLlmExtractor } from "@/lib/pipeline/extractors";
-import { beginStoreWork, getExcludedMerchants, getExtractionCache, setPipelineResult } from "@/lib/store";
+import { beginStoreWork, getExcludedMerchants, getExtractionCache, setLastSyncAt, setPipelineResult } from "@/lib/store";
 import { buildPipelineRunResponse } from "@/lib/api/ledger";
 import { gmailProgress } from "@/lib/gmail/progress";
 
@@ -48,9 +48,10 @@ async function handlePOST(request: Request): Promise<Response> {
       );
     }
     setPipelineResult("gmail", now.toISOString(), result);
+    setLastSyncAt(new Date().toISOString());
     progress.complete();
     return Response.json({ ...buildPipelineRunResponse(), ...info }, { headers });
   } catch (error) { progress?.fail(); return gmailErrorResponse(error); }
   finally { if (userId && acquired) running.delete(userId); }
 }
-export const POST = withAccountStore(handlePOST);
+export const POST = withAccountStore(handlePOST, { requireToken: true });

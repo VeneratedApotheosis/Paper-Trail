@@ -146,3 +146,31 @@ export interface SessionStatus {
   error?: string;
   reconnectUrl?: string;
 }
+
+/** GET /api/account (issue #109): connection and sync status of the current account. Never carries tokens. */
+export interface AccountResponse {
+  gmail: {
+    /** A locally valid Gmail grant exists. False for anonymous users and after expiry or Disconnect Gmail. */
+    connected: boolean;
+    /** Signed in but the Gmail grant is gone (expired, revoked, disconnected): offer Connect Gmail again. */
+    expired: boolean;
+    /** Connected Gmail address (stored encrypted with the tokens); null when anonymous, unknown or cleared. */
+    mailbox: string | null;
+  };
+  mode: StoreMode;
+  asOf: string | null;
+  /** When the last Gmail sync was published; null before the first sync and after delete-all. */
+  lastSyncAt: string | null;
+  /** Visible rows (excluded merchants already removed). */
+  counts: { orders: number; findings: number; reviewItems: number };
+  excludedMerchants: string[];
+  /** A Gmail sync is running for this account right now. */
+  syncing: boolean;
+}
+
+/** POST /api/auth/disconnect: Gmail grant cleared; the signed-in identity and the synced ledger are kept. */
+export interface DisconnectResponse {
+  disconnected: true;
+  /** Google confirmed the revocation. False when no grant existed or Google was unreachable (credentials are cleared anyway). */
+  revokedToken: boolean;
+}

@@ -14,13 +14,36 @@ export async function revokeUserAuthorization(
 ): Promise<boolean> {
   const row = store.find(userId);
   if (!row) return false;
-  let refreshToken: string | undefined;
-  try {
-    if (row.tokenEnc) refreshToken = storedTokens.parse(unseal(row.tokenEnc, config.key, "tokens")).refreshToken;
-  } catch {
-    // Undecryptable credentials are deleted too; never log their value or error.
-  }
+  const refreshToken = storedRefreshToken(row.tokenEnc, config.key);
   store.remove(userId);
+  return revokeRefreshToken(refreshToken, fetcher);
+}
+
+/** Disconnect Gmail only: clears the grant (and the sealed mailbox) but keeps the user row, session identity and ledger. */
+export async function disconnectUserAuthorization(
+  userId: string,
+  config: ReturnType<typeof authConfig>,
+  store: AuthStore,
+  fetcher: Fetcher = fetch,
+): Promise<boolean> {
+  const row = store.find(userId);
+  if (!row) return false;
+  const refreshToken = storedRefreshToken(row.tokenEnc, config.key);
+  store.update(userId, null);
+  store.audit("oauth.disconnected", userId);
+  return revokeRefreshToken(refreshToken, fetcher);
+}
+
+/** Undecryptable credentials yield undefined (they are cleared anyway); never log their value or error. */
+function storedRefreshToken(tokenEnc: string | null, key: string): string | undefined {
+  try {
+    return tokenEnc ? storedTokens.parse(unseal(tokenEnc, key, "tokens")).refreshToken : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function revokeRefreshToken(refreshToken: string | undefined, fetcher: Fetcher): Promise<boolean> {
   if (!refreshToken) return false;
   try {
     const response = await fetcher("https://oauth2.googleapis.com/revoke", {

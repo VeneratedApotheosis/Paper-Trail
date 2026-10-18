@@ -1,9 +1,13 @@
 import { clearAuthCookies, resolveSessionUser, sessionCookie } from "@/lib/auth/session";
 import { withStoreScope } from "@/lib/store";
 
-/** Keep anonymous synthetic/upload state distinct from authenticated account data. */
+/**
+ * Keep anonymous synthetic/upload state distinct from authenticated account data. The default needs only a valid
+ * identity, so an account whose Gmail grant expired or was disconnected (#109) still reads and edits its own ledger;
+ * pass `requireToken: true` for routes that call Gmail.
+ */
 export function withAccountStore<A extends unknown[]>(handler: (...args: A) => Promise<Response>,
-  options: { requireToken: boolean } = { requireToken: true }) {
+  options: { requireToken: boolean } = { requireToken: false }) {
   return async (...args: A): Promise<Response> => {
     const respond = async () => {
       const response = await handler(...args);

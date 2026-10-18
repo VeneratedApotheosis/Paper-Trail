@@ -1,5 +1,6 @@
 import type { AuditEntry } from "@/lib/types";
 import type {
+  AccountResponse,
   ApiErrorBody,
   AuditResponse,
   ClaimApproveResponse,
@@ -8,6 +9,7 @@ import type {
   ClaimRegenerateResponse,
   ClaimResponse,
   DeleteAllResponse,
+  DisconnectResponse,
   FindingResponse,
   FindingStatusRequest,
   FindingStatusResponse,
@@ -63,6 +65,19 @@ export async function getSessionStatus(): Promise<SessionStatus> {
   const response = await fetch("/api/auth/session", { cache: "no-store" });
   const json = (await response.json().catch(() => null)) as SessionStatus | null;
   return json ?? { connected: false };
+}
+
+/**
+ * Gmail connection, mailbox, last sync time, row counts and `syncing` for the current account; also works for
+ * anonymous users (`gmail.connected: false`). After `disconnectGmail`, a sync, or `deleteAll`, refetch it and the ledger.
+ */
+export function getAccount(): Promise<AccountResponse> {
+  return request("/api/account");
+}
+
+/** Revokes the Google grant and clears stored tokens + mailbox; the synced ledger and the sign-in are kept. */
+export function disconnectGmail(): Promise<DisconnectResponse> {
+  return request("/api/auth/disconnect", { method: "POST" });
 }
 
 export function getLedger(): Promise<LedgerResponse> {

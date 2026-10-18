@@ -12,6 +12,8 @@ const tokenResponse = z.object({
 export const storedTokens = z.object({
   accessToken: z.string().min(1), refreshToken: z.string().min(1),
   expiresAt: z.number(), refreshExpiresAt: z.number().optional(),
+  // Connected address, sealed with the tokens (absent in rows saved before #109).
+  mailbox: z.string().optional(),
 });
 export type Tokens = z.infer<typeof storedTokens>;
 export type Fetcher = typeof fetch;

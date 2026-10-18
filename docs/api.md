@@ -12,6 +12,8 @@ Raw email bodies are never stored: only orders, findings, drafts, the review que
 |---|---|---|---|
 | `POST /api/demo` | none | `PipelineRunResponse` `{ mode: "demo", asOf, summary, stats }` | 409 if delete-all / demo reset ran while it was loading (nothing saved) |
 | `DELETE /api/demo` | none | `{ mode: "empty" }` (audit log kept) | 409 when the ledger holds non-demo data |
+| `GET /api/account` | none | `AccountResponse` (see "Account and Gmail disconnect" below) | 401 invalid / expired session cookie (cookies cleared) |
+| `POST /api/auth/disconnect` | none | `DisconnectResponse` `{ disconnected: true, revokedToken }` | 401 not signed in, 403 cross-site |
 | `GET /api/ledger` | none | `LedgerResponse` `{ mode, asOf, orders, findings, summary, reviewQueue, excludedMerchants, stats, labels }` | |
 | `GET /api/orders/:id` | id URL-encoded (`encodeURIComponent`) | `{ order, findings }` | 400 empty id, 404 unknown / excluded |
 | `GET /api/findings/:id` | id URL-encoded | `{ finding, order }` | 400, 404 |
@@ -41,6 +43,42 @@ Notes:
   "Precomputed extraction from seed gold label, no LLM call".
 - Uploads use real extraction (`ANTHROPIC_API_KEY`) with a session cache; without a key, cache misses land in the
   review queue instead of failing. Uploads replace the current ledger.
+
+## Account and Gmail disconnect (issue #109)
+
+`GET /api/account` (account-scoped, `Cache-Control: no-store`, never returns tokens) -> `AccountResponse`:
+
+```json
+{ "gmail": { "connected": true, "expired": false, "mailbox": "shopper@example.com" },
+  "mode": "gmail", "asOf": "...", "lastSyncAt": "2026-10-18T01:02:03.000Z",
+  "counts": { "orders": 45, "findings": 6, "reviewItems": 2 }, "excludedMerchants": [], "syncing": false }
+```
+
+- Anonymous (no cookie): `gmail: { connected: false, expired: false, mailbox: null }` plus the anonymous store's mode / counts.
+- `gmail.connected` = a locally valid refresh grant exists. `gmail.expired` = signed in but the grant is gone (expired,
+  revoked, cleared after `invalid_grant`, or disconnected): show "Connect Gmail" again. `mailbox` is shown while the
+  sealed token blob is readable, otherwise `null`.
+- The address is stored **inside the encrypted token blob** (same AES-GCM key and `tokens` purpose as the tokens), so it
+  disappears on disconnect and delete-all. Accounts saved before #109 have no address: the first `GET /api/account`
+  with a still-valid access token fetches it once from Gmail's profile (audited as `gmail.fetch`) and re-seals it.
+- `lastSyncAt`: set when a Gmail sync publishes; `null` before the first sync, after delete-all / clearing the ledger,
+  and when a sync fails or is discarded. `syncing` is true while a sync for this account is running.
+- `counts` are visible rows (excluded merchants removed), the same as `/api/ledger`.
+
+`POST /api/auth/disconnect` (same-origin, signed-in): clears the stored tokens + mailbox, then revokes the Google grant
+(best effort, like delete-all) -> `{ disconnected: true, revokedToken }`. The user row, session cookie and **synced
+ledger are kept** (the UI labels it "Gmail disconnected"). Writes an `approval` audit entry "Gmail disconnected"
+(no new audit type). Calling it again is harmless (`revokedToken: false`). Reconnecting through `/api/auth/google`
+reuses the same account and ledger.
+
+Token requirement (behaviour change): data routes (`/api/ledger`, orders, findings, claims, audit, review, merchants,
+demo, upload, account, delete-all) only need a valid identity, so an account with an expired or disconnected Gmail grant
+still reads and edits its own ledger. Only `GET /api/gmail/preview` and `POST /api/gmail/sync` need a live grant and
+answer `401 { code: "token_expired", reconnectUrl }` otherwise. Tampered / expired / deleted identities still get 401
+and their cookies cleared on every route.
+
+Client: `getAccount()`, `disconnectGmail()`. After `disconnectGmail`, a Gmail sync, or `deleteAll`, refetch the account
+and the ledger (shared-cache invalidation point).
 
 ## Owed summary and finding status (issue #77, Option A)
 

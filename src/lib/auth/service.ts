@@ -35,7 +35,7 @@ export async function finishAuthorization(params: URLSearchParams, cookie: strin
   if (!token.refresh_token) throw new AuthError("token_expired");
   store.audit("gmail.fetch", null, { endpoint: "users/me/profile", count: 1 });
   const mailbox = await mailboxIdentity(token.access_token, fetcher);
-  const value = { accessToken: token.access_token, refreshToken: token.refresh_token,
+  const value = { accessToken: token.access_token, refreshToken: token.refresh_token, mailbox,
     expiresAt: now + token.expires_in * 1000,
     refreshExpiresAt: token.refresh_token_expires_in ? now + token.refresh_token_expires_in * 1000 : undefined };
   const userId = store.save(mailbox, seal(value, config.key, "tokens"));

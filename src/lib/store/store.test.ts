@@ -13,6 +13,7 @@ import {
   getState,
   includeMerchant,
   resetStore,
+  setLastSyncAt,
   setPipelineResult,
   setFindingStatus,
   setRevokeOAuthHook,
@@ -34,6 +35,18 @@ describe("store", () => {
     expect(getState()).toMatchObject({ mode: "empty", asOf: null, orders: [], findings: [], audit: [] });
     appendAudit({ at: "2026-10-17T00:00:00.000Z", type: "sync_start", detail: "x" });
     expect(getState().audit).toEqual([{ id: "aud_1", at: "2026-10-17T00:00:00.000Z", type: "sync_start", detail: "x" }]);
+  });
+
+  it("records lastSyncAt per scope and clears it on clearLedger and deleteAll", async () => {
+    expect(getState().lastSyncAt).toBeNull();
+    setLastSyncAt("2026-10-18T00:00:00.000Z");
+    expect(getState().lastSyncAt).toBe("2026-10-18T00:00:00.000Z");
+    expect(withStoreScope("lastsync-other", getState).lastSyncAt).toBeNull();
+    clearLedger();
+    expect(getState().lastSyncAt).toBeNull();
+    setLastSyncAt("2026-10-18T00:00:00.000Z");
+    await deleteAll();
+    expect(getState().lastSyncAt).toBeNull();
   });
 
   it("returns audit entries newest first", () => {

@@ -9,4 +9,4 @@ async function handleGET(request: Request): Promise<Response> {
     return Response.json(await previewGmail(gmailRequest(request).deps), { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return gmailErrorResponse(error); }
 }
-export const GET = withAccountStore(handleGET);
+export const GET = withAccountStore(handleGET, { requireToken: true });

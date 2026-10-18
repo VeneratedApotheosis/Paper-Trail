@@ -21,20 +21,24 @@ beforeEach(() => {
 });
 afterEach(() => { db.close(); resetStore(); vi.unstubAllEnvs(); });
 
-it("allows a cleared-grant identity into only its own deletion scope", async () => {
+it("lets a cleared-grant identity into only its own scope, except where a live Gmail grant is required", async () => {
   const id = db.save("synthetic@example.test", "synthetic-encrypted");
   db.update(id, null);
   withStoreScope(id, () => { resetStore(); appendAudit({ at: new Date().toISOString(), type: "sync_start", detail: "account-only" }); });
   appendAudit({ at: new Date().toISOString(), type: "sync_start", detail: "anonymous-only" });
   const handler = vi.fn(async (request: Request) => Response.json({ entries: getState().audit, path: new URL(request.url).pathname }));
-  const normal = await withAccountStore(handler)(request(cookie(id)));
+  const normal = await withAccountStore(handler, { requireToken: true })(request(cookie(id)));
   expect(normal.status).toBe(401);
   // Clearing this valid identity here would make the owner's data undeletable.
   expect(normal.headers.get("set-cookie")).toBeNull();
   expect(handler).not.toHaveBeenCalled();
-  const deletionScope = await withAccountStore(handler, { requireToken: false })(request(cookie(id)));
-  expect(await deletionScope.text()).toContain("account-only");
-  expect(deletionScope.headers.get("cache-control")).toBe("no-store");
+  for (const options of [undefined, { requireToken: false }]) {
+    const accountScope = await withAccountStore(handler, options)(request(cookie(id)));
+    const text = await accountScope.text();
+    expect(text).toContain("account-only");
+    expect(text).not.toContain("anonymous-only");
+    expect(accountScope.headers.get("cache-control")).toBe("no-store");
+  }
 });
 it.each(["invalid", "expired", "deleted"])("clears %s identity cookies without invoking an anonymous handler", async kind => {
   const id = db.save("synthetic@example.test", "synthetic-encrypted");

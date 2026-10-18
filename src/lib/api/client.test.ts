@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   approveClaim,
+  disconnectGmail,
+  getAccount,
   getClaim,
   getFinding,
   getOrder,
@@ -79,5 +81,14 @@ describe("getSessionStatus", () => {
   it("treats a non-JSON response as disconnected", async () => {
     fetchMock.mockResolvedValueOnce(new Response("oops", { status: 500 }));
     expect(await getSessionStatus()).toEqual({ connected: false });
+  });
+});
+
+describe("account client", () => {
+  it("reads /api/account and posts /api/auth/disconnect", async () => {
+    await getAccount();
+    await disconnectGmail();
+    expect(requestedPaths()).toEqual(["/api/account", "/api/auth/disconnect"]);
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: "POST" });
   });
 });

@@ -26,6 +26,8 @@ export type RevokeOAuthHook = () => Promise<boolean>;
 interface StoreData {
   mode: StoreMode;
   asOf: string | null;
+  /** ISO time the last Gmail sync was published; cleared by delete-all and clearLedger. */
+  lastSyncAt: string | null;
   orders: NormalizedOrder[];
   findings: Finding[];
   drafts: Draft[];
@@ -44,6 +46,7 @@ interface StoreData {
 export interface StoreState {
   mode: StoreMode;
   asOf: string | null;
+  lastSyncAt: string | null;
   orders: NormalizedOrder[];
   findings: Finding[];
   drafts: Draft[];
@@ -88,6 +91,7 @@ function emptyData(): StoreData {
   return {
     mode: "empty",
     asOf: null,
+    lastSyncAt: null,
     orders: [],
     findings: [],
     drafts: [],
@@ -133,6 +137,7 @@ export function getState(): StoreState {
   return {
     mode: store.mode,
     asOf: store.asOf,
+    lastSyncAt: store.lastSyncAt,
     orders,
     findings,
     drafts: store.drafts.filter((draft) => findingIds.has(draft.findingId)),
@@ -179,6 +184,11 @@ export function setPipelineResult(mode: Exclude<StoreMode, "empty">, asOf: strin
   store.drafts = [];
 }
 
+/** Records when a Gmail sync was published (call right after `setPipelineResult("gmail", ...)`). */
+export function setLastSyncAt(at: string): void {
+  data().lastSyncAt = at;
+}
+
 /**
  * Async work that commits to the store later (upload, demo load). Capture it before the first await, mirroring
  * Gmail sync's `active()` guard: if delete-all or a demo reset ran meanwhile, the work must not commit.
@@ -211,6 +221,7 @@ export function clearLedger(): void {
   store.generation += 1;
   store.mode = "empty";
   store.asOf = null;
+  store.lastSyncAt = null;
   store.orders = [];
   store.findings = [];
   store.drafts = [];
