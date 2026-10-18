@@ -7,6 +7,7 @@ import {
 } from "./client";
 import { decodeGmailMessageDetailed } from "./decode";
 import type { GmailWorkProgress } from "./progress";
+import { PROMO_BUDGET_MS, PROMO_MIN_BUDGET_MS, readPromotionEmails, type PromotionsRead } from "./promotions";
 
 export interface GmailSyncOptions extends GmailDeps {
   pipeline: PipelineDeps;
@@ -17,6 +18,11 @@ export interface GmailSyncOptions extends GmailDeps {
   budgetMs?: number;
   /** Linked account id stamped on every decoded email as `RawEmail.sourceAccount` (#114). */
   sourceAccount?: string;
+  /**
+   * Promotions-category emails to read after the receipt pass (#137); 0 or unset = off. The routes pass
+   * `PROMO_FETCH_LIMIT` (see promoFetchLimit()).
+   */
+  promoFetchLimit?: number;
 }
 /** Whole-sync time budget in ms; syncing several accounts splits it between them (see syncGmailAccounts). */
 export const SYNC_BUDGET_MS = 240000;
@@ -27,6 +33,8 @@ export interface GmailSyncResult {
   parseErrors: Array<{ id: string; reason: string }>;
   /** Decoded messages by the MIME part their text came from (#117 quality report). */
   bodySources?: { plain: number; html: number };
+  /** Set when the promotions pass ran (#137): emails for the Promotions tab only, never for the ledger. */
+  promotions?: PromotionsRead;
 }
 export async function previewGmail(deps: GmailDeps) {
   const estimatedMessages = await createGmailClient(deps).preview();
@@ -36,6 +44,35 @@ export async function previewGmail(deps: GmailDeps) {
 }
 
 export async function syncGmail(options: GmailSyncOptions): Promise<GmailSyncResult> {
+  const startedAt = Date.now();
+  const budgetMs = options.budgetMs ?? SYNC_BUDGET_MS;
+  // Paces only when the request budget is spent; `pace` is the sleep it uses (tests inject a no-op). Shared by both
+  // passes: the Gmail quota is per user.
+  const acquireFetchBudget = createRequestPacer({
+    burst: GMAIL_FETCH_BURST, perSecond: GMAIL_FETCH_PER_SECOND,
+    sleep: options.pace ?? (ms => new Promise(resolve => setTimeout(resolve, ms))),
+  });
+  const { receiptIds, ...receipts } = await syncReceipts(options, budgetMs, acquireFetchBudget);
+  const limit = options.promoFetchLimit ?? 0;
+  if (limit <= 0) return receipts;
+  // Promotions come after the receipts and use only what is left of the budget; they can never fail the receipt sync.
+  options.signal?.throwIfAborted();
+  const remainingMs = budgetMs - (Date.now() - startedAt);
+  if (remainingMs < PROMO_MIN_BUDGET_MS) return { ...receipts, promotions: { emails: [], listed: 0, warning: "promotions_timeout" } };
+  const signal = AbortSignal.any([...(options.signal ? [options.signal] : []), AbortSignal.timeout(Math.min(PROMO_BUDGET_MS, remainingMs))]);
+  options.onProgress?.({ stage: "promotions", fetched: receipts.fetched, total: receipts.fetched, skipped: receipts.parseErrors.length,
+    promotions: { fetched: 0, total: null } });
+  const promotions = await readPromotionEmails({
+    client: createGmailClient({ ...options, signal }), limit, receiptIds: new Set(receiptIds),
+    ...(options.sourceAccount ? { sourceAccount: options.sourceAccount } : {}), signal, acquire: acquireFetchBudget,
+    onProgress: promotions => options.onProgress?.({ stage: "promotions", fetched: receipts.fetched, total: receipts.fetched,
+      skipped: receipts.parseErrors.length, promotions }),
+  });
+  options.signal?.throwIfAborted();
+  return { ...receipts, promotions };
+}
+
+async function syncReceipts(options: GmailSyncOptions, budgetMs: number, acquireFetchBudget: () => Promise<void>): Promise<GmailSyncResult & { receiptIds: string[] }> {
   const controller = new AbortController();
   const signal = options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -44,11 +81,11 @@ export async function syncGmail(options: GmailSyncOptions): Promise<GmailSyncRes
       const error = new GmailError(504, "sync_timeout");
       // Reject first so an in-flight request's abort cannot mask the timeout.
       reject(error); controller.abort(error);
-    }, options.budgetMs ?? SYNC_BUDGET_MS);
+    }, budgetMs);
   });
   try {
     // The route can never publish a late worker result once this race rejects.
-    return await Promise.race([syncWithinBudget({ ...options, signal }), deadline]);
+    return await Promise.race([syncWithinBudget({ ...options, signal }, acquireFetchBudget), deadline]);
   } finally {
     clearTimeout(timer);
     // Stop stragglers (other fetch worker, pending LLM calls) when the sync failed, timed out or was canceled.
@@ -59,17 +96,12 @@ export async function syncGmail(options: GmailSyncOptions): Promise<GmailSyncRes
 type FetchedSlot = { email: RawEmail } | { parseError: string };
 const FETCH_CONCURRENCY = 2;
 
-async function syncWithinBudget(options: GmailSyncOptions & { signal: AbortSignal }): Promise<GmailSyncResult> {
+async function syncWithinBudget(options: GmailSyncOptions & { signal: AbortSignal }, acquireFetchBudget: () => Promise<void>): Promise<GmailSyncResult & { receiptIds: string[] }> {
   const { signal } = options;
   const client = createGmailClient(options);
   options.onProgress?.({ stage: "listing", fetched: 0, total: null, skipped: 0 });
   const listed = await client.listIds();
   const total = listed.ids.length;
-  // Paces only when the request budget is spent; `pace` is the sleep it uses (tests inject a no-op).
-  const acquireFetchBudget = createRequestPacer({
-    burst: GMAIL_FETCH_BURST, perSecond: GMAIL_FETCH_PER_SECOND,
-    sleep: options.pace ?? (ms => new Promise(resolve => setTimeout(resolve, ms))),
-  });
   let fetched = 0, skipped = 0;
   const report = (stage: "fetching" | "processing") => options.onProgress?.({ stage, fetched, total, skipped });
 
@@ -163,5 +195,5 @@ async function syncWithinBudget(options: GmailSyncOptions & { signal: AbortSigna
   if (extractionFailed) throw new GmailError(503, "extraction_unavailable");
   for (const error of parseErrors) result.reviewQueue.push({ emailId: error.id, stage: "extract", reason: error.reason });
   result.stats.needsReview = result.reviewQueue.length;
-  return { result, fetched: total, capped: listed.capped, parseErrors, bodySources };
+  return { result, fetched: total, capped: listed.capped, parseErrors, bodySources, receiptIds: listed.ids };
 }

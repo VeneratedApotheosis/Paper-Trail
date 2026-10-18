@@ -29,6 +29,7 @@ describe("accountProgressLine", () => {
     expect(accountProgressLine({ ...base, stage: "fetching", fetched: 12, total: 50 }).detail).toBe("12 of 50");
     expect(accountProgressLine({ ...base, stage: "fetching", fetched: 3 }).detail).toBe("reading");
     expect(accountProgressLine({ ...base, stage: "processing" }).detail).toBe("analyzing receipts");
+    expect(accountProgressLine({ ...base, stage: "promotions" }).detail).toBe("reading promotions");
     expect(accountProgressLine({ ...base, stage: "complete" }).detail).toBe("done");
     expect(accountProgressLine({ ...base, stage: "failed" }).detail).toBe("could not sync");
   });

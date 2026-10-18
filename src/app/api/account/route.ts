@@ -31,7 +31,7 @@ async function handleGET(request: Request): Promise<Response> {
     lastSyncAt: state.lastSyncAt,
     counts: { orders: state.orders.length, findings: state.findings.length, reviewItems: state.reviewQueue.length },
     excludedMerchants: state.excludedMerchants,
-    syncing: progress !== null && ["listing", "fetching", "processing"].includes(progress.stage),
+    syncing: progress !== null && ["listing", "fetching", "processing", "promotions"].includes(progress.stage),
     redaction: redactionMode(),
   };
   return Response.json(body);

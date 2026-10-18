@@ -86,6 +86,7 @@ beforeEach(() => {
   vi.stubEnv("AUTH_ENCRYPTION_KEY", "ab".repeat(32)); vi.stubEnv("AUTH_BASE_URL", "http://localhost:3000");
   vi.stubEnv("GOOGLE_CLIENT_ID", "synthetic-client"); vi.stubEnv("GOOGLE_CLIENT_SECRET", "synthetic-secret");
   vi.stubEnv("ANTHROPIC_API_KEY", "synthetic-key"); vi.stubEnv("LLM_MODEL", "synthetic-model");
+  vi.stubEnv("PROMO_FETCH_LIMIT", "0"); // these tests are about receipts; promotions are covered in promotions-fetch.test.ts
   // The shared order arrives in both inboxes under different message ids; each inbox also has an order of its own.
   setInboxes([{ id: "a1", ref: SHARED }, { id: "a2", ref: "A-ONLY" }], [{ id: "b1", ref: SHARED }, { id: "b2", ref: "B-ONLY" }]);
 });

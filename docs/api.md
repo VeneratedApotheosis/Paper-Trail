@@ -125,7 +125,7 @@ disconnected on its own.
   act on one account, or by default on **every** account, one after another. Responses keep their top-level fields
   (summed over the accounts that worked) and add `accounts`: preview entries are
   `{ accountId, mailbox, ok: true, estimatedMessages, messagesToFetch }`, sync entries
-  `{ accountId, mailbox, ok: true, fetched, capped }`; an account that could not be read is
+  `{ accountId, mailbox, ok: true, fetched, capped, promotionsFound?, promotionsWarning? }` (#137); an account that could not be read is
   `{ accountId, mailbox, ok: false, code }` (`token_expired`, `gmail_access_denied`, `sync_timeout`, ...) while the others
   still publish. The call fails (with the first error, like a single-account sync) only when no account succeeded; an
   unknown `accountId` is 404 `account_not_found`. `parseErrors` entries carry their `accountId` in a multi-account sync.
@@ -137,6 +137,13 @@ disconnected on its own.
   is `null` until every account knows its own) and, when **several accounts** are synced, adds
   `accounts: [{ accountId, mailbox, stage, fetched, total }]` (`idle` = waiting for its turn, `failed` for an account
   that could not be read). A single-account sync keeps the plain shape.
+  **Promotions pass (#137):** after an account's receipts, a second list query (`category:promotions newer_than:30d`, newest
+  `PROMO_FETCH_LIMIT` = 30, `0` = off, at most 100) reads Promotions-category mail for the Promotions tab. The status gets stage
+  `promotions` ("Reading promotions") and an additive `promotions: { fetched, total }` (summed over accounts; `total` is `null`
+  until every account listed). During that stage `fetched` / `total` stay at the finished receipt counts. The sync response gets
+  `promotionsFound` (promotion emails read, all accounts; `0` when off) and, if a promotions pass stopped early, `promotionsWarning`
+  (first code: `promotions_timeout`, `gmail_access_denied`, `gmail_rate_limited`, `gmail_unavailable`, ...). The receipts are published
+  regardless and the account keeps its earlier promotions. The quality report gets `promotionsFetched` (not part of `fetched`).
 - Client: `getAccount()`, `disconnectGmail({ accountId? })`, `getGmailPreview({ accountId? })`, `syncGmail({ accountId? })`,
   `gmailConnectUrl({ link? })`.
 
@@ -149,8 +156,8 @@ need a live Gmail grant, these do (401 `token_expired` + `reconnectUrl` otherwis
 | Method + path | Request | Response (200) | Errors (`code`) |
 |---|---|---|---|
 | `GET /api/gmail/preview` | optional `?accountId=` | `GmailPreviewResponse` `{ query, estimatedMessages, messagesToFetch, countIsEstimate, windowDays: 90, maxMessages: 50, accounts, redaction }` | 401 `token_expired`, 404 `account_not_found`, 429 `gmail_rate_limited`, 502 / 503 |
-| `POST /api/gmail/sync` | `{ "confirmed": true, "accountId"? }`, same-origin | `GmailSyncResponse` = `PipelineRunResponse` (`mode: "gmail"`) + `{ fetched, capped, parseErrors, accounts }` | 400 not confirmed, 401 `token_expired`, 404 `account_not_found`, 403 `gmail_access_denied` / cross-origin, 409 `sync_already_running` (or data deleted meanwhile, nothing saved), 422 `no_parseable_messages`, 429 `gmail_rate_limited`, 504 `sync_timeout`, 502 / 503 |
-| `GET /api/gmail/sync/status` | none | `GmailSyncStatus` `{ stage: "idle" \| "listing" \| "fetching" \| "processing" \| "complete" \| "failed", fetched, total: number \| null, skipped, accounts? }` (in-process, kept 15 minutes) | 401 `token_expired` |
+| `POST /api/gmail/sync` | `{ "confirmed": true, "accountId"? }`, same-origin | `GmailSyncResponse` = `PipelineRunResponse` (`mode: "gmail"`) + `{ fetched, capped, parseErrors, promotionsFound, promotionsWarning?, accounts }` | 400 not confirmed, 401 `token_expired`, 404 `account_not_found`, 403 `gmail_access_denied` / cross-origin, 409 `sync_already_running` (or data deleted meanwhile, nothing saved), 422 `no_parseable_messages`, 429 `gmail_rate_limited`, 504 `sync_timeout`, 502 / 503 |
+| `GET /api/gmail/sync/status` | none | `GmailSyncStatus` `{ stage: "idle" \| "listing" \| "fetching" \| "processing" \| "promotions" \| "complete" \| "failed", fetched, total: number \| null, skipped, promotions?: { fetched, total }, accounts? }` (in-process, kept 15 minutes) | 401 `token_expired` |
 
 - A sync reads at most **50** messages **per account** (`maxMessages`, last 90 days) and has a **240 s** budget (shared by the accounts, see "Multiple Gmail accounts"): when it runs out the
   route answers **504 `sync_timeout`** and publishes nothing (the previous ledger is unchanged).
@@ -370,7 +377,9 @@ are scanned: skipped emails the classifier called marketing, plus prefiltered or
 date (Chinese promos, mail the prefilter dropped). Receipts, shipping updates, extraction failures and phishing look-alikes are never
 promotions (a receipt with a promo footer stays a receipt). Marketing without any offer (no discount, code or end date) is not listed unless the user
 says "this is a promotion". A Gmail run replaces that account's promotions; an upload or demo run replaces all.
-The Gmail search query is unchanged, so promotions only come from marketing mail the receipt search already returned (subjects/senders that look transactional); uploads and the demo see everything they are given.
+Gmail sync also runs a second, separate list query for Promotions-category mail (#137, below); uploads and the demo see everything they are given.
+
+**Gmail promotions query (#137).** Per account, after the receipt pass, `category:promotions newer_than:30d` lists the newest `PROMO_FETCH_LIMIT` (default 30, `0` = off, max 100) messages; ids the receipt pass already fetched are not fetched twice. They are decoded like receipts but never enter the pipeline: no classification as a receipt, no extraction, no order, ledger row, finding or owed money, and they are not in the quality skipped list. They get the same rules and the same Claude pass (`PROMO_LLM_LIMIT`) as every other promotion candidate; Gmail's category counts as "marketing" for them (a phishing look-alike is still dropped). The pass runs inside the sync budget (at most 45 s, only what the receipt pass left; under 3 s left it is skipped) and shares the request pacer. A failure never fails the receipt sync: it is a `promotionsWarning` and the account keeps its earlier promotions. Every list and get is audited (`messages.list (promotions)`, `purpose: "promotions"` in the SQLite meta).
 
 **Rules first (free).** `src/lib/promotions/rules.ts`: codes (`code: X`, `use code X`, `promo code`, 折扣碼/優惠碼), percent / amount off (`8折` = 20% off), min spend,
 free shipping, buy-one-get-one, expiry phrases (ends tonight / today / tomorrow / Sunday / Oct 20 / 10/20 / in 48 hours / 今晚截止 / 10月20日截止) and channel words (in store / pickup / online).

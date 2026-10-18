@@ -6,6 +6,7 @@ import { syncGmailAccounts } from "@/lib/gmail/accounts";
 import { createLlmExtractor } from "@/lib/pipeline/extractors";
 import { createSyncCollector, type SyncCollector } from "@/lib/quality/collector";
 import { classOverridesFor } from "@/lib/quality/labels";
+import { promotionTextsOf } from "@/lib/promotions/gmail";
 import { recordSyncPromotions } from "@/lib/promotions/state";
 import { recordSyncQuality } from "@/lib/quality/state";
 import { beginStoreWork, currentStoreScope, getExcludedMerchants, getExtractionCache, setAccountPipelineResult } from "@/lib/store";
@@ -59,9 +60,14 @@ async function handlePOST(request: Request): Promise<Response> {
         setAccountPipelineResult(accountId, now.toISOString(), result, new Date().toISOString());
         const collector = collectors.get(accountId);
         if (collector) {
-          const collected = collector.finish(result, { fetched: accountSync.fetched, bodySource: accountSync.bodySources });
+          const promotions = accountSync.promotions;
+          const collected = collector.finish(result, { fetched: accountSync.fetched, bodySource: accountSync.bodySources,
+            ...(promotions ? { promotionsFetched: promotions.emails.length } : {}) });
           recordSyncQuality(collected);
-          void recordSyncPromotions(collected).enrichment; // Claude reads promotion details in the background (PROMO_LLM_LIMIT)
+          // Promotions-category emails (#137) reach the Promotions tab only, never the quality skipped list or the ledger.
+          const withPromotions = promotions ? { ...collected, texts: [...collected.texts, ...promotionTextsOf(promotions.emails)] } : collected;
+          // Claude reads promotion details in the background (PROMO_LLM_LIMIT). A failed promotions pass keeps the earlier ones.
+          void recordSyncPromotions(withPromotions, { retainPrevious: promotions?.warning !== undefined }).enrichment;
         }
         return true;
       },

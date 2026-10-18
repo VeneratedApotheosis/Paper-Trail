@@ -20,6 +20,8 @@ export interface SyncQualityReport {
   accountId?: string;
   /** Messages the source handed over (Gmail: listed, including ones that could not be decoded). */
   fetched: number;
+  /** Gmail only (#137): Promotions-category emails read by the separate promotions pass. Not part of `fetched`; they are never classified as receipts or listed as skipped. */
+  promotionsFetched?: number;
   /** Dropped by the receipt prefilter before classification. */
   prefilteredOut: number;
   /** Classifier verdicts of the emails that were classified. */

@@ -61,6 +61,11 @@ export interface RecordPromotionsOptions {
   limit?: number;
   now?: () => Date;
   rules?: RulesOptions;
+  /**
+   * Keep the account's earlier promotions and add this run's (default: replace them). A Gmail sync whose promotions
+   * pass failed sets it, so a Gmail hiccup does not empty the Promotions tab (#137).
+   */
+  retainPrevious?: boolean;
 }
 
 export interface RecordedPromotions {
@@ -86,7 +91,7 @@ export function recordSyncPromotions(collected: CollectedSync, options: RecordPr
   const data = getPromotionData();
   const { accountId, source } = collected.report;
   for (const [emailId, entry] of data.entries) {
-    if (source !== "gmail" || entry.stored.accountId === accountId) data.entries.delete(emailId);
+    if (options.retainPrevious !== true && (source !== "gmail" || entry.stored.accountId === accountId)) data.entries.delete(emailId);
   }
   const candidates = promotionCandidates(collected.texts, options.rules)
     .sort((a, b) => Date.parse(b.promotion.receivedAt) - Date.parse(a.promotion.receivedAt))

@@ -1,8 +1,13 @@
+/** Promotions-category emails read by the second pass of a sync (#137); `total` is null until its list query answered. */
+export type GmailPromotionsProgress = { fetched: number; total: number | null };
 export type GmailWorkProgress = {
-  stage: "listing" | "fetching" | "processing";
+  stage: "listing" | "fetching" | "processing" | "promotions";
+  /** Receipt messages (all stages): during `promotions` they stay at the finished receipt pass's counts. */
   fetched: number;
   total: number | null;
   skipped: number;
+  /** Set from the `promotions` stage on (#137); summed over accounts at the top level. */
+  promotions?: GmailPromotionsProgress;
 };
 type GmailSyncStage = GmailWorkProgress["stage"] | "idle" | "complete" | "failed";
 /** Progress of one linked Gmail account within a sync (#114). `idle` = waiting for its turn. */
@@ -54,16 +59,23 @@ export function createGmailProgressStore(now = Date.now) {
         entry.value = { ...value };
         entry.updatedAt = now();
       };
-      const work = new Map<string, { mailbox: string | null; stage: GmailSyncStage; fetched: number; total: number | null; skipped: number }>();
-      const active = ["listing", "fetching", "processing"];
+      const work = new Map<string, { mailbox: string | null; stage: GmailSyncStage; fetched: number; total: number | null; skipped: number;
+        promotions?: GmailPromotionsProgress }>();
+      const active = ["listing", "fetching", "processing", "promotions"];
       const refresh = () => {
         const all = [...work.entries()];
         const current = all.find(([, item]) => active.includes(item.stage));
+        const withPromotions = all.filter(([, item]) => item.promotions);
         write({
           stage: current ? current[1].stage : entry.value.stage,
           fetched: all.reduce((sum, [, item]) => sum + item.fetched, 0),
           skipped: all.reduce((sum, [, item]) => sum + item.skipped, 0),
           total: all.some(([, item]) => item.total === null) ? null : all.reduce((sum, [, item]) => sum + (item.total ?? 0), 0),
+          ...(withPromotions.length > 0 ? { promotions: {
+            fetched: withPromotions.reduce((sum, [, item]) => sum + item.promotions!.fetched, 0),
+            total: withPromotions.some(([, item]) => item.promotions!.total === null) ? null
+              : withPromotions.reduce((sum, [, item]) => sum + item.promotions!.total!, 0),
+          } } : {}),
           accounts: all.map(([accountId, item]) => ({ accountId, mailbox: item.mailbox, stage: item.stage, fetched: item.fetched, total: item.total })),
         });
       };

@@ -2,6 +2,7 @@ import { AuthError } from "@/lib/auth/google";
 import type { PipelineDeps, PipelineResult } from "@/lib/pipeline/run";
 import { GmailError, type GmailDeps } from "./client";
 import type { GmailWorkProgress } from "./progress";
+import { promoFetchLimit } from "./promotions";
 import { previewGmail, syncGmail, SYNC_BUDGET_MS, type GmailSyncResult } from "./service";
 
 /** One linked Gmail account of the signed-in profile as the preview/sync routes see it (#114). */
@@ -23,7 +24,7 @@ export type GmailAccountPreview =
   | GmailAccountFailure;
 
 export type GmailAccountSync =
-  | { accountId: string; mailbox: string | null; ok: true; fetched: number; capped: boolean }
+  | { accountId: string; mailbox: string | null; ok: true; fetched: number; capped: boolean; promotionsFound?: number; promotionsWarning?: string }
   | GmailAccountFailure;
 
 function failureCode(error: unknown): string {
@@ -84,12 +85,18 @@ export interface SyncAccountsOptions {
   publish: (accountId: string, result: PipelineResult, synced: GmailSyncResult) => boolean;
   /** Total budget across accounts; defaults to SYNC_BUDGET_MS. Server-side/test injection only. */
   totalBudgetMs?: number;
+  /** Promotions-category emails to read per account (#137); defaults to `PROMO_FETCH_LIMIT`. 0 = off. Server-side/test injection only. */
+  promoFetchLimit?: number;
 }
 
 export interface SyncAccountsResult {
   fetched: number;
   capped: boolean;
   parseErrors: Array<GmailSyncResult["parseErrors"][number] & { accountId: string }>;
+  /** Promotions-category emails read for the Promotions tab, summed over accounts (#137); the sync route always sets it (0 when the pass is off). */
+  promotionsFound?: number;
+  /** Code of the first promotions-pass problem (e.g. `promotions_timeout`); the receipts were synced regardless. */
+  promotionsWarning?: string;
   accounts: GmailAccountSync[];
 }
 
@@ -105,7 +112,8 @@ export async function syncGmailAccounts(options: SyncAccountsOptions): Promise<S
   const total = options.totalBudgetMs ?? SYNC_BUDGET_MS;
   const outcomes: GmailAccountSync[] = [];
   const parseErrors: SyncAccountsResult["parseErrors"] = [];
-  let fetched = 0, capped = false, firstError: unknown;
+  let fetched = 0, capped = false, promotionsFound = 0, promotionsWarning: string | undefined, firstError: unknown;
+  const promoLimit = options.promoFetchLimit ?? promoFetchLimit();
   // Every account is registered up front so progress shows the ones still waiting for their turn.
   const reporters = options.accounts.map(account => options.reporter(account));
   for (const [index, account] of options.accounts.entries()) {
@@ -114,7 +122,7 @@ export async function syncGmailAccounts(options: SyncAccountsOptions): Promise<S
     try {
       if (!account.connected) throw new AuthError("token_expired");
       const budgetMs = Math.max(1, Math.floor((total - (Date.now() - startedAt)) / (options.accounts.length - index)));
-      const synced = await syncGmail({ ...account.deps, sourceAccount: account.id, budgetMs, onProgress: report.update,
+      const synced = await syncGmail({ ...account.deps, sourceAccount: account.id, budgetMs, promoFetchLimit: promoLimit, onProgress: report.update,
         pipeline: options.pipeline(account) });
       options.signal.throwIfAborted();
       if (!account.active()) throw new GmailError(401, "token_expired");
@@ -126,7 +134,11 @@ export async function syncGmailAccounts(options: SyncAccountsOptions): Promise<S
       fetched += synced.fetched;
       capped ||= synced.capped;
       parseErrors.push(...synced.parseErrors.map(error => ({ ...error, accountId: account.id })));
-      outcomes.push({ ...base, ok: true, fetched: synced.fetched, capped: synced.capped });
+      const promotions = synced.promotions;
+      promotionsFound += promotions?.emails.length ?? 0;
+      promotionsWarning ??= promotions?.warning;
+      outcomes.push({ ...base, ok: true, fetched: synced.fetched, capped: synced.capped,
+        ...(promotions ? { promotionsFound: promotions.emails.length, ...(promotions.warning ? { promotionsWarning: promotions.warning } : {}) } : {}) });
     } catch (error) {
       report.fail();
       // A canceled request or a reset store ends the whole sync; anything else only fails this account.
@@ -136,5 +148,5 @@ export async function syncGmailAccounts(options: SyncAccountsOptions): Promise<S
     }
   }
   if (!outcomes.some(outcome => outcome.ok)) throw firstError ?? new AuthError("token_expired");
-  return { fetched, capped, parseErrors, accounts: outcomes };
+  return { fetched, capped, parseErrors, promotionsFound, ...(promotionsWarning ? { promotionsWarning } : {}), accounts: outcomes };
 }

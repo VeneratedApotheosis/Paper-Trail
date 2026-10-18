@@ -58,3 +58,18 @@ it("reports each account of a multi-account sync and sums them at the top level"
   expect(store.read("synthetic").stage).toBe("complete");
   expect(store.read("synthetic").accounts!.map(account => account.stage)).toEqual(["complete", "failed"]);
 });
+
+it("carries the promotions pass counts (#137) and sums them over accounts", () => {
+  const store = createGmailProgressStore();
+  const single = store.begin("synthetic-one");
+  single.update({ stage: "promotions", fetched: 4, total: 4, skipped: 0, promotions: { fetched: 2, total: 5 } });
+  expect(store.read("synthetic-one")).toEqual({ stage: "promotions", fetched: 4, total: 4, skipped: 0, promotions: { fetched: 2, total: 5 } });
+  const run = store.begin("synthetic-two");
+  const first = run.forAccount("acct-a", null);
+  const second = run.forAccount("acct-b", null);
+  first.update({ stage: "promotions", fetched: 2, total: 2, skipped: 0, promotions: { fetched: 3, total: 10 } });
+  expect(store.read("synthetic-two")).toMatchObject({ stage: "promotions", promotions: { fetched: 3, total: 10 } });
+  first.complete();
+  second.update({ stage: "promotions", fetched: 1, total: 1, skipped: 0, promotions: { fetched: 0, total: null } });
+  expect(store.read("synthetic-two")).toMatchObject({ stage: "promotions", promotions: { fetched: 3, total: null } });
+});

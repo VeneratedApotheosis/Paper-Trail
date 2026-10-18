@@ -21,7 +21,7 @@ export interface AppShellSyncAccountProgress {
  * only while two or more accounts sync, one line each.
  */
 export interface AppShellSyncProgress {
-  stage: "listing" | "fetching" | "processing";
+  stage: "listing" | "fetching" | "processing" | "promotions";
   fetched: number;
   total: number | null;
   accounts?: AppShellSyncAccountProgress[];
@@ -85,6 +85,7 @@ export function syncButtonLabel(state: AppShellSyncState, progress?: AppShellSyn
     case "running":
       if (!progress || progress.stage === "listing") return "Syncing";
       if (progress.stage === "processing") return "Analyzing receipts";
+      if (progress.stage === "promotions") return progress.total !== null ? `Reading promotions ${progress.fetched} of ${progress.total}` : "Reading promotions";
       return progress.total !== null ? `Reading ${progress.fetched} of ${progress.total}` : "Syncing";
   }
 }

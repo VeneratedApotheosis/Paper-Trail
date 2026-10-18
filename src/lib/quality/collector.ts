@@ -16,7 +16,7 @@ export interface SyncCollector {
   observe(observation: PipelineEmailObservation): void;
   /** Pass as `createLlmExtractor({ onUsage })`. */
   recordUsage(entry: ExtractionAuditEntry): void;
-  finish(result: PipelineResult, extra?: { fetched?: number; bodySource?: { plain: number; html: number } }): CollectedSync;
+  finish(result: PipelineResult, extra?: { fetched?: number; bodySource?: { plain: number; html: number }; promotionsFetched?: number }): CollectedSync;
 }
 
 export interface SyncCollectorOptions {
@@ -77,6 +77,7 @@ export function createSyncCollector(options: SyncCollectorOptions): SyncCollecto
           source: options.source,
           ...(options.accountId ? { accountId: options.accountId } : {}),
           fetched: extra.fetched ?? stats.emails,
+          ...(extra.promotionsFetched !== undefined ? { promotionsFetched: extra.promotionsFetched } : {}),
           prefilteredOut: stats.prefilteredOut,
           classified: { ...stats.classes },
           skippedNonReceipt,

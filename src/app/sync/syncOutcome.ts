@@ -53,6 +53,8 @@ export function gmailProgress(status: GmailSyncStatus | null): SyncProgressInfo 
   if (!status) return null;
   const { stage, fetched, total, skipped } = status;
   if (stage === "listing" || stage === "fetching" || stage === "processing") return { stage, fetched, total, skipped };
+  // The promotions pass (#137) reports its own counts; the receipt counts stay in `fetched`/`total` of the status.
+  if (stage === "promotions") return { stage, fetched: status.promotions?.fetched ?? 0, total: status.promotions?.total ?? null, skipped };
   return null;
 }
 

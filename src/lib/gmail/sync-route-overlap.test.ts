@@ -65,6 +65,7 @@ beforeEach(() => {
   vi.stubEnv("AUTH_ENCRYPTION_KEY", "ab".repeat(32)); vi.stubEnv("AUTH_BASE_URL", "http://localhost:3000");
   vi.stubEnv("GOOGLE_CLIENT_ID", "synthetic-client"); vi.stubEnv("GOOGLE_CLIENT_SECRET", "synthetic-secret");
   vi.stubEnv("ANTHROPIC_API_KEY", "synthetic-key"); vi.stubEnv("LLM_MODEL", "synthetic-model");
+  vi.stubEnv("PROMO_FETCH_LIMIT", "0"); // these tests are about receipts; promotions are covered in promotions-fetch.test.ts
 });
 afterEach(() => { db.close(); resetStore(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 

@@ -95,6 +95,9 @@ describe("gmailProgress", () => {
   });
 
   it("returns null (plain 'syncing') for no status or a stage left over from an earlier run", () => {
+    expect(gmailProgress({ stage: "promotions", fetched: 50, total: 50, skipped: 1, promotions: { fetched: 7, total: 30 } }))
+      .toEqual({ stage: "promotions", fetched: 7, total: 30, skipped: 1 });
+    expect(gmailProgress({ stage: "promotions", fetched: 50, total: 50, skipped: 0 })).toEqual({ stage: "promotions", fetched: 0, total: null, skipped: 0 });
     expect(gmailProgress(null)).toBeNull();
     for (const stage of ["idle", "complete", "failed"] as const) {
       expect(gmailProgress({ stage, fetched: 50, total: 50, skipped: 0 })).toBeNull();

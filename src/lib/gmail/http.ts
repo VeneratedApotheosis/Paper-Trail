@@ -32,7 +32,7 @@ export function gmailRequest(request: Request, accountId?: string): { userId: st
           authStore().audit(action, userId, { ...meta, accountId: grant.id });
           const where = grants.length > 1 ? ` [${grant.mailbox ?? "account"}]` : "";
           appendAudit({ at: new Date().toISOString(), type: "gmail_fetch",
-            detail: `${meta.endpoint} attempt ${meta.attempt}${meta.messageId ? ` message ${meta.messageId}` : ""}${where}` });
+            detail: `${meta.endpoint}${meta.purpose ? ` (${meta.purpose})` : ""} attempt ${meta.attempt}${meta.messageId ? ` message ${meta.messageId}` : ""}${where}` });
         },
       },
     })),

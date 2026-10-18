@@ -64,6 +64,7 @@ const ACCOUNT_STAGE_DETAIL = {
   idle: "waiting",
   listing: "listing emails",
   processing: "analyzing receipts",
+  promotions: "reading promotions",
   complete: "done",
   failed: "could not sync",
 } as const;

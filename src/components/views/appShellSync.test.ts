@@ -52,6 +52,8 @@ describe("shell Sync emails button", () => {
     expect(syncButtonLabel("running", { stage: "fetching", fetched: 12, total: 50 })).toBe("Reading 12 of 50");
     expect(syncButtonLabel("running", { stage: "fetching", fetched: 3, total: null })).toBe("Syncing");
     expect(syncButtonLabel("running", { stage: "processing", fetched: 50, total: 50 })).toBe("Analyzing receipts");
+    expect(syncButtonLabel("running", { stage: "promotions", fetched: 3, total: 30 })).toBe("Reading promotions 3 of 30");
+    expect(syncButtonLabel("running", { stage: "promotions", fetched: 0, total: null })).toBe("Reading promotions");
   });
 
   it("ready shows Sync emails and the last sync time", () => {

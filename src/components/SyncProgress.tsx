@@ -3,7 +3,7 @@ import { plural } from "@/components/SyncResult";
 // Live state of a running Gmail sync, as reported by GET /api/gmail/sync/status. `total` is null until listing
 // finishes; `fetched` counts attempted messages, including the `skipped` ones Gmail could not return or parse.
 export interface SyncProgressInfo {
-  stage: "listing" | "fetching" | "processing";
+  stage: "listing" | "fetching" | "processing" | "promotions";
   fetched: number;
   total: number | null;
   skipped: number;
@@ -13,6 +13,7 @@ const STAGES = [
   { key: "listing", label: "List", desc: "Listing matching messages in Gmail" },
   { key: "fetching", label: "Fetch", desc: "Fetching receipt-like messages" },
   { key: "processing", label: "Process", desc: "Classifying and extracting receipts" },
+  { key: "promotions", label: "Promos", desc: "Reading promotions" },
 ] as const;
 
 // Shown while a sync runs (issue #25). Fully controlled: it renders only the counts it is given and never advances on
