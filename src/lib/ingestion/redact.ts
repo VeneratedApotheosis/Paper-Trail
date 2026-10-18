@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { customerNames, namePattern } from "./names";
+import { customerNames, namePattern, isPurchaseFact } from "./names";
 import type { RawEmail, RedactedEmail, RedactionKind } from "@/lib/contracts";
 
 /**
@@ -119,7 +119,8 @@ class Redactor {
   redactText(text: string): string {
     let out = text.replace(EMAIL_PATTERN, (match) => this.token("email", match.toLowerCase()));
     for (const name of this.names) {
-      out = out.replace(namePattern(name), () => this.token("name", name.toLowerCase()));
+      out = out.replace(namePattern(name), (match: string, offset: number, whole: string) =>
+        isPurchaseFact(whole, offset, match) ? match : this.token("name", name.toLowerCase()));
     }
     out = out.replace(INTERNATIONAL_PHONE, match => this.token("phone", normalizePhone(match)));
     out = out.replace(PAN_PATTERN, (match: string, offset: number, whole: string) => {

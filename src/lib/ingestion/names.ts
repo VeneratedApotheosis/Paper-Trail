@@ -33,5 +33,20 @@ export function customerNames(email: RawEmail): string[] {
 
 export function namePattern(name: string): RegExp {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "giu");
+  return new RegExp(`(?<![\\p{L}\\p{N}#/_-])${escaped}(?![\\p{L}\\p{N}#/_-])`, "giu");
+}
+
+const MONTH = /^(?:January|February|March|April|May|June|July|August|September|October|November|December)$/i;
+const REFERENCE_PREFIX = /\b(?:order|tracking|sku|item|ref|reference|invoice)(?:[ \t]+(?:number|no\.?|ref|id))?[ \t]*[:#]?[ \t]*$/i;
+
+/** Names can also be months or order-id fragments. Preserve explicit structured purchase facts. */
+export function isPurchaseFact(text: string, offset: number, value: string): boolean {
+  const start = text.lastIndexOf("\n", offset - 1) + 1;
+  const before = text.slice(Math.max(start, offset - 60), offset);
+  if (REFERENCE_PREFIX.test(before)) return true;
+  if (!MONTH.test(value)) return false;
+  const after = text.slice(offset + value.length, offset + value.length + 30);
+  return /^[ \t]+(?:[0-2]?\d|3[01])(?:st|nd|rd|th)?\b/i.test(after)
+    || /^[ \t]+(?:19|20)\d{2}\b/.test(after)
+    || /\b(?:[0-2]?\d|3[01])(?:st|nd|rd|th)?[ \t]+$/i.test(before);
 }

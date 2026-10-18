@@ -198,3 +198,22 @@ describe("international and name privacy", () => {
     expect(result.text).not.toMatch(/Élodie|Martin|Maya|Chen/);
   });
 });
+
+
+describe("names overlapping purchase facts", () => {
+  it.each(["May 4, 2026", "4 May 2026", "May 2026", "May 4th, 2026"])("preserves date %s while redacting the customer", date => {
+    const result = redact({ ...email(`Hi May,\nCustomer: May Rivera\nPurchased ${date}.\nOrder #MAY-1001\nSKU: MAY/2026`), to: "May Rivera <customer@mail.example>" });
+    expect(result.text).toContain(date);
+    expect(result.text).toContain("Order #MAY-1001");
+    expect(result.text).toContain("SKU: MAY/2026");
+    expect(result.text).not.toContain("Hi May");
+    expect(result.text).not.toContain("Customer: May Rivera");
+    expect(result.redactions.name).toBe(2);
+  });
+  it("preserves standalone labeled references without losing personal name occurrences", () => {
+    const result = redact(email("Order ref: SAM\nTracking: SAM\nHi Sam,\nCustomer: Sam Rivera"));
+    expect(result.text).toContain("Order ref: SAM");
+    expect(result.text).toContain("Tracking: SAM");
+    expect(result.redactions.name).toBe(2);
+  });
+});
