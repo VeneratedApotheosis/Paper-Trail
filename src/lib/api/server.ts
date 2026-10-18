@@ -1,8 +1,10 @@
 // Server-only module (Node runtime): reads request cookies via next/headers and the auth DB through getSession.
 // Import it only from server components / server actions, never from "use client" files or Edge middleware.
 // (The `server-only` package is not installed, so this is not enforced at build time.)
+import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth/session";
 import { getFindingsForOrder, getFinding, getOrder, getState, withStoreScope } from "@/lib/store";
+import { ANON_COOKIE, anonymousScope } from "@/lib/store/anonymous";
 import { CLAIM_NOT_FOUND_MESSAGE, openClaim, type OpenedClaim } from "./claims";
 import { isValidRouteId, safeDecode } from "./ids";
 import { buildLedgerResponse } from "./ledger";
@@ -15,15 +17,17 @@ export type { OpenedClaim };
  * JSON route (docs/api.md) from the same account store the route handlers use:
  * - signed-in session (`getSession()` from `cookies()`, connected or not) -> that account's store, never the
  *   anonymous one;
- * - no cookie, or a stale / invalid / expired cookie or deleted account (`getSession()` returns null) -> the
- *   anonymous demo/upload store.
+ * - no session, or a stale / invalid / expired cookie or deleted account (`getSession()` returns null) -> that
+ *   browser's anonymous demo/upload store (`papertrail_anon` cookie, #90), or the shared fallback without one.
  * Auth config or DB failures from getSession propagate (fail closed), as Chelsea's #49 contract requires.
  * Ids may be raw or still percent-encoded (Next 15 `params.id`); missing or invalid ids return null.
  */
 
 async function inRequestScope<T>(task: () => T): Promise<T> {
   const session = await getSession();
-  return session ? withStoreScope(session.userId, task) : task();
+  if (session) return withStoreScope(session.userId, task);
+  const anonymous = anonymousScope((await cookies()).get(ANON_COOKIE)?.value);
+  return anonymous ? withStoreScope(anonymous, task) : task();
 }
 
 function routeId(id: string): string | null {

@@ -59,7 +59,7 @@ Notes:
   "counts": { "orders": 45, "findings": 6, "reviewItems": 2 }, "excludedMerchants": [], "syncing": false, "redaction": "off" }
 ```
 
-- Anonymous (no cookie): `gmail: { connected: false, expired: false, mailbox: null }`, `accounts: []` plus the anonymous store's mode / counts.
+- Anonymous (no session cookie): `gmail: { connected: false, expired: false, mailbox: null }`, `accounts: []` plus the anonymous store's mode / counts.
 - `accounts` (#114) lists every Gmail account linked to the profile, the profile's first mailbox first, then linked ones in
   link order; `gmail` mirrors the first connected account (else the first one) so single-account UI keeps working.
 - `gmail.connected` = a locally valid refresh grant exists. `gmail.expired` = signed in but the grant is gone (expired,
@@ -80,6 +80,8 @@ Notes:
 ledger are kept** (the UI labels it "Gmail disconnected"). Writes an `approval` audit entry "Gmail disconnected"
 (no new audit type). Calling it again is harmless (`revokedToken: false`). Reconnecting through `/api/auth/google`
 reuses the same account and ledger.
+
+Anonymous scopes (#90): `src/middleware.ts` gives every browser a random httpOnly `papertrail_anon` cookie (v4 UUID, 30 days) on its first request, and anonymous requests run in that browser's own store (`anon:<id>`), so one visitor's demo or uploaded ledger is never visible to another. At most 500 anonymous stores stay in memory; the least recently used one is dropped together with its in-memory corrections and quality labels. Delete-all empties the visitor's store. Requests without the cookie (scripts, route tests) share one fallback store that browsers never use. Anonymous Review corrections stay in memory only.
 
 Token requirement (behaviour change): data routes (`/api/ledger`, orders, findings, claims, audit, review, merchants,
 demo, upload, account, delete-all) only need a valid identity, so an account with an expired or disconnected Gmail grant
@@ -292,7 +294,7 @@ middleware). Each helper returns the same body as its route, read from the same 
 
 Scope: the helpers read the session cookie through `cookies()` with `getSession()` (`src/lib/auth/session.ts`). A
 session (Gmail connected or not) reads that account's store, so a signed-in user never sees the anonymous demo. No
-cookie, or a stale / invalid / expired cookie or a deleted account, reads the anonymous demo/upload store. Auth config
+cookie, or a stale / invalid / expired cookie or a deleted account, reads the anonymous demo/upload store of that browser. Auth config
 or DB failures throw (fail closed). The JSON routes (`withAccountStore`) answer a stale cookie with 401 instead.
 
 **Client component** -> `@/hooks` (`src/hooks/**`), built on `@/lib/api/client`:

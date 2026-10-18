@@ -3,6 +3,7 @@ import { SESSION_COOKIE } from "@/lib/auth/config";
 import { seal } from "@/lib/auth/crypto";
 import { createAuthStore, type AuthStore } from "@/lib/auth/store";
 import { withStoreScope, resetStore, getState, appendAudit } from "@/lib/store";
+import { ANON_COOKIE } from "@/lib/store/anonymous";
 import { withAccountStore } from "./context";
 
 let db: AuthStore;
@@ -53,4 +54,22 @@ it.each(["invalid", "expired", "deleted"])("clears %s identity cookies without i
     expect(result.headers.get("cache-control")).toBe("no-store");
   }
   expect(handler).not.toHaveBeenCalled();
+});
+
+it("gives two anonymous browsers separate stores; only cookie-less clients share the fallback (#90)", async () => {
+  const anon = (id?: string) => new Request("http://localhost:3000/api/ledger", id ? { headers: { cookie: `${ANON_COOKIE}=${id}` } } : {});
+  const alice = "11111111-1111-4111-8111-111111111111";
+  const bob = "22222222-2222-4222-8222-222222222222";
+  const write = withAccountStore(async (request: Request) => {
+    appendAudit({ at: new Date().toISOString(), type: "sync_start", detail: new URL(request.url).searchParams.get("who") ?? "?" });
+    return Response.json({ ok: true });
+  });
+  const read = withAccountStore(async (request: Request) =>
+    Response.json({ path: new URL(request.url).pathname, audit: getState().audit.map((entry) => entry.detail) }));
+  await write(new Request("http://localhost:3000/api/upload?who=alice-upload", { headers: { cookie: `${ANON_COOKIE}=${alice}` } }));
+  expect((await (await read(anon(alice))).json()).audit).toEqual(["alice-upload"]);
+  expect((await (await read(anon(bob))).json()).audit).toEqual([]);
+  expect((await (await read(anon())).json()).audit).toEqual([]);
+  // A forged, non-UUID cookie never reaches another scope: it falls back to the shared cookie-less store.
+  expect((await (await read(anon("anonymous"))).json()).audit).toEqual([]);
 });

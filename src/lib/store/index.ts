@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import type { Finding, FindingStatus, NormalizedOrder } from "@/lib/contracts";
 import { createMemoryCache, type ExtractionCache } from "@/lib/ingestion";
 import { deleteScopeLabels } from "@/lib/quality/labels";
+import { isAnonymousScope } from "./anonymous";
 import { deleteScopeOverrides, listOverrides, recordOverride, removeFindingOverride, resetOverrideStores } from "@/lib/review/override-store";
 import { applyOverrides } from "@/lib/review/overrides";
 import { emptyQualityData, type QualityData } from "@/lib/quality/types";
@@ -89,13 +90,30 @@ const holder = globalThis as GlobalWithStore;
 const context = holder[CONTEXT_KEY] ??= new AsyncLocalStorage<string>();
 const scopes = holder[SCOPES_KEY] ??= new Map<string, StoreData>();
 
-/** Authenticated HTTP handlers run in an isolated account store. Anonymous demo stays separate. */
+/** Most per-visitor anonymous stores kept in memory (#90); past it the least recently used one is dropped. */
+export const MAX_ANONYMOUS_SCOPES = 500;
+
+/** Keeps anonymous scopes in least-recently-used order and evicts past MAX_ANONYMOUS_SCOPES (no unbounded growth). */
+function touchScope(scope: string, store: StoreData, created: boolean): void {
+  if (!isAnonymousScope(scope)) { scopes.set(scope, store); return; }
+  scopes.delete(scope);
+  scopes.set(scope, store);
+  if (!created) return;
+  const anonymous = [...scopes.keys()].filter(isAnonymousScope);
+  for (const old of anonymous.slice(0, Math.max(0, anonymous.length - MAX_ANONYMOUS_SCOPES))) {
+    scopes.delete(old);
+    deleteScopeLabels(old);
+    deleteScopeOverrides(old);
+  }
+}
+
+/** Authenticated HTTP handlers run in an isolated account store; each anonymous visitor (`anon:<id>`) in its own. */
 export function withStoreScope<T>(userId: string, task: () => T): T {
   return context.run(userId, task);
 }
 function replaceData(value: StoreData) {
   const scope = context.getStore();
-  if (scope) scopes.set(scope, value);
+  if (scope) touchScope(scope, value, !scopes.has(scope));
   else holder[STORE_KEY] = value;
 }
 
@@ -124,8 +142,9 @@ function emptyData(): StoreData {
 function data(): StoreData {
   const scope = context.getStore();
   if (scope) {
-    let store = scopes.get(scope);
-    if (!store) { store = emptyData(); scopes.set(scope, store); }
+    const existing = scopes.get(scope);
+    const store = existing ?? emptyData();
+    if (!existing || isAnonymousScope(scope)) touchScope(scope, store, !existing);
     return withCurrentFields(store);
   }
   return withCurrentFields((holder[STORE_KEY] ??= emptyData()));
@@ -303,7 +322,7 @@ export function getPromotionData(): PromotionData {
   return data().promotions;
 }
 
-/** Key of the current store scope: the signed-in profile id, or "anonymous" for the demo. Keys the local label store. */
+/** Key of the current store scope: the signed-in profile id, `anon:<id>` per anonymous browser, or "anonymous" without a cookie. Keys the local label store. */
 export function currentStoreScope(): string {
   return context.getStore() ?? "anonymous";
 }

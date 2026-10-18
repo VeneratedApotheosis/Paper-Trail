@@ -1,5 +1,7 @@
 import { clearAuthCookies, resolveSessionUser, sessionCookie } from "@/lib/auth/session";
+import { NextRequest } from "next/server";
 import { withStoreScope } from "@/lib/store";
+import { ANON_COOKIE, anonymousScope } from "@/lib/store/anonymous";
 
 /**
  * Keep anonymous synthetic/upload state distinct from authenticated account data. The default needs only a valid
@@ -17,7 +19,11 @@ export function withAccountStore<A extends unknown[]>(handler: (...args: A) => P
     const request = args[0];
     if (!(request instanceof Request)) return respond();
     const cookie = sessionCookie(request);
-    if (cookie === undefined) return respond();
+    if (cookie === undefined) {
+      // Each anonymous browser has its own store (#90); only cookie-less clients (scripts, route tests) share one.
+      const anonymous = anonymousScope(new NextRequest(request.url, { headers: request.headers }).cookies.get(ANON_COOKIE)?.value);
+      return anonymous ? withStoreScope(anonymous, respond) : respond();
+    }
     let userId: string | null;
     try {
       userId = resolveSessionUser(request, { requireToken: false });

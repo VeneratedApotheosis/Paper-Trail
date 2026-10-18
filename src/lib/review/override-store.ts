@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { existsSync } from "node:fs";
 import { ReviewEditSchema, type ReviewEdit } from "./schema";
+import { isAnonymousScope } from "@/lib/store/anonymous";
 
 /**
  * Durable Review corrections (#124). One SQLite table in the same database file as the Gmail accounts and quality
@@ -118,7 +119,7 @@ function fileStore(create: boolean): OverrideStore | undefined {
 }
 
 function storeFor(scope: string, create: boolean): OverrideStore | undefined {
-  if (scope === ANONYMOUS_SCOPE) return create ? (memoryHolder[MEMORY_KEY] ??= createOverrideStore(":memory:")) : memoryHolder[MEMORY_KEY];
+  if (isAnonymousScope(scope)) return create ? (memoryHolder[MEMORY_KEY] ??= createOverrideStore(":memory:")) : memoryHolder[MEMORY_KEY];
   return fileStore(create);
 }
 
