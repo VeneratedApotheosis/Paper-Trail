@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeGmailMessage } from "./decode";
+import { decodeGmailMessage, decodeGmailMessageDetailed } from "./decode";
 
 const data = (value: string) => Buffer.from(value).toString("base64url");
 export function gmailMessage(id = "m1", text = "Thanks for your order. Order total: $40.00") {
@@ -29,7 +29,16 @@ describe("Gmail MIME decoder", () => {
     expect(decodeGmailMessage({ ...base, payload: { ...base.payload, headers: [...base.payload.headers, { name: "Content-Type", value: "text/plain; charset=iso-8859-1" }],
       body: { data: Buffer.from([99, 97, 102, 233]).toString("base64url") } } }).text).toBe("café");
   });
-  it("falls back to HTML when a plain part is empty", () => {
+  it("reports the body source and prefers HTML over a thin 'view in browser' plain part", () => {
+    const base = gmailMessage();
+    const html = "<table><tr><td>Mug</td><td>$8.00</td></tr><tr><td>Order total</td><td>$8.00</td></tr></table>";
+    const multipart = (plain: string) => ({ ...base, payload: { ...base.payload, mimeType: "multipart/alternative", parts: [
+      { mimeType: "text/plain", body: { data: data(plain) } }, { mimeType: "text/html", body: { data: data(html) } }] } });
+    expect(decodeGmailMessageDetailed(multipart("View this email in your browser"))).toMatchObject({ bodySource: "html", email: { text: "Mug | $8.00\nOrder total | $8.00" } });
+    expect(decodeGmailMessageDetailed(multipart(`${"Thanks for your order. ".repeat(12)}Order total: $8.00 and a Mug: $8.00`)).bodySource).toBe("plain");
+    expect(decodeGmailMessageDetailed(base).bodySource).toBe("plain");
+    expect(decodeGmailMessage(multipart("View this email in your browser")).text).toBe("Mug | $8.00\nOrder total | $8.00");
+  });  it("falls back to HTML when a plain part is empty", () => {
     const base = gmailMessage();
     expect(decodeGmailMessage({ ...base, payload: { ...base.payload, parts: [
       { mimeType: "text/plain", body: { data: data(" ") } },

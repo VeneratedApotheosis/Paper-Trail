@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { RawEmailSchema, type RawEmail } from "@/lib/contracts";
-import { htmlToText } from "@/lib/demo/eml";
+import { selectBodyText, type BodySource } from "@/lib/ingestion/mime";
 
 interface Part {
   mimeType?: string; filename?: string;
@@ -19,8 +19,19 @@ const messageSchema = z.object({ id: z.string().min(1), threadId: z.string().opt
 const MAX_BODY_BYTES = 1024 * 1024;
 export class GmailDecodeError extends Error { constructor() { super("unsupported_or_malformed_message"); } }
 
-/** Ignores attachments; prefers plain text over HTML, including nested MIME. */
+export interface DecodedGmailMessage {
+  email: RawEmail;
+  /** Which MIME part the email text came from (see selectBodyText). */
+  bodySource: BodySource;
+}
+
+/** Ignores attachments; walks nested MIME and picks the richer of text/plain and text/html (selectBodyText). */
 export function decodeGmailMessage(input: unknown): RawEmail {
+  return decodeGmailMessageDetailed(input).email;
+}
+
+/** Like decodeGmailMessage, but also reports which body part was used. */
+export function decodeGmailMessageDetailed(input: unknown): DecodedGmailMessage {
   const parsed = messageSchema.safeParse(input);
   if (!parsed.success) throw new GmailDecodeError();
   const message = parsed.data;
@@ -45,8 +56,8 @@ export function decodeGmailMessage(input: unknown): RawEmail {
     if (decoded.trim()) (mime === "text/plain" ? plain : html).push(decoded);
   }
   visit(message.payload, 0);
-  const text = (plain.length ? plain.join("\n") : htmlToText(html.join("\n"))).trim();
-  if (!text) throw new GmailDecodeError();
+  const { text, bodySource } = selectBodyText({ plain: plain.join("\n"), html: html.join("\n") });
+  if (!text || !bodySource) throw new GmailDecodeError();
   const internal = Number(message.internalDate);
   const received = message.internalDate && Number.isFinite(internal) ? new Date(internal) : new Date(headers.get("date") ?? "");
   if (!Number.isFinite(received.getTime())) throw new GmailDecodeError();
@@ -54,5 +65,5 @@ export function decodeGmailMessage(input: unknown): RawEmail {
     from: headers.get("from"), to: headers.get("to"), subject: headers.get("subject") ?? "",
     date: received.toISOString(), text, labels: message.labelIds });
   if (!result.success) throw new GmailDecodeError();
-  return result.data;
+  return { email: result.data, bodySource };
 }

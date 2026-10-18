@@ -1,10 +1,13 @@
 import { createHash } from "node:crypto";
 import { RawEmailSchema, type RawEmail } from "@/lib/contracts";
+import { htmlToText, selectBodyText, type BodySource } from "@/lib/ingestion/mime";
+
+export { htmlToText };
 
 /**
  * Minimal, dependency-free .eml / .mbox parser for demo uploads (issue #4, F1.2).
- * Supports folded headers, RFC 2047 encoded words, multipart (alternative prefers text/plain, nested parts),
- * quoted-printable and base64 bodies, common charsets, and an HTML-to-text fallback.
+ * Supports folded headers, RFC 2047 encoded words, multipart (nested parts), quoted-printable and base64 bodies, common
+ * charsets, and picks the richer of text/plain and text/html (shared with Gmail decoding, see ingestion/mime.ts).
  */
 
 export class EmailParseError extends Error {
@@ -110,28 +113,6 @@ function decodeEncodedWords(value: string): string {
     );
 }
 
-const HTML_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
-
-/** Basic HTML to plain text: drops script/style, maps block tags to newlines, strips tags, decodes entities. */
-export function htmlToText(html: string): string {
-  return html
-    .replace(/<(script|style|head)[\s\S]*?<\/\1>/gi, "")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|tr|li|h[1-6]|table|section)>/gi, "\n")
-    .replace(/<\/t[dh]>/gi, " ")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, entity: string) => {
-      if (entity.startsWith("#x") || entity.startsWith("#X")) return String.fromCodePoint(parseInt(entity.slice(2), 16));
-      if (entity.startsWith("#")) return String.fromCodePoint(parseInt(entity.slice(1), 10));
-      return HTML_ENTITIES[entity.toLowerCase()] ?? match;
-    })
-    .split("\n")
-    .map((line) => line.replace(/[ \t\u00a0]+/g, " ").trim())
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
 function splitMultipart(body: string, boundary: string): string[] {
   const delimiter = `--${boundary}`;
   const parts: string[] = [];
@@ -182,18 +163,24 @@ function toIsoDate(value: string | undefined): string {
 
 /** Parses one RFC 822 message. Throws EmailParseError when From or Date is missing. */
 export function parseEml(source: string): RawEmail {
+  return parseEmlDetailed(source).email;
+}
+
+/** Like parseEml, but also reports which body part was used (`null` when the message has no body text). */
+export function parseEmlDetailed(source: string): { email: RawEmail; bodySource: BodySource | null } {
   const message = splitHeaderBlock(source.replace(/^\uFEFF/, ""));
   const from = decodeEncodedWords(message.headers.get("from") ?? "");
   if (!from) throw new EmailParseError("missing From header");
   const date = toIsoDate(message.headers.get("date"));
   const bodies = extractBodies(message);
-  const text = (bodies.text ?? (bodies.html !== null ? htmlToText(bodies.html) : "")).replace(/\r\n/g, "\n").trim();
+  const { text: selectedText, bodySource } = selectBodyText({ plain: bodies.text ?? "", html: bodies.html ?? "" });
+  const text = selectedText.replace(/\r\n/g, "\n").trim();
   const messageId = message.headers.get("message-id");
   const id = messageId
     ? stripAngles(messageId)
     : `eml-${createHash("sha256").update(source, "utf8").digest("hex").slice(0, 16)}`;
   const to = message.headers.get("to");
-  return RawEmailSchema.parse({
+  const email = RawEmailSchema.parse({
     id,
     from,
     ...(to ? { to: decodeEncodedWords(to) } : {}),
@@ -201,6 +188,7 @@ export function parseEml(source: string): RawEmail {
     date,
     text,
   });
+  return { email, bodySource };
 }
 
 export interface MboxParseResult {

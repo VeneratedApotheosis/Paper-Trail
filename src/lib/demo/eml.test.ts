@@ -103,8 +103,8 @@ describe("parseEml", () => {
 });
 
 describe("htmlToText", () => {
-  it("decodes numeric entities and collapses whitespace", () => {
-    expect(htmlToText("<div>A&#36;1  &#x41;</div>\n\n\n<div>B</div>")).toBe("A$1 A\n\nB");
+  it("decodes numeric entities and collapses whitespace (table-aware conversion lives in ingestion/mime.ts)", () => {
+    expect(htmlToText("<div>A&#36;1  &#x41;</div>\n\n\n<div>B</div>")).toBe("A$1 A\nB");
   });
 });
 
