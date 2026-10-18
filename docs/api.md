@@ -211,7 +211,13 @@ or DB failures throw (fail closed). The JSON routes (`withAccountStore`) answer 
   `connected: false` is normal in demo mode).
 - Mutations return `{ run, pending, error }`; `run(...)` resolves to the response or `null` on failure:
   `useLoadDemo()`, `useSetFindingStatus()`, `useSaveClaim()`, `useApproveClaim()`, or `useAction(anyClientFn)`.
-  Call `refetch()` on the affected reads after a successful `run`.
+  A successful `run` invalidates the shared read cache and waits for the refetch, so no `refetch()` call is needed.
+- Reads come from a shared client cache (`src/hooks/cache.ts`, issue #108): repeat visits render cached data at once
+  (`loading` is true only while nothing is cached) and refresh in the background when it is older than 5 s; requests for
+  the same endpoint are deduplicated (page and app shell share one). After a mutation that does not go through
+  `useAction` (Gmail sync, review confirm), call `invalidate(keys?)` from `@/hooks`: keys are `ledger`, `session`,
+  `audit`, `order`, `finding`, `claim` (a kind matches every `kind:id`); no argument invalidates everything.
+  Mounted reads refetch immediately and keep their data on screen; unmounted ones are dropped.
 
 Ids: pass `params.id` as is. Next 15 hands it over still percent-encoded and real ids contain `:`; the helpers and
 the client decode once with `safeDecode` (exported from `@/lib/api/client`) before encoding, so ids are never

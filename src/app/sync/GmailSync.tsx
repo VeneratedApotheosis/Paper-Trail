@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SyncView, type SyncErrorInfo, type SyncResultInfo } from "@/components/views/SyncView";
-import { useAsync } from "@/hooks";
+import { invalidate, useAsync } from "@/hooks";
 import { getGmailPreview, getGmailSyncStatus, syncGmail, type GmailSyncStatus } from "./gmailApi";
 import { gmailErrorCopy, gmailProgress, gmailSyncOutcome } from "./syncOutcome";
 
@@ -51,6 +51,8 @@ export function GmailSync() {
     setScreen({ name: "syncing" });
     try {
       const result = await syncGmail();
+      // A sync (even a failed or partial one) can change the ledger, audit log and mode: refresh every cached read.
+      await invalidate();
       if (!result.ok) {
         setScreen({ name: "failed", error: gmailErrorCopy(result.failure, "sync") });
         return;

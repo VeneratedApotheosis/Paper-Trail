@@ -64,7 +64,8 @@ export default function TrustPage() {
     if (merchantToggle.pending || deletion.pending) return;
     if (shouldExclude) setExcludedNames((prev) => ({ ...prev, [merchantKey(name)]: name }));
     setActionErrorDismissed(false);
-    if (await merchantToggle.run(name, shouldExclude)) ledger.refetch();
+    // useAction refreshes the shared cache (ledger and audit) after a successful toggle.
+    await merchantToggle.run(name, shouldExclude);
   }
 
   async function handleDeleteAll() {
@@ -72,8 +73,7 @@ export default function TrustPage() {
     setActionErrorDismissed(false);
     if (!(await deletion.run())) return;
     setExcludedNames({});
-    // Only the delete record remains: the refetched audit log is the real receipt.
-    refetchAll();
+    // Only the delete record remains: useAction already refetched the audit log, which is the real receipt.
   }
 
   const showsDemo = ledger.data?.mode === "demo";
@@ -96,9 +96,9 @@ export default function TrustPage() {
     );
   }
 
-  // The audit log is refetched only on mount and after a deletion, so its loading state also covers the
-  // post-delete refresh (and remounts DeleteAllPanel out of its confirm step). Merchant toggles keep the view.
-  if (!ledger.data || !audit.data || audit.loading || deletion.pending) {
+  // `deletion.pending` (which also covers the post-delete cache refresh) swaps in the skeleton, which remounts
+  // DeleteAllPanel out of its confirm step. Merchant toggles keep the view.
+  if (!ledger.data || !audit.data || deletion.pending) {
     return (
       <AppShell demo={showsDemo}>
         <LedgerSkeleton />

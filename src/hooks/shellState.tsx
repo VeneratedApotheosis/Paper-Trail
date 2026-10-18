@@ -2,13 +2,15 @@
 
 // App shell state for every page (issue #75): which data the app is showing (store mode), the honest labels, and a
 // neutral account line. Loaded once in layout.tsx; <AppShell> reads it, so views that render <AppShell> stay
-// props-only and unchanged. Each <AppShell> mount calls `refresh`, so the shell follows demo loads, uploads, syncs
-// and deletes as pages switch between their loading and loaded states.
+// props-only and unchanged. The ledger and session come from the shared read cache (cache.ts, issue #108): mounting
+// <AppShell> costs no request, and every mutation (useAction, `invalidate()`) refetches them, so the banner and
+// account follow demo loads, uploads, syncs and deletes immediately.
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { AppShellAccount, AppShellMode } from "@/components/views/AppShellView";
 import { resetDemo } from "@/lib/api/client";
 import type { LedgerResponse, SessionStatus } from "@/lib/api/types";
+import { invalidate } from "./cache";
 import { useLedger, useSession } from "./data";
 
 export interface ShellState {
@@ -21,7 +23,7 @@ export interface ShellState {
 export interface ShellStateValue extends ShellState {
   /** Clears the demo ledger, then routes to /connect. */
   onLeaveDemo: () => void;
-  /** Refetches mode, labels and Gmail status. */
+  /** Refetches mode, labels and Gmail status (ledger and session cache keys). */
   refresh: () => void;
 }
 
@@ -76,18 +78,15 @@ export function ShellStateProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const ledger = useLedger();
   const session = useSession();
-  const refetchLedger = ledger.refetch;
-  const refetchSession = session.refetch;
 
   const refresh = useCallback(() => {
-    refetchLedger();
-    refetchSession();
-  }, [refetchLedger, refetchSession]);
+    void invalidate(["ledger", "session"]);
+  }, []);
 
   const onLeaveDemo = useCallback(() => {
     resetDemo()
-      .then(() => {
-        refresh();
+      .then(async () => {
+        await invalidate();
         router.push("/connect");
       })
       // The banner stays up; the refetched mode shows whether demo data is still loaded.

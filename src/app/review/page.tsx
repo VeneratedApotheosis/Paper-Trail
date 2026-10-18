@@ -6,7 +6,7 @@ import type { OrderFieldEdit } from "@/components/ReviewCard";
 import { EmptyState, ErrorState, OrderDetailSkeleton } from "@/components/states";
 import { Button } from "@/components/ui/Button";
 import { ReviewView } from "@/components/views/ReviewView";
-import { useLedger } from "@/hooks";
+import { invalidate, useLedger } from "@/hooks";
 import type { NormalizedOrder } from "@/lib/contracts";
 import { formatMoney } from "@/lib/format";
 import { countsTowardOwed, orderNeedsReview } from "@/lib/rules/owed";
@@ -123,6 +123,8 @@ export default function ReviewPage() {
         setNotice({ kind: "invalid_edit", message: outcome.message });
         return;
       }
+      // Saved edits and confirmations change the ledger, audit log and owed total: refresh every cached read.
+      await invalidate();
       if (outcome.status === "confirmed" || outcome.status === "stale") {
         setPendingEdits((prev) => {
           const next = { ...prev };
@@ -147,7 +149,6 @@ export default function ReviewPage() {
       } else {
         setNotice({ kind: "failed", merchant, message: outcome.message, savedEdits: outcome.savedEdits });
       }
-      ledger.refetch();
     } finally {
       inFlight.current = false;
     }

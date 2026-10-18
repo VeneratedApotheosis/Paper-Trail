@@ -32,6 +32,8 @@ export interface AppShellViewProps {
   // Shown next to the demo label when extractions came from seed labels, not an LLM.
   precomputedExtractionLabel?: string;
   onLeaveDemo?: () => void;
+  // Called with the nav item's href when the user is about to open it (hover, focus, touch), so the wrapper can warm data.
+  onNavIntent?: (href: string) => void;
 }
 
 const defaultNav: AppShellNavItem[] = [
@@ -56,6 +58,7 @@ export function AppShellView({
   demoLabel = DEFAULT_DEMO_LABEL,
   precomputedExtractionLabel,
   onLeaveDemo,
+  onNavIntent,
 }: AppShellViewProps) {
   const showDemoBanner = mode === "demo";
 
@@ -74,6 +77,9 @@ export function AppShellView({
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
+                onMouseEnter={() => onNavIntent?.(item.href)}
+                onFocus={() => onNavIntent?.(item.href)}
+                onTouchStart={() => onNavIntent?.(item.href)}
                 className={`rounded-sm px-4 py-3 text-sm transition-shadow ${
                   active ? "neu-inset font-bold text-teal-deep" : "font-medium text-ink-muted hover:text-ink"
                 }`}
@@ -129,6 +135,9 @@ export function AppShellView({
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
+                onMouseEnter={() => onNavIntent?.(item.href)}
+                onFocus={() => onNavIntent?.(item.href)}
+                onTouchStart={() => onNavIntent?.(item.href)}
                 className={`rounded-sm px-4 py-2 text-xs font-bold transition-shadow ${
                   active ? "neu-inset text-teal-deep" : "text-ink-muted"
                 }`}

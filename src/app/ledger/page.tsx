@@ -15,8 +15,9 @@ export default function LedgerPage() {
   const ledger = useLedger();
   const demo = useLoadDemo();
 
+  // useLoadDemo refreshes the shared cache itself, so there is nothing to refetch here.
   async function loadDemoAndRefetch() {
-    if (await demo.run()) ledger.refetch();
+    await demo.run();
   }
 
   const showsDemo = ledger.data?.mode === "demo";
