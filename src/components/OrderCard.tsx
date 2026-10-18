@@ -25,14 +25,12 @@ export function OrderCard({
     <button
       type="button"
       onClick={onOpen}
-      className="neu-raised flex w-full items-center gap-4 rounded-lg px-5 py-4 text-left transition-shadow hover:shadow-soft-lg"
+      className="neu-raised grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 rounded-lg p-5 text-left transition-shadow hover:shadow-soft-lg md:grid-cols-[minmax(0,1fr)_auto_7rem] md:items-center md:py-4"
     >
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-serif text-lg text-ink">{merchantName(order)}</span>
+      <span className="min-w-0">
+        <span className="block font-serif text-lg text-ink md:truncate">{merchantName(order)}</span>
         <span className="mt-0.5 block text-sm text-ink-faint">
-          {order.merchant.domain ? (
-            <span className="truncate">{order.merchant.domain}</span>
-          ) : null}
+          {order.merchant.domain ? <span className="block truncate">{order.merchant.domain}</span> : null}
           <span className="block tabular-nums">{formatShortDate(order.placedAt)}</span>
         </span>
         {sources && sources.length > 0 ? (
@@ -41,13 +39,12 @@ export function OrderCard({
           </span>
         ) : null}
       </span>
-      <span className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+      <span className="text-right font-serif text-lg tabular-nums text-money md:order-3">
+        {formatMoney(order.total, order.currency)}
+      </span>
+      <span className="col-span-2 flex flex-wrap items-center gap-2 md:order-2 md:col-span-1 md:justify-end">
         <StatusChip status={deriveOrderStatus(order)} />
         {needsReview ? <Chip tone="review">Needs a quick check</Chip> : null}
       </span>
-      <span className="w-28 shrink-0 text-right font-serif text-lg tabular-nums text-money">
-        {formatMoney(order.total, order.currency)}
-      </span>
-    </button>
-  );
+    </button>  );
 }
