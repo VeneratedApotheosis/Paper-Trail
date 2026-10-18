@@ -2,6 +2,7 @@ import { withAccountStore } from "@/lib/gmail/context";
 import { buildPipelineRunResponse } from "@/lib/api/ledger";
 import { jsonError } from "@/lib/api/http";
 import type { PipelineRunResponse, ResetDemoResponse } from "@/lib/api/types";
+import { DEMO_COOKIE } from "@/middleware";
 import { loadSeedDemo } from "@/lib/demo";
 import { createSyncCollector } from "@/lib/quality/collector";
 import { classOverridesFor } from "@/lib/quality/labels";
@@ -51,6 +52,18 @@ async function handleDELETE(_request: Request): Promise<Response> {
   return Response.json(body);
 }
 
-export const POST = withAccountStore(handlePOST);
+/** Mirrors the demo state into a cookie so middleware can route demo visitors into the app (and out on reset). */
+function withDemoCookie(handler: (request: Request) => Promise<Response>, loaded: boolean) {
+  return async (request: Request): Promise<Response> => {
+    const response = await handler(request);
+    if (!response.ok) return response;
+    const out = new Response(response.body, response);
+    const value = loaded ? `${DEMO_COOKIE}=1; Path=/; Max-Age=${7 * 24 * 60 * 60}; SameSite=Lax` : `${DEMO_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
+    out.headers.append("Set-Cookie", value);
+    return out;
+  };
+}
 
-export const DELETE = withAccountStore(handleDELETE);
+export const POST = withAccountStore(withDemoCookie(handlePOST, true));
+
+export const DELETE = withAccountStore(withDemoCookie(handleDELETE, false));

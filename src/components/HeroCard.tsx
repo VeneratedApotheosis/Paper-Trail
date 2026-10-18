@@ -29,7 +29,7 @@ export function HeroCard({
   children?: ReactNode;
 }) {
   const reducedMotion = useReducedMotion();
-  const [displayed, setDisplayed] = useState(reducedMotion ? total : 0);
+  const [displayed, setDisplayed] = useState(total); // server and first client render both show the final value (no hydration mismatch); the count-up starts in the effect
 
   useEffect(() => {
     if (reducedMotion) {

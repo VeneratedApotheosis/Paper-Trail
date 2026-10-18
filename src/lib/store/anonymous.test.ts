@@ -23,19 +23,19 @@ describe("anonymousScope", () => {
 
 describe("middleware", () => {
   it("sets a random httpOnly anonymous cookie on the response and the forwarded request", () => {
-    const response = middleware(new NextRequest("http://localhost:3000/"));
+    const response = middleware(new NextRequest("http://localhost:3000/api/ledger"));
     const cookie = response.cookies.get(ANON_COOKIE);
     expect(anonymousScope(cookie?.value)).not.toBeNull();
     expect(cookie).toMatchObject({ httpOnly: true, sameSite: "lax", path: "/" });
     expect(response.headers.get("x-middleware-request-cookie") ?? response.headers.get("x-middleware-override-headers")).toBeTruthy();
-    const other = middleware(new NextRequest("http://localhost:3000/")).cookies.get(ANON_COOKIE)?.value;
+    const other = middleware(new NextRequest("http://localhost:3000/api/ledger")).cookies.get(ANON_COOKIE)?.value;
     expect(other).not.toBe(cookie?.value);
   });
 
   it("keeps a valid cookie and replaces a forged one", () => {
-    const kept = middleware(new NextRequest("http://localhost:3000/ledger", { headers: { cookie: `${ANON_COOKIE}=${ID}` } }));
+    const kept = middleware(new NextRequest("http://localhost:3000/api/ledger", { headers: { cookie: `${ANON_COOKIE}=${ID}` } }));
     expect(kept.cookies.get(ANON_COOKIE)).toBeUndefined();
-    const forged = middleware(new NextRequest("http://localhost:3000/", { headers: { cookie: `${ANON_COOKIE}=anonymous` } }));
+    const forged = middleware(new NextRequest("http://localhost:3000/api/ledger", { headers: { cookie: `${ANON_COOKIE}=anonymous` } }));
     expect(anonymousScope(forged.cookies.get(ANON_COOKIE)?.value)).not.toBeNull();
   });
 });
@@ -56,5 +56,20 @@ describe("anonymous store scopes", () => {
     withStoreScope(filler(MAX_ANONYMOUS_SCOPES), () => getState());
     withStoreScope(first, () => expect(details()).toEqual(["first visitor"]));
     withStoreScope(filler(0), () => expect(details()).toEqual([]));
+  });
+});
+
+describe("middleware routing", () => {
+  const at = (path: string, cookie?: string) => middleware(new NextRequest(`http://localhost:3000${path}`, cookie ? { headers: { cookie } } : undefined));
+  it("sends signed-out visitors to /welcome and leaves /welcome and APIs alone", () => {
+    expect(at("/").headers.get("location")).toBe("http://localhost:3000/welcome");
+    expect(at("/ledger").headers.get("location")).toBe("http://localhost:3000/welcome");
+    expect(at("/welcome").headers.get("location")).toBeNull();
+    expect(at("/api/ledger").headers.get("location")).toBeNull();
+  });
+  it("sends demo or Gmail-session visitors from /welcome to the dashboard", () => {
+    expect(at("/welcome", "papertrail_demo=1").headers.get("location")).toBe("http://localhost:3000/");
+    expect(at("/welcome", "papertrail_session=x").headers.get("location")).toBe("http://localhost:3000/");
+    expect(at("/ledger", "papertrail_demo=1").headers.get("location")).toBeNull();
   });
 });
