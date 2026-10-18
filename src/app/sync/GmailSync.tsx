@@ -89,6 +89,7 @@ export function GmailSync() {
       onStart={() => void startSync()}
       onRetry={backToPreview}
       onOpenLedger={() => router.push("/")}
+      onOpenReview={() => router.push("/review")}
       onReconnect={() => router.push("/connect")}
     />
   );

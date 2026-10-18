@@ -12,11 +12,18 @@ describe("promotionsViewProps", () => {
     const onShowExpiredChange = vi.fn();
     const onCopyCode = vi.fn();
     const accounts = [{ id: "a1", mailbox: "sam@example.test", connected: true }];
-    const props = promotionsViewProps({ data, accounts, showExpired: true, onShowExpiredChange, onCopyCode });
+    const onSyncInbox = vi.fn();
+    const props = promotionsViewProps({ data, accounts, showExpired: true, onShowExpiredChange, onCopyCode, onSyncInbox });
     expect(props).toEqual({
       promotions: data.promotions, asOf: data.asOf, accounts, showExpired: true, onShowExpiredChange,
-      expiredHidden: 1, enriching: true, onCopyCode,
+      expiredHidden: 1, enriching: true, loading: false, onCopyCode, onSyncInbox,
     });
+  });
+
+  it("shows the view's loading placeholders with no offers while the first load runs", () => {
+    const props = promotionsViewProps({ data: null, accounts: undefined, showExpired: false, onShowExpiredChange: vi.fn(), onCopyCode: vi.fn() });
+    expect(props).toMatchObject({ promotions: [], expiredHidden: 0, enriching: false, loading: true, onSyncInbox: undefined });
+    expect(Number.isNaN(new Date(props.asOf).getTime())).toBe(false);
   });
 });
 

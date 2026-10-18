@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Finding, NormalizedOrder } from "@/lib/contracts";
+import { encodeIdSegment } from "@/lib/api/ids";
 import { OrderDetailView } from "@/components/views/OrderDetailView";
 import { useAccount, useMarkEmailNotAboutOrder, useMarkNotPurchase, useRestoreOrder } from "@/hooks";
 
@@ -60,6 +61,7 @@ export function OrderDetailWrapper({
       simulatedLabel={simulatedLabel}
       accounts={account.data?.accounts}
       onBack={() => router.push("/ledger")}
+      onOpenClaim={(findingId) => router.push(`/claim/${encodeIdSegment(findingId)}`)}
       onMarkNotPurchase={handleMarkNotPurchase}
       onMarkEmailNotAboutOrder={handleMarkEmail}
       onRestore={handleRestore}

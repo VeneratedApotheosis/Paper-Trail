@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import type { OrderFieldEdit } from "@/components/ReviewCard";
 import { EmptyState, ErrorState, OrderDetailSkeleton } from "@/components/states";
@@ -16,7 +17,8 @@ import { applyEdits, bufferEdit, itemsWithoutOrder, saveEditsThenConfirm } from 
 // Thin wrapper for "/review" (issue #65): the queue is GET /api/ledger's orders that need review (the same filter as
 // GET /api/review) plus its reviewQueue. Field edits are buffered here and saved only on Confirm (see reviewFlow.ts),
 // through POST /api/review/:id/edit and /confirm (#47). Queue items without an order can't be shown as a card, so
-// they are counted in a notice instead of dropped (hard rule 5).
+// they are counted in a notice instead of dropped (hard rule 5). Orders confirmed or marked "not a purchase" on this
+// visit drive the "N of M checked" count (an undo takes the order back out).
 
 type Notice =
   | { kind: "confirmed"; merchant: string; owedFindings: number; owedTotal: string }
@@ -87,8 +89,17 @@ function NoticeState({ notice, onUndo, undoDisabled }: { notice: Notice; onUndo:
   }
 }
 
+function withId(ids: ReadonlySet<string>, id: string, present: boolean): Set<string> {
+  const next = new Set(ids);
+  if (present) next.add(id);
+  else next.delete(id);
+  return next;
+}
+
 export default function ReviewPage() {
+  const router = useRouter();
   const ledger = useLedger();
+  const [checkedIds, setCheckedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [pendingEdits, setPendingEdits] = useState<Record<string, OrderFieldEdit[]>>({});
   const [notice, setNotice] = useState<Notice | null>(null);
   const inFlight = useRef(false);
@@ -150,6 +161,7 @@ export default function ReviewPage() {
         delete next[orderId];
         return next;
       });
+      setCheckedIds((prev) => withId(prev, orderId, true));
       setNotice({ kind: "not_purchase", orderId, merchant: response.merchant, owedTotal: formatMoney(response.summary.owedTotal, response.summary.currency) });
     } finally {
       inFlight.current = false;
@@ -163,7 +175,10 @@ export default function ReviewPage() {
     setLastAction("restore");
     try {
       const response = await restoreOrder.run(orderId);
-      if (response) setNotice({ kind: "restored", merchant: response.merchant });
+      if (response) {
+        setCheckedIds((prev) => withId(prev, orderId, false));
+        setNotice({ kind: "restored", merchant: response.merchant });
+      }
     } finally {
       inFlight.current = false;
     }
@@ -198,6 +213,7 @@ export default function ReviewPage() {
       }
       if (outcome.status === "confirmed") {
         const { order, findings, summary } = outcome.response;
+        setCheckedIds((prev) => withId(prev, orderId, true));
         setNotice({
           kind: "confirmed",
           merchant: order.merchant.name,
@@ -224,6 +240,8 @@ export default function ReviewPage() {
         pendingOrderId={pendingOrderId}
         saveStates={Object.fromEntries(Object.entries(pendingEdits).filter(([, edits]) => edits.length).map(([id]) => [id, "unsaved" as const]))}
         onNotPurchase={handleNotPurchase}
+        checkedCount={checkedIds.size}
+        onOpenOwed={() => router.push("/")}
         notice={shownNotice ? <NoticeState notice={shownNotice} onUndo={handleUndoNotPurchase} undoDisabled={restoreOrder.pending} /> : null} unreadableItems={unreadable} />
     </AppShell>
   );

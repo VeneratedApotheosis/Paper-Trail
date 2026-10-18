@@ -84,6 +84,7 @@ export function AnonymousSync() {
       onTryDemo={() => void tryDemo()}
       onRetry={retry}
       onOpenLedger={() => router.push("/")}
+      onOpenReview={() => router.push("/review")}
     />
   );
 }

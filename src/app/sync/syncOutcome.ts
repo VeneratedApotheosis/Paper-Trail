@@ -95,8 +95,20 @@ export const tokenExpiredCopy: SyncErrorInfo = {
   fix: "Reconnect Gmail so PaperTrail can read new receipts again.",
 };
 
+/** The raw HTTP status, error code and server message for "Technical details"; undefined when there is none. */
+export function gmailTechnicalDetail(failure: GmailFailure): string | undefined {
+  const parts = [failure.status > 0 ? `HTTP ${failure.status}` : null, failure.code, failure.error].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
 /** A failed Gmail call (preview or sync). The sync route publishes nothing on failure, so the prior ledger is kept. */
 export function gmailErrorCopy(failure: GmailFailure, during: "preview" | "sync"): SyncErrorInfo {
+  const copy = gmailErrorMessage(failure, during);
+  const detail = gmailTechnicalDetail(failure);
+  return detail ? { ...copy, detail } : copy;
+}
+
+function gmailErrorMessage(failure: GmailFailure, during: "preview" | "sync"): SyncErrorInfo {
   const kept = during === "sync" ? " Your previous ledger is unchanged." : "";
   if (failure.status === 401 || failure.code === "token_expired") {
     return {

@@ -3,6 +3,7 @@ import type { PipelineStats } from "@/lib/pipeline/run";
 import type { GmailSyncResponse } from "@/lib/api/types";
 import {
   gmailErrorCopy,
+  gmailTechnicalDetail,
   gmailProgress,
   gmailSyncOutcome,
   importErrorCopy,
@@ -175,5 +176,23 @@ describe("gmailErrorCopy", () => {
     );
     const generic = gmailErrorCopy({ status: 503, code: "sync_unavailable", error: "Gmail sync is unavailable." }, "preview");
     expect(generic).toMatchObject({ kind: "failed", title: "Couldn't load the Gmail preview", what: "Gmail sync is unavailable." });
+  });
+});
+
+describe("gmailTechnicalDetail", () => {
+  it("joins the status, code and server message for Technical details", () => {
+    expect(gmailTechnicalDetail({ status: 504, code: "sync_timeout", error: "Gmail sync did not complete." })).toBe(
+      "HTTP 504 · sync_timeout · Gmail sync did not complete.",
+    );
+    expect(gmailTechnicalDetail({ status: 429, code: null, error: null })).toBe("HTTP 429");
+  });
+
+  it("is absent when the request never reached the server", () => {
+    expect(gmailTechnicalDetail({ status: 0, code: null, error: null })).toBeUndefined();
+    expect(gmailErrorCopy({ status: 0, code: null, error: null }, "sync")).not.toHaveProperty("detail");
+  });
+
+  it("is attached to the error copy", () => {
+    expect(gmailErrorCopy({ status: 403, code: "gmail_access_denied", error: null }, "sync").detail).toBe("HTTP 403 · gmail_access_denied");
   });
 });
