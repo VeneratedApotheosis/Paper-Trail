@@ -163,7 +163,7 @@ export function getFindingsForOrder(orderId: string): Finding[] {
 }
 
 /**
- * Replaces the ledger with a pipeline run. Drafts belong to the previous findings and are cleared.
+ * Replaces the ledger with a pipeline run. Drafts survive by finding id; changed facts add a warning.
  * Finding statuses carry over by deterministic finding id (#77): a re-run keeps drafted / resolved / dismissed,
  * while findings the rules no longer produce (e.g. the refund arrived) disappear. Delete-all and clearLedger empty
  * the findings first, so nothing carries over across them.
@@ -171,6 +171,7 @@ export function getFindingsForOrder(orderId: string): Finding[] {
 export function setPipelineResult(mode: Exclude<StoreMode, "empty">, asOf: string, result: PipelineResult): void {
   const store = data();
   const previousStatus = new Map(store.findings.map((finding) => [finding.id, finding.status]));
+  const previousFindings = new Map(store.findings.map(finding => [finding.id, finding]));
   store.mode = mode;
   store.asOf = asOf;
   // New snapshots invalidate stale review forms, including after a repeat sync.
@@ -181,7 +182,17 @@ export function setPipelineResult(mode: Exclude<StoreMode, "empty">, asOf: strin
   });
   store.reviewQueue = result.reviewQueue;
   store.stats = result.stats;
-  store.drafts = [];
+  const currentFindings = new Map(store.findings.map(finding => [finding.id, finding]));
+  store.drafts = store.drafts.filter(draft => currentFindings.has(draft.findingId)).map(draft => {
+    const before = previousFindings.get(draft.findingId);
+    const after = currentFindings.get(draft.findingId)!;
+    const facts = (finding: Finding) => JSON.stringify([finding.currency, finding.amountAtStake, finding.explain]);
+    if (!before || facts(before) === facts(after)) return draft;
+    const warning = "Finding facts changed after this draft was saved; amounts or dates may be outdated. Review before sending.";
+    const warnings: string[] = "warnings" in draft && Array.isArray(draft.warnings)
+      ? draft.warnings.filter((value: unknown): value is string => typeof value === "string") : [];
+    return { ...draft, warnings: [...new Set([...warnings, warning])] };
+  });
 }
 
 /** Records when a Gmail sync was published (call right after `setPipelineResult("gmail", ...)`). */
