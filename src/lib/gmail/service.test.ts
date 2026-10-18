@@ -3,6 +3,9 @@ import { ExtractionSchema, type RedactedEmail } from "@/lib/contracts";
 import { syncGmail, previewGmail } from "./service";
 import { GmailError } from "./client";
 
+// These tests assert what redaction does to the pipeline input; the default switch is off (#125).
+vi.stubEnv("PAPERTRAIL_REDACT", "on");
+
 function fixture(id: string, text = "Thanks for your order #SY-1001. Order total: $40.00. Call (555) 012-3456.") {
   return { id, internalDate: "1790812800000", payload: { mimeType: "text/plain", headers: [
     { name: "From", value: "orders@synthetic.example" }, { name: "Subject", value: "Order confirmation #SY-1001" },

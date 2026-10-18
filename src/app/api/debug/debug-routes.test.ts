@@ -28,6 +28,7 @@ beforeEach(() => {
   vi.stubEnv("ANTHROPIC_API_KEY", "");
   vi.stubEnv("LLM_MODEL", undefined);
   vi.stubEnv("PT_ENABLE_DEBUG", undefined);
+  vi.stubEnv("PAPERTRAIL_REDACT", "on");
 });
 afterEach(() => {
   vi.unstubAllEnvs();

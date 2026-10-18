@@ -13,7 +13,7 @@ This describes the implementation checked against the source, rather than the or
 | Gmail | `src/lib/gmail/service.ts: syncGmail`, `POST /api/gmail/sync` | Scoped cache then Claude; sync time |
 
 ```text
-RawEmail -> receipt prefilter -> classify(raw, locally) -> redact
+RawEmail -> receipt prefilter -> classify(raw, locally) -> prepareForLlm (redact when PAPERTRAIL_REDACT=on)
          -> validated extraction -> matchOrders -> runRules -> orders/findings/review
 ```
 
@@ -36,6 +36,10 @@ The classifier sees the raw email locally to recognize forwarded sender domains 
 `src/lib/gmail/decode.ts` walks nested MIME parts, bounds decoding, ignores attachments and non-text content, and produces `RawEmail`. `src/lib/ingestion/mime.ts` is shared with `.eml` import: `selectBodyText` prefers plain text unless HTML contains richer purchase evidence, then `htmlToText` preserves useful table structure. Script/style/hidden content is stripped. This is string processing, not a browser: no email JavaScript executes and no remote images/resources are requested.
 
 ## 3. Redaction, extraction and caching
+
+**Redaction switch (#125).** `PAPERTRAIL_REDACT=on|off` (default **off**, a local-demo decision) is read by `prepareForLlm(raw)` in `src/lib/ingestion/prepare.ts`, the one helper every LLM path uses (pipeline extraction, claim rephrase, the debug route, "This is a receipt" re-extraction and quality experiments). `on` = today's `redact()` (below). `off` = subject and text unchanged, all redaction counts 0, `html` still dropped, `textHash` = SHA-256 of the unredacted text (so the two modes never share cache entries; `eval/run.ts` computes its cache keys with the same helper). Audit rows are written for every LLM call in both modes. The mode is exposed as `redaction: "on"|"off"` on `GET /api/account`, `GET /api/prefilter` and `GET /api/gmail/preview`, and the Sync copy follows it. With `off`, the text kept for Review and quality labels is unredacted; it is stored locally only. Text stored under one mode is re-prepared for the current mode before it is sent to Claude again. The extraction prompt still mentions `[PAN_1]`-style tokens; with `off` there are none.
+
+Everything below describes the `on` mode.
 
 `src/lib/ingestion/redact.ts` tokenizes recognized email addresses, Luhn-valid card numbers, international and contextual bare phones, street/postal addresses and recognized customer names in subject/body, preserving labeled order/tracking references and last-four mentions. HTML is dropped. Token numbering is shared within an email; `textHash` is SHA-256 of the redacted body.
 

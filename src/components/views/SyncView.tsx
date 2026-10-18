@@ -110,7 +110,9 @@ function SyncPhaseContent({
     case "syncing":
       return <SyncProgress progress={progress} />;
     case "uploading":
-      return <EmptyState title="Importing your files…">Each email is redacted before any AI call.</EmptyState>;
+      return <EmptyState title="Importing your files…">
+          {preview?.redaction === "off" ? "Receipt text is sent to the AI as is (redaction is off)." : "Each email is redacted before any AI call."}
+        </EmptyState>;
     case "loading_demo":
       return <EmptyState title="Loading the synthetic demo inbox…" />;
     case "opening":

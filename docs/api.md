@@ -21,7 +21,7 @@ Raw email bodies are never stored: only orders, findings, drafts, the review que
 | `GET /api/findings/:id` | id URL-encoded | `{ finding, order }` | 400, 404 |
 | `POST /api/findings/:id/status` | `{ status: "resolved" \| "dismissed" \| "open" }` | `FindingStatusResponse` `{ finding, summary }` (summary recomputed) | 400 empty id / invalid JSON / body, 404 unknown / excluded / deleted |
 | `POST /api/upload` | `multipart/form-data`, one or more `.eml` / `.mbox` files (any field name), 5 MB total | `UploadResponse` = `PipelineRunResponse` (`mode: "upload"`) + `{ files: [{ name, emails }], parseErrors: [{ file, index, reason }] }` | 400 no files / wrong type / nothing parseable, 413 too large, 409 if delete-all ran while it was processing (nothing saved) |
-| `GET /api/prefilter` | none | `{ query, description, windowDays }` (exact Gmail search + plain-language text) | |
+| `GET /api/prefilter` | none | `{ query, description, windowDays, redaction }` (exact Gmail search + plain-language text; `redaction` = `"on"|"off"`, see `PAPERTRAIL_REDACT` below) | |
 | `GET /api/audit` | none | `{ entries: AuditEntry[] }`, newest first | |
 | `POST /api/delete-all` | none | `{ deleted: true, ok: true, at, revokedToken, purged: { orders, findings, drafts, reviewItems, audit } }` | |
 | `POST /api/merchants/exclude` | `{ merchant: string }` (name or domain, case-insensitive) | `{ excludedMerchants: string[] }` | 400 invalid JSON / body |
@@ -56,7 +56,7 @@ Notes:
 { "gmail": { "connected": true, "expired": false, "mailbox": "shopper@example.com" },
   "accounts": [{ "id": "…", "mailbox": "shopper@example.com", "connected": true, "expired": false, "lastSyncAt": "2026-10-18T01:02:03.000Z" }],
   "mode": "gmail", "asOf": "...", "lastSyncAt": "2026-10-18T01:02:03.000Z",
-  "counts": { "orders": 45, "findings": 6, "reviewItems": 2 }, "excludedMerchants": [], "syncing": false }
+  "counts": { "orders": 45, "findings": 6, "reviewItems": 2 }, "excludedMerchants": [], "syncing": false, "redaction": "off" }
 ```
 
 - Anonymous (no cookie): `gmail: { connected: false, expired: false, mailbox: null }`, `accounts: []` plus the anonymous store's mode / counts.
@@ -71,6 +71,9 @@ Notes:
 - `lastSyncAt`: set when a Gmail sync publishes; `null` before the first sync, after delete-all / clearing the ledger,
   and when a sync fails or is discarded. `syncing` is true while a sync for this account is running.
 - `counts` are visible rows (excluded merchants removed), the same as `/api/ledger`.
+- `redaction` (#125) = the `PAPERTRAIL_REDACT` switch (`"on"` | `"off"`, default `"off"`): `"off"` means receipt text is sent to
+  the AI unredacted (HTML is still dropped). `GET /api/prefilter` and `GET /api/gmail/preview` carry the same field so the
+  Sync copy can say which. `POST /api/debug/pipeline` reports it as `redaction.mode`. Every LLM call is audited in both modes.
 
 `POST /api/auth/disconnect` (same-origin, signed-in): clears the stored tokens + mailbox, then revokes the Google grant
 (best effort, like delete-all) -> `{ disconnected: true, revokedToken }`. The user row, session cookie and **synced
@@ -144,7 +147,7 @@ need a live Gmail grant, these do (401 `token_expired` + `reconnectUrl` otherwis
 
 | Method + path | Request | Response (200) | Errors (`code`) |
 |---|---|---|---|
-| `GET /api/gmail/preview` | optional `?accountId=` | `GmailPreviewResponse` `{ query, estimatedMessages, messagesToFetch, countIsEstimate, windowDays: 90, maxMessages: 50, accounts }` | 401 `token_expired`, 404 `account_not_found`, 429 `gmail_rate_limited`, 502 / 503 |
+| `GET /api/gmail/preview` | optional `?accountId=` | `GmailPreviewResponse` `{ query, estimatedMessages, messagesToFetch, countIsEstimate, windowDays: 90, maxMessages: 50, accounts, redaction }` | 401 `token_expired`, 404 `account_not_found`, 429 `gmail_rate_limited`, 502 / 503 |
 | `POST /api/gmail/sync` | `{ "confirmed": true, "accountId"? }`, same-origin | `GmailSyncResponse` = `PipelineRunResponse` (`mode: "gmail"`) + `{ fetched, capped, parseErrors, accounts }` | 400 not confirmed, 401 `token_expired`, 404 `account_not_found`, 403 `gmail_access_denied` / cross-origin, 409 `sync_already_running` (or data deleted meanwhile, nothing saved), 422 `no_parseable_messages`, 429 `gmail_rate_limited`, 504 `sync_timeout`, 502 / 503 |
 | `GET /api/gmail/sync/status` | none | `GmailSyncStatus` `{ stage: "idle" \| "listing" \| "fetching" \| "processing" \| "complete" \| "failed", fetched, total: number \| null, skipped, accounts? }` (in-process, kept 15 minutes) | 401 `token_expired` |
 
@@ -198,8 +201,8 @@ Claim drafts are still cleared by a re-run (a drafted finding keeps its status; 
 ## Pipeline
 
 `runPipeline` (`src/lib/pipeline/run.ts`) is shared by demo, upload and Gmail sync:
-`isReceiptLike` (demo/upload only) → `classify` (raw email, for phishing detection) → `redact` → extractor on the
-redacted email (marketing / not_receipt are never extracted) → `matchOrders` → `runRules(defaultRules)`.
+`isReceiptLike` (demo/upload only) → `classify` (raw email, for phishing detection) → `prepareForLlm` (= `redact`
+only when `PAPERTRAIL_REDACT=on`; default **off**, #125) → extractor on the prepared email (marketing / not_receipt are never extracted) → `matchOrders` → `runRules(defaultRules)`.
 Demo mode (`loadSeedDemo` in `src/lib/demo`) runs `seed/inbox.json` with `now = asOf` and the simulated seed
 price feed, fully offline: recorded LLM output from `seed/llm-cache.json` when present, otherwise gold labels.
 

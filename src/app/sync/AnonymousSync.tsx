@@ -55,7 +55,7 @@ export function AnonymousSync() {
   }
 
   const preview = prefilter.data
-    ? { query: prefilter.data.query, windowDays: prefilter.data.windowDays }
+    ? { query: prefilter.data.query, windowDays: prefilter.data.windowDays, redaction: prefilter.data.redaction }
     : null;
 
   function phaseProps() {

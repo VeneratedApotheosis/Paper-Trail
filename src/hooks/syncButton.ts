@@ -47,7 +47,7 @@ export function lastSyncLabel(account: SyncAccount | null, state: AppShellSyncSt
 
 /** The confirm text's numbers: what a sync would read, from GET /api/gmail/preview. */
 export function confirmFromPreview(
-  preview: Pick<GmailPreviewResponse, "messagesToFetch" | "maxMessages" | "windowDays"> & Partial<Pick<GmailPreviewResponse, "accounts">>,
+  preview: Pick<GmailPreviewResponse, "messagesToFetch" | "maxMessages" | "windowDays"> & Partial<Pick<GmailPreviewResponse, "accounts" | "redaction">>,
 ): Extract<AppShellSyncConfirm, { status: "ready" }> {
   // Accounts that answered the preview are the ones a sync reads; the cap is per account.
   const readable = preview.accounts?.filter((account) => account.ok).length ?? 0;
@@ -56,6 +56,7 @@ export function confirmFromPreview(
     messageCount: preview.messagesToFetch > 0 ? preview.messagesToFetch : preview.maxMessages * Math.max(1, readable),
     windowDays: preview.windowDays,
     ...(readable > 1 ? { accountCount: readable } : {}),
+    ...(preview.redaction ? { redaction: preview.redaction } : {}),
   };
 }
 

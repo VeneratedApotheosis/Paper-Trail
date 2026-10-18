@@ -1,5 +1,5 @@
 import type { Classification, ExtractedFieldName, RedactedEmail } from "@/lib/contracts";
-import { extract, type ExtractResult, type ExtractionAuditEntry, type ExtractionCache } from "@/lib/ingestion";
+import { extract, prepareForLlm, type RedactionMode, type ExtractResult, type ExtractionAuditEntry, type ExtractionCache } from "@/lib/ingestion";
 import { AnthropicLlmClient, DEFAULT_LLM_MODEL, LlmUnavailableError, type LlmClient } from "@/lib/llm";
 import { runRealEval } from "@/lib/eval/real";
 import type { FieldScore } from "@/lib/eval/metrics";
@@ -58,6 +58,8 @@ export interface ExperimentDeps {
   cache?: ExtractionCache;
   audit?: (event: PipelineAuditEvent) => void;
   now?: () => Date;
+  /** Pins the redaction switch (#125); default: PAPERTRAIL_REDACT. */
+  redaction?: RedactionMode;
 }
 
 const EXPERIMENT_CONCURRENCY = 4;
@@ -98,7 +100,8 @@ async function runSide(
   // Nothing is ever written back: the cache argument is a read-only view of the live cache (or absent).
   const cache: ExtractionCache | undefined = readCache && { get: (hash) => readCache.get(hash), set: () => undefined };
   const results = await mapPool(labels, EXPERIMENT_CONCURRENCY, async (label): Promise<ExtractResult | null> => {
-    const email = redactedEmailOfLabel(label);
+    // Saved label text may have been stored under another mode: re-prepare it for the current one before it reaches Claude.
+    const email = prepareForLlm(redactedEmailOfLabel(label), deps.redaction);
     const classification: Classification = { emailId: label.emailId, class: label.class, confidence: 1 };
     try {
       const result = await extract(email, classification, { llm, cache, now: deps.now, audit: (entry) => record(entry, email) });

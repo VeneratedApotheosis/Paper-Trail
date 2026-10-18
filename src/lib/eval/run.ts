@@ -11,7 +11,7 @@ import {
   type NormalizedOrder,
   type RawEmail,
 } from "@/lib/contracts";
-import { SKIPPED_EXTRACTION_CLASSES, classify, redact } from "@/lib/ingestion";
+import { SKIPPED_EXTRACTION_CLASSES, classify, prepareForLlm, redactionMode, type RedactionMode } from "@/lib/ingestion";
 import { matchOrders, type MatchInput } from "@/lib/orders/matcher";
 import { extractionFromGoldLabel } from "@/lib/pipeline/gold";
 import { PriceFeedSchema } from "@/lib/prices/feed";
@@ -38,7 +38,7 @@ import {
 
 export type EvalSplit = "all" | "holdout" | "dev";
 
-/** Real extraction outputs (e.g. cached Claude results) keyed by RedactedEmail.textHash of redact(email). */
+/** Real extraction outputs (e.g. cached Claude results) keyed by the textHash of prepareForLlm(email), the same key the pipeline caches under (#125). */
 export type ExtractionMap = Record<string, Extraction>;
 
 export interface EvalOptions {
@@ -48,6 +48,8 @@ export interface EvalOptions {
   split?: EvalSplit;
   /** Report timestamp, supplied by the caller. */
   now?: Date;
+  /** Redaction mode the extraction map was recorded under (#125); default: PAPERTRAIL_REDACT, like the pipeline. */
+  redaction?: RedactionMode;
 }
 
 export interface MisclassifiedEmail {
@@ -202,14 +204,14 @@ function extractionMapSource(map: ExtractionMap): { label: string; models: strin
   return { label: `extraction map (${models.join(", ") || "no models"})`, models };
 }
 
-function extractionReport(emails: readonly SeedEmail[], source: EvalOptions["extractionSource"], split: EvalSplit): ExtractionReport {
+function extractionReport(emails: readonly SeedEmail[], source: EvalOptions["extractionSource"], split: EvalSplit, redaction: RedactionMode): ExtractionReport {
   if (source === undefined || source === "gold") return { status: "not_run", reason: EXTRACTION_NOT_RUN_REASON };
 
   const scored = emails.filter(({ label }) => inSplit(label, split) && isReceiptClass(label.class));
   const pairs = [];
   const emailsMissing: string[] = [];
   for (const { email, label } of scored) {
-    const extraction = source[redact(email).textHash];
+    const extraction = source[prepareForLlm(email, redaction).textHash];
     if (extraction) pairs.push({ emailId: email.id, gold: label.fields, actual: extraction.fields });
     else emailsMissing.push(email.id);
   }
@@ -273,13 +275,13 @@ function oracleFindings(emails: readonly SeedEmail[]): FindingModeReport {
  * Realistic mode: only emails classify() routes to a receipt class get an extraction, carrying the predicted class
  * (as extract() does), so classifier misses and misroutes propagate into finding precision/recall.
  */
-function realisticFindings(emails: readonly SeedEmail[], source: EvalOptions["extractionSource"]): FindingModeReport {
+function realisticFindings(emails: readonly SeedEmail[], source: EvalOptions["extractionSource"], redaction: RedactionMode): FindingModeReport {
   const map = source === undefined || source === "gold" ? null : source;
   const inputs: MatchInput[] = [];
   const missing: string[] = [];
   for (const { email, label, classification } of emails) {
     if (!isReceiptClass(classification.class)) continue;
-    const base = map ? map[redact(email).textHash] : extractionFromGoldLabel(email, label);
+    const base = map ? map[prepareForLlm(email, redaction).textHash] : extractionFromGoldLabel(email, label);
     if (!base) {
       missing.push(email.id);
       continue;
@@ -299,6 +301,7 @@ function realisticFindings(emails: readonly SeedEmail[], source: EvalOptions["ex
 /** Runs the full eval over the committed synthetic seed. */
 export function runEval(opts: EvalOptions = {}): EvalReport {
   const split = opts.split ?? "all";
+  const redaction = opts.redaction ?? redactionMode();
   const emails = seedEmails();
   const extractionSourceLabel =
     opts.extractionSource === undefined || opts.extractionSource === "gold"
@@ -325,11 +328,11 @@ export function runEval(opts: EvalOptions = {}): EvalReport {
       expectedFindings: expected.findings.length,
     },
     classification: classificationReport(emails, split),
-    extraction: extractionReport(emails, opts.extractionSource, split),
+    extraction: extractionReport(emails, opts.extractionSource, split, redaction),
     findings: {
       scope: "full inbox",
       oracleExtraction: oracleFindings(emails),
-      realisticRouting: realisticFindings(emails, opts.extractionSource),
+      realisticRouting: realisticFindings(emails, opts.extractionSource, redaction),
     },
   };
 }

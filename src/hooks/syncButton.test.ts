@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AccountResponse, GmailFailure } from "@/lib/api/types";
+import { syncConfirmText } from "@/components/ShellSyncControl";
 import {
   confirmFromPreview,
   deriveSyncButtonState,
@@ -81,6 +82,13 @@ describe("confirmFromPreview", () => {
       messageCount: 18,
       windowDays: 90,
     });
+  });
+
+  it("carries the redaction mode so the confirm copy can say whether receipts are redacted (#125)", () => {
+    const confirm = confirmFromPreview({ messagesToFetch: 18, maxMessages: 50, windowDays: 90, redaction: "off" });
+    expect(confirm.redaction).toBe("off");
+    expect(syncConfirmText(confirm)).toContain("redaction is off");
+    expect(syncConfirmText({ ...confirm, redaction: "on" })).toContain("Receipts are redacted");
   });
 
   it("falls back to the per-run cap when Google's estimate is zero", () => {

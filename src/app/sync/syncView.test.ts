@@ -70,7 +70,7 @@ describe("SyncView fixtures", () => {
     expect(renderToStaticMarkup(createElement(SyncView, fixtures.syncViewSyncingFetchingFixture))).toContain(
       'aria-valuenow="42"',
     );
-    expect(render(fixtures.syncViewSyncingProcessingFixture)).toContain("Redacting, classifying and extracting receipts");
+    expect(render(fixtures.syncViewSyncingProcessingFixture)).toContain("Classifying and extracting receipts");
     expect(renderToStaticMarkup(createElement(SyncView, fixtures.syncViewSyncingProcessingFixture))).not.toContain(
       "progressbar",
     );

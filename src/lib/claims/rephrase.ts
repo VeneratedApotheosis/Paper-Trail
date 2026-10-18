@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { redact } from "@/lib/ingestion/redact";
+import { prepareForLlm, type RedactionMode } from "@/lib/ingestion/prepare";
 import type { LlmClient, LlmTool } from "@/lib/llm";
 import { llmErrorClass } from "@/lib/llm/audit";
 import { claimClosing, type ClaimDraft } from "./draft";
@@ -28,6 +28,8 @@ export type RephraseDeps = {
   llm: LlmClient;
   audit?: (entry: RephraseAuditEntry) => void;
   now?: () => Date;
+  /** Pins the redaction switch (#125); default: PAPERTRAIL_REDACT. */
+  redaction?: RedactionMode;
 };
 
 export type RephraseResult =
@@ -86,14 +88,14 @@ export async function rephraseDraft(draft: ClaimDraft, deps: RephraseDeps): Prom
   if (!draft.body.endsWith(closing)) return fallback("draft signature was edited; rephrase skipped");
   const content = draft.body.slice(0, -closing.length);
 
-  const prompt = redact({
+  const prompt = prepareForLlm({
     id: draft.findingId,
     from: "claims@papertrail.example",
     to: `"${draft.signedName}" <customer@papertrail.example>`,
     subject: "",
     date: "2000-01-01T00:00:00Z",
     text: userPrompt(content, draft),
-  }).text;
+  }, deps.redaction).text;
 
   let toolInput: unknown;
   try {

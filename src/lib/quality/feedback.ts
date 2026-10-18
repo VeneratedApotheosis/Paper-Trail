@@ -1,5 +1,5 @@
 import { REVIEW_CONFIDENCE_THRESHOLD, type EmailClass, type ExtractedFields, type NormalizedOrder } from "@/lib/contracts";
-import { SKIPPED_EXTRACTION_CLASSES, extract } from "@/lib/ingestion";
+import { SKIPPED_EXTRACTION_CLASSES, extract, prepareForLlm, type RedactionMode } from "@/lib/ingestion";
 import { LlmError, LlmUnavailableError, type LlmClient } from "@/lib/llm";
 import { seedPriceFeed } from "@/lib/demo/seed";
 import { llmCallAuditEvent } from "@/lib/pipeline/extractors";
@@ -27,6 +27,8 @@ export interface FeedbackOptions {
   now?: Date;
   /** Defaults to the local SQLite label store. */
   labels?: LabelStore;
+  /** Pins the redaction switch (#125); default: PAPERTRAIL_REDACT. */
+  redaction?: RedactionMode;
 }
 
 export interface ReceiptFeedbackOptions extends FeedbackOptions {
@@ -100,7 +102,8 @@ export async function markSkippedAsReceipt(emailId: string, options: ReceiptFeed
   const receiptClass = options.class ?? (isReceiptClass(stored.classification?.class) ? stored.classification!.class : "order");
   if (!isReceiptClass(receiptClass)) throw new QualityError(400, "Choose a receipt class (order, shipped, refund, ...).");
   const work = beginStoreWork();
-  const redacted = redactedEmailOf(stored);
+  // Stored text may come from a run under another mode: re-prepare it for the current one before it reaches Claude.
+  const redacted = prepareForLlm(redactedEmailOf(stored), options.redaction);
   const at = options.now ?? new Date();
   const scope = currentStoreScope();
   const labels = options.labels ?? labelStore();

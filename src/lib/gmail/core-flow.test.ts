@@ -53,7 +53,7 @@ function extraction(returned: boolean) {
 beforeEach(() => {
   resetStore(); db = createAuthStore(":memory:");
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now);
-  vi.stubEnv("GOOGLE_CLIENT_ID", "synthetic-client"); vi.stubEnv("GOOGLE_CLIENT_SECRET", "synthetic-secret");
+  vi.stubEnv("PAPERTRAIL_REDACT", "on"); vi.stubEnv("GOOGLE_CLIENT_ID", "synthetic-client"); vi.stubEnv("GOOGLE_CLIENT_SECRET", "synthetic-secret");
   vi.stubEnv("AUTH_ENCRYPTION_KEY", "ab".repeat(32)); vi.stubEnv("AUTH_BASE_URL", origin);
   vi.stubEnv("ANTHROPIC_API_KEY", "synthetic-key"); vi.stubEnv("LLM_MODEL", "synthetic-model");
 });

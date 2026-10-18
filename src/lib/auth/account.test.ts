@@ -52,7 +52,7 @@ describe("GET /api/account", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toEqual({
       gmail: { connected: false, expired: false, mailbox: null }, accounts: [], mode: "empty", asOf: null, lastSyncAt: null,
-      counts: { orders: 0, findings: 0, reviewItems: 0 }, excludedMerchants: [], syncing: false,
+      counts: { orders: 0, findings: 0, reviewItems: 0 }, excludedMerchants: [], syncing: false, redaction: "off",
     });
     expect(fetcher).not.toHaveBeenCalled();
   });

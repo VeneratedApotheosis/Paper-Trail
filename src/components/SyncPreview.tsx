@@ -10,6 +10,8 @@ export interface SyncPreviewInfo {
   messagesToFetch?: number;
   maxMessages?: number;
   countIsEstimate?: boolean;
+  /** PAPERTRAIL_REDACT (#125): decides whether the copy says receipts are redacted before the AI reads them. Omitted = on. */
+  redaction?: "on" | "off";
 }
 
 export type SyncMode = "gmail" | "import";
@@ -28,6 +30,7 @@ export function SyncPreview({
   onTryDemo?: () => void;
 }) {
   const gmail = mode === "gmail";
+  const redactionOff = preview.redaction === "off";
 
   return (
     <div className="mx-auto max-w-ledger space-y-6">
@@ -38,8 +41,8 @@ export function SyncPreview({
         </h1>
         <p className="max-w-md text-base text-ink-muted">
           {gmail
-            ? "PaperTrail reads only receipt-like email, redacts it before any AI call, and never sends or changes a thing. Here is exactly what this run will do."
-            : "Gmail is not connected. Import receipt emails as .eml or .mbox files, or load the synthetic demo inbox. Each email is redacted before any AI call."}
+            ? `PaperTrail reads only receipt-like email, ${redactionOff ? "sends the full receipt text to the AI (redaction is off)" : "redacts it before any AI call"}, and never sends or changes a thing. Here is exactly what this run will do.`
+            : `Gmail is not connected. Import receipt emails as .eml or .mbox files, or load the synthetic demo inbox. ${redactionOff ? "Receipt text is sent to the AI as is (redaction is off)." : "Each email is redacted before any AI call."}`}
         </p>
       </header>
 

@@ -1,6 +1,7 @@
 import type { ClaimDraft } from "@/lib/claims";
 import type { Finding, NormalizedOrder } from "@/lib/contracts";
 import type { PipelineStats, ReviewQueueItem } from "@/lib/pipeline/run";
+import type { RedactionMode } from "@/lib/ingestion/prepare";
 import type { GmailAccountPreview, GmailAccountSync, SyncAccountsResult } from "@/lib/gmail/accounts";
 import type { GmailSyncProgress } from "@/lib/gmail/progress";
 import type { previewGmail } from "@/lib/gmail/service";
@@ -94,6 +95,8 @@ export interface PrefilterResponse {
   query: string;
   description: string;
   windowDays: number;
+  /** PAPERTRAIL_REDACT (#125): "off" = receipt text reaches the AI unredacted. Copy about redaction must follow it. */
+  redaction: RedactionMode;
 }
 
 export interface AuditResponse {
@@ -191,6 +194,8 @@ export interface AccountResponse {
   excludedMerchants: string[];
   /** A Gmail sync is running for this account right now. */
   syncing: boolean;
+  /** PAPERTRAIL_REDACT (#125): "on" = PII is redacted before any AI call; "off" (default) = receipt text is sent as is. */
+  redaction: RedactionMode;
 }
 
 /** POST /api/auth/disconnect `{ accountId? }`: Gmail grant(s) cleared; the signed-in identity and the synced ledger are kept. */
@@ -202,10 +207,10 @@ export interface DisconnectResponse {
 
 /**
  * GET /api/gmail/preview[?accountId=]: { query, estimatedMessages, messagesToFetch, countIsEstimate, windowDays,
- * maxMessages } summed over the accounts that answered, plus `accounts` with each account's result (#114). Accounts that
+ * maxMessages, redaction (#125) } summed over the accounts that answered, plus `accounts` with each account's result (#114). Accounts that
  * could not be read are `{ ok: false, code }` (e.g. `token_expired`); the call fails only when none could.
  */
-export type GmailPreviewResponse = Awaited<ReturnType<typeof previewGmail>> & { accounts: GmailAccountPreview[] };
+export type GmailPreviewResponse = Awaited<ReturnType<typeof previewGmail>> & { accounts: GmailAccountPreview[]; redaction: RedactionMode };
 
 /**
  * POST /api/gmail/sync `{ confirmed: true, accountId? }`: the PipelineRunResponse (merged ledger of every account)

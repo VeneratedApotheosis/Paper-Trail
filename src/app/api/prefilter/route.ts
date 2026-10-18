@@ -1,5 +1,5 @@
 import type { PrefilterResponse } from "@/lib/api/types";
-import { GMAIL_RECEIPT_QUERY, PREFILTER_WINDOW_DAYS, describePrefilterQuery } from "@/lib/ingestion";
+import { GMAIL_RECEIPT_QUERY, PREFILTER_WINDOW_DAYS, describePrefilterQuery, redactionMode } from "@/lib/ingestion";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +10,7 @@ export async function GET(): Promise<Response> {
     query: GMAIL_RECEIPT_QUERY,
     description: describePrefilterQuery(),
     windowDays: PREFILTER_WINDOW_DAYS,
+    redaction: redactionMode(),
   };
   return Response.json(body);
 }

@@ -12,7 +12,7 @@ export interface SyncProgressInfo {
 const STAGES = [
   { key: "listing", label: "List", desc: "Listing matching messages in Gmail" },
   { key: "fetching", label: "Fetch", desc: "Fetching receipt-like messages" },
-  { key: "processing", label: "Process", desc: "Redacting, classifying and extracting receipts" },
+  { key: "processing", label: "Process", desc: "Classifying and extracting receipts" },
 ] as const;
 
 // Shown while a sync runs (issue #25). Fully controlled: it renders only the counts it is given and never advances on

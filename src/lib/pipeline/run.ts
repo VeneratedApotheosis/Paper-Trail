@@ -7,7 +7,7 @@ import {
   type RawEmail,
   type RedactedEmail,
 } from "@/lib/contracts";
-import { SKIPPED_EXTRACTION_CLASSES, classify, isReceiptLike, redact, type ExtractResult } from "@/lib/ingestion";
+import { SKIPPED_EXTRACTION_CLASSES, classify, isReceiptLike, prepareForLlm, type ExtractResult, type RedactionMode } from "@/lib/ingestion";
 import { matchOrdersWithReasons, type MatchInput } from "@/lib/orders/matcher";
 import type { PriceFeed } from "@/lib/prices/feed";
 import { defaultRules, runRulesIsolated } from "@/lib/rules";
@@ -15,7 +15,7 @@ import type { AuditEntry } from "@/lib/types";
 
 /**
  * Pipeline runner (issue #4): every input source (Gmail sync, seed demo, .eml/.mbox upload) goes through this one
- * code path: [prefilter] -> classify (raw) -> redact -> extract (redacted) -> matchOrders -> runRules.
+ * code path: [prefilter] -> classify (raw) -> prepareForLlm (redact when PAPERTRAIL_REDACT=on) -> extract -> matchOrders -> runRules.
  * Nothing low-confidence or failed is dropped silently: it lands in `reviewQueue` with a reason. One bad email or
  * order never aborts the run: extraction failures and per-order rule failures are isolated to that email/order.
  */
@@ -56,6 +56,8 @@ export interface PipelineDeps {
    * overrides the classifier and bypasses the prefilter; marketing / not_receipt skips extraction.
    */
   classOverride?: (emailId: string) => EmailClass | undefined;
+  /** Pins the redaction switch (#125); default: PAPERTRAIL_REDACT (off unless set to `on`). */
+  redaction?: RedactionMode;
 }
 
 /** How one email ended up in a run; see PipelineDeps.observer. */
@@ -255,7 +257,7 @@ export function createPipelineRun(deps: PipelineDeps, expectedEmails?: number): 
     const override = deps.classOverride?.(raw.id);
     if (!override && deps.applyPrefilter && !isReceiptLike(raw).keep) {
       outcome.prefilteredOut = true;
-      if (deps.observer) outcome.observed = { email: redact(raw), classOverridden: false };
+      if (deps.observer) outcome.observed = { email: prepareForLlm(raw, deps.redaction), classOverridden: false };
       return Promise.resolve();
     }
 
@@ -264,7 +266,7 @@ export function createPipelineRun(deps: PipelineDeps, expectedEmails?: number): 
       ? { emailId: raw.id, class: override, confidence: 1, reason: "set by the user" }
       : classify(raw);
     outcome.classification = classification.class;
-    const redacted = redact(raw);
+    const redacted = prepareForLlm(raw, deps.redaction);
     if (deps.observer) outcome.observed = { email: redacted, classification, classOverridden: override !== undefined };
 
     if (SKIPPED_EXTRACTION_CLASSES.has(classification.class)) {

@@ -23,6 +23,7 @@ function account(overrides: Partial<AccountResponse> = {}): AccountResponse {
     counts: { orders: 45, findings: 6, reviewItems: 2 },
     excludedMerchants: ["shop.example"],
     syncing: false,
+    redaction: "off",
     ...overrides,
   };
 }

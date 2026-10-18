@@ -9,6 +9,8 @@ export {
 } from "./prefilter";
 export type { PrefilterDecision } from "./prefilter";
 export { hashRedactedText, passesLuhn, redact } from "./redact";
+export { DEFAULT_REDACTION_MODE, REDACTION_ENV_VAR, prepareForLlm, redactionMode } from "./prepare";
+export type { RedactionMode } from "./prepare";
 export { classify } from "./classify";
 /** Extraction (issue #7): LLM structured extraction, validated with ExtractionSchema, cached by textHash. */
 export { createFileCache, createMemoryCache } from "./cache";

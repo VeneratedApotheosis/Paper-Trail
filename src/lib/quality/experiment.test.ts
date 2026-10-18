@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMemoryCache } from "@/lib/ingestion";
+import { createMemoryCache, hashRedactedText } from "@/lib/ingestion";
 import { LlmHttpError, type LlmClient } from "@/lib/llm";
 import type { PipelineAuditEvent } from "@/lib/pipeline/run";
 import { MAX_EXPERIMENT_LABELS, PROMPT_VARIANTS, experimentLabels, runExperiment } from "./experiment";
@@ -7,7 +7,7 @@ import { fakeLlm, unavailableLlm } from "./test-helpers";
 import type { QualityLabel } from "./types";
 
 const labeled = (emailId: string, total = 120, extra: Partial<QualityLabel> = {}): QualityLabel => ({
-  emailId, source: "review", class: "order", redactedText: `Order #NW-${emailId}\nOrder total: $${total}.00`, textHash: `h-${emailId}`,
+  emailId, source: "review", class: "order", redactedText: `Order #NW-${emailId}\nOrder total: $${total}.00`, textHash: hashRedactedText(`Order #NW-${emailId}\nOrder total: $${total}.00`),
   subject: `Order #NW-${emailId}`, from: '"Northwind" <sender@northwind.example>', date: "2026-10-01T10:00:00.000Z", at: "2026-10-17T10:00:00.000Z",
   fields: { merchant: "Northwind Outfitters", orderRef: `NW-${emailId}`, totals: { total } }, ...extra,
 });

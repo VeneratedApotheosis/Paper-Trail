@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GoldLabelsFileSchema, SeedInboxSchema } from "@/lib/contracts";
-import { redact } from "@/lib/ingestion";
+import { prepareForLlm, type RedactionMode } from "@/lib/ingestion";
 import { extractionFromGoldLabel } from "@/lib/pipeline/gold";
 import goldJson from "../../../seed/gold_labels.json";
 import inboxJson from "../../../seed/inbox.json";
@@ -10,15 +10,26 @@ const inbox = SeedInboxSchema.parse(inboxJson);
 const labels = GoldLabelsFileSchema.parse(goldJson).labels;
 
 /** A stand-in "model" cache built from gold labels, used only to test the extraction-map plumbing. */
-function goldExtractionMap(model: string): ExtractionMap {
+function goldExtractionMap(model: string, mode?: RedactionMode): ExtractionMap {
   const map: ExtractionMap = {};
   for (const email of inbox.emails) {
     const label = labels.find((candidate) => candidate.emailId === email.id);
     if (!label || label.class === "marketing" || label.class === "not_receipt") continue;
-    map[redact(email).textHash] = { ...extractionFromGoldLabel(email, label), model };
+    map[prepareForLlm(email, mode).textHash] = { ...extractionFromGoldLabel(email, label), model };
   }
   return map;
 }
+
+describe.each(["on", "off"] as const)("runEval with redaction %s", (mode) => {
+  it("finds a cached extraction by the same textHash the pipeline caches under", () => {
+    const report = runEval({ extractionSource: goldExtractionMap("test-model", mode), redaction: mode, split: "all" });
+    if (report.extraction.status !== "ok") throw new Error("expected extraction metrics");
+    expect(report.extraction.emailsMissing).toEqual([]);
+    expect(report.findings.realisticRouting.emailsMissingExtraction).toEqual([]);
+    expect(report.findings.realisticRouting.recall).toBe(runEval().findings.realisticRouting.recall);
+    expect(report.findings.realisticRouting.precision).toBe(runEval().findings.realisticRouting.precision);
+  });
+});
 
 describe("runEval", () => {
   it("reports seed counts, sources, asOf and the caller's timestamp", () => {

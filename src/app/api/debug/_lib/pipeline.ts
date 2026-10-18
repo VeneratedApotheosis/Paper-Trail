@@ -10,8 +10,10 @@ import {
   SKIPPED_EXTRACTION_CLASSES,
   classify,
   isReceiptLike,
-  redact,
+  prepareForLlm,
+  redactionMode,
   type ExtractionCache,
+  type RedactionMode,
   type PrefilterDecision,
 } from "@/lib/ingestion";
 import type { LlmClient } from "@/lib/llm";
@@ -22,7 +24,7 @@ import { defaultRules, runRules } from "@/lib/rules";
 
 /**
  * Stage-by-stage run of ONE email for the dev playground's Email lab (issue #34). Mirrors the upload path of
- * runPipeline (prefilter -> classify raw -> redact -> extract redacted -> matchOrders -> runRules) but returns every
+ * runPipeline (prefilter -> classify raw -> prepareForLlm -> extract -> matchOrders -> runRules) but returns every
  * intermediate result. Nothing is stored except audit rows for LLM calls (AGENTS.md hard rule #6).
  */
 
@@ -38,6 +40,8 @@ export interface DebugPipelineResult {
   prefilter: PrefilterDecision;
   classification: Classification;
   redaction: {
+    /** PAPERTRAIL_REDACT (#125): "off" means subject and text below are the unredacted email and are sent to the LLM as is. */
+    mode: RedactionMode;
     subject: string;
     text: string;
     redactions: Partial<Record<RedactionKind, number>>;
@@ -63,6 +67,8 @@ export interface DebugPipelineOptions {
   cache: ExtractionCache;
   /** Defaults to extract()'s AnthropicLlmClient. Injected in tests. */
   llm?: LlmClient;
+  /** Pins the redaction switch; default: PAPERTRAIL_REDACT. */
+  redaction?: RedactionMode;
   audit?: (event: PipelineAuditEvent) => void;
 }
 
@@ -81,7 +87,8 @@ export async function runDebugPipeline(options: DebugPipelineOptions): Promise<D
   const email = parseEml(options.raw);
   const prefilter = isReceiptLike(email);
   const classification = classify(email);
-  const redacted = redact(email);
+  const mode = options.redaction ?? redactionMode();
+  const redacted = prepareForLlm(email, mode);
   const auditRows: PipelineAuditEvent[] = [];
   const audit = (event: PipelineAuditEvent) => {
     auditRows.push(event);
@@ -130,6 +137,7 @@ export async function runDebugPipeline(options: DebugPipelineOptions): Promise<D
     prefilter,
     classification,
     redaction: {
+      mode,
       subject: redacted.subject,
       text: redacted.text,
       redactions: redacted.redactions,

@@ -5,6 +5,7 @@ import { resolveSessionUser } from "@/lib/auth/session";
 import { authStore } from "@/lib/auth/store";
 import { withAccountStore } from "@/lib/gmail/context";
 import { gmailProgress } from "@/lib/gmail/progress";
+import { redactionMode } from "@/lib/ingestion";
 import { getAccountSyncTimes, getState } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -31,6 +32,7 @@ async function handleGET(request: Request): Promise<Response> {
     counts: { orders: state.orders.length, findings: state.findings.length, reviewItems: state.reviewQueue.length },
     excludedMerchants: state.excludedMerchants,
     syncing: progress !== null && ["listing", "fetching", "processing"].includes(progress.stage),
+    redaction: redactionMode(),
   };
   return Response.json(body);
 }

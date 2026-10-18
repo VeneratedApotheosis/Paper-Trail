@@ -30,7 +30,7 @@ export interface AppShellSyncProgress {
 /** Inline confirm shown before a sync starts, from GET /api/gmail/preview. `accountCount` is set for two or more accounts. */
 export type AppShellSyncConfirm =
   | { status: "loading" }
-  | { status: "ready"; messageCount: number; windowDays: number; accountCount?: number };
+  | { status: "ready"; messageCount: number; windowDays: number; accountCount?: number; redaction?: "on" | "off" };
 
 /** How one account ended in a finished sync (#115). `reconnect`: it needs Google's read-only consent again. */
 export interface AppShellSyncNoticeAccount {
@@ -89,9 +89,9 @@ export function syncButtonLabel(state: AppShellSyncState, progress?: AppShellSyn
   }
 }
 
-export function syncConfirmText(confirm: { messageCount: number; windowDays: number; accountCount?: number }): string {
+export function syncConfirmText(confirm: { messageCount: number; windowDays: number; accountCount?: number; redaction?: "on" | "off" }): string {
   const across = confirm.accountCount !== undefined && confirm.accountCount > 1 ? ` across ${confirm.accountCount} Gmail accounts` : "";
-  return `Read up to ${confirm.messageCount} emails from the last ${confirm.windowDays} days${across}. Receipts are redacted and sent to Claude for analysis. Nothing is sent or changed in your mailbox.`;
+  return `Read up to ${confirm.messageCount} emails from the last ${confirm.windowDays} days${across}. ${confirm.redaction === "off" ? "Receipt text is sent to Claude as is (redaction is off)." : "Receipts are redacted and sent to Claude for analysis."} Nothing is sent or changed in your mailbox.`;
 }
 
 /** The confirm wording and its actions; the header popover and the Account page both show it. */

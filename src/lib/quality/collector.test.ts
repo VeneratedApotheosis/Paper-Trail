@@ -1,10 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { runUploadPipeline } from "@/lib/demo";
 import { createMemoryCache } from "@/lib/ingestion";
 import { LlmHttpError, type LlmClient } from "@/lib/llm";
 import type { PipelineAuditEvent } from "@/lib/pipeline/run";
 import { createSyncCollector } from "./collector";
 import { NEWSLETTER, NOW, PROMO, fakeLlm, order, unavailableLlm } from "./test-helpers";
+
+// The stored-text test asserts redaction; the default switch is off (#125).
+vi.stubEnv("PAPERTRAIL_REDACT", "on");
 
 async function collect(emails = [order("o1", "NW-1"), order("o2", "NW-2"), NEWSLETTER, PROMO], llm = fakeLlm()) {
   const collector = createSyncCollector({ source: "upload", clock: () => NOW });
