@@ -71,6 +71,7 @@ export default function ReviewPage() {
   const [pendingEdits, setPendingEdits] = useState<Record<string, OrderFieldEdit[]>>({});
   const [notice, setNotice] = useState<Notice | null>(null);
   const inFlight = useRef(false);
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
 
   const showsDemo = ledger.data?.mode === "demo";
 
@@ -114,6 +115,7 @@ export default function ReviewPage() {
     const stored = storedById.get(orderId);
     if (!stored || inFlight.current) return;
     inFlight.current = true;
+    setPendingOrderId(orderId);
     setNotice(null);
     const sent = pendingEdits[orderId] ?? [];
     const merchant = stored.merchant.name;
@@ -151,24 +153,16 @@ export default function ReviewPage() {
       }
     } finally {
       inFlight.current = false;
+      setPendingOrderId(null);
     }
   }
 
   return (
     <AppShell demo={showsDemo}>
-      {notice ? <NoticeState notice={notice} /> : null}
-      <ReviewView items={shownOrders} onConfirm={handleConfirm} onEditField={handleEditField} />
-      {unreadable.length > 0 ? (
-        <ErrorState
-          title={`${plural(unreadable.length, "email")} couldn't be read automatically`}
-          what={`PaperTrail couldn't turn ${unreadable.length === 1 ? "it" : "them"} into ${
-            unreadable.length === 1 ? "an order" : "orders"
-          }, so ${unreadable.length === 1 ? "it isn't" : "they aren't"} in your ledger or your owed total.`}
-          fix={`There is nothing to confirm here. If you think money is owed on ${
-            unreadable.length === 1 ? "it" : "one of them"
-          }, check that receipt in your inbox.`}
-        />
-      ) : null}
+      <ReviewView items={shownOrders} onConfirm={handleConfirm} onEditField={handleEditField}
+        pendingOrderId={pendingOrderId}
+        saveStates={Object.fromEntries(Object.entries(pendingEdits).filter(([, edits]) => edits.length).map(([id]) => [id, "unsaved" as const]))}
+        notice={notice ? <NoticeState notice={notice} /> : null} unreadableItems={unreadable} />
     </AppShell>
   );
 }

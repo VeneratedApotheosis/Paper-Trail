@@ -20,27 +20,32 @@ const destructive =
 // --- Per-merchant exclude ----------------------------------------------------
 // Lets the user exclude a merchant from future scanning. The excluded set and
 // the toggle action are owned by the caller; this panel only renders them.
+export interface MerchantItem { key: string; displayName: string; excluded: boolean }
 export interface MerchantExcludePanelProps {
-  merchants: string[];
+  merchants: Array<string | MerchantItem>;
   excludedMerchants: string[];
   onToggleMerchant: (name: string, exclude: boolean) => void;
+  pending?: boolean;
+  error?: string | null;
 }
 
 export function MerchantExcludePanel({
   merchants,
   excludedMerchants,
-  onToggleMerchant,
+  onToggleMerchant, pending = false, error,
 }: MerchantExcludePanelProps) {
   const excluded = new Set(excludedMerchants);
 
   return (
     <div>
       <ul className="space-y-3">
-        {merchants.map((name) => {
-          const isExcluded = excluded.has(name);
+        {merchants.map((item) => {
+          const name = typeof item === "string" ? item : item.displayName;
+          const key = typeof item === "string" ? item : item.key;
+          const isExcluded = typeof item === "string" ? excluded.has(name) : item.excluded;
           return (
             <li
-              key={name}
+              key={key}
               className="neu-inset flex items-center justify-between gap-4 rounded-lg px-4 py-3"
             >
               <span className="flex items-center gap-2 font-sans text-sm text-ink">
@@ -50,9 +55,10 @@ export function MerchantExcludePanel({
               <label className="flex cursor-pointer items-center gap-2 font-sans text-sm text-ink-muted">
                 <span className="hidden sm:inline">Exclude from scanning</span>
                 <input
+                  disabled={pending}
                   type="checkbox"
                   checked={isExcluded}
-                  onChange={() => onToggleMerchant(name, !isExcluded)}
+                  onChange={() => onToggleMerchant(key, !isExcluded)}
                   className="h-4 w-4 accent-teal"
                   aria-label={`Exclude ${name} from scanning`}
                 />
@@ -61,10 +67,8 @@ export function MerchantExcludePanel({
           );
         })}
       </ul>
-      <p className="mt-4 text-label text-ink-faint">
-        Excluded merchants are skipped on the next scan. This choice is not saved yet. Persistence
-        is pending the backend.
-      </p>
+      {error ? <p role="alert" className="mt-4 text-sm">{error}</p> : null}
+
     </div>
   );
 }
@@ -77,18 +81,20 @@ const CONFIRM_WORD = "DELETE";
 // Receipt shown after a confirmed deletion. Produced by the caller (the real
 // POST /api/delete-all response, or an optimistic mock) and passed back in.
 export interface DeleteReceipt {
-  ordersPurged: number;
-  findingsPurged: number;
-  auditEntriesPurged: number;
-  completedAt: string; // ISO
+  at: string;
+  revokedToken: boolean;
+  purged: { orders: number; findings: number; drafts: number; reviewItems: number; audit: number };
 }
 
 export interface DeleteAllPanelProps {
   onDeleteAll: () => void;
   deleteReceipt?: DeleteReceipt | null;
+  pending?: boolean;
+  error?: string | null;
+  gmailConnected?: boolean;
 }
 
-export function DeleteAllPanel({ onDeleteAll, deleteReceipt }: DeleteAllPanelProps) {
+export function DeleteAllPanel({ onDeleteAll, deleteReceipt, pending = false, error, gmailConnected = false }: DeleteAllPanelProps) {
   const [stage, setStage] = useState<DeleteStage>("idle");
   const [typed, setTyped] = useState("");
 
@@ -112,17 +118,17 @@ export function DeleteAllPanel({ onDeleteAll, deleteReceipt }: DeleteAllPanelPro
 
   if (deleteReceipt) {
     const receipt: Array<[string, string]> = [
-      ["Gmail access", "OAuth token revoked"],
-      ["Purchases erased", String(deleteReceipt.ordersPurged)],
-      ["Refunds and deadlines erased", String(deleteReceipt.findingsPurged)],
-      ["Audit entries erased", String(deleteReceipt.auditEntriesPurged)],
-      ["Completed", formatDate(deleteReceipt.completedAt)],
+      ["Gmail access revocation", deleteReceipt.revokedToken ? "Confirmed" : "Not confirmed"],
+      ["Purchases erased", String(deleteReceipt.purged.orders)],
+      ["Refunds and deadlines erased", String(deleteReceipt.purged.findings)],
+      ["Audit entries erased", String(deleteReceipt.purged.audit)],
+      ["Completed", formatDate(deleteReceipt.at)],
     ];
     return (
       <div className="neu-inset rounded-xl p-6">
         <p className="eyebrow text-[#b0574c]">Deletion receipt</p>
         <p className="mt-3 font-sans text-base text-ink">
-          Everything was erased and Gmail access was revoked.
+          Stored data was erased. {deleteReceipt.revokedToken ? "Gmail access was revoked." : "No successful Google revocation was reported. Local credentials were removed."}
         </p>
         <dl className="mt-4 space-y-2.5 font-sans text-sm">
           {receipt.map(([label, value]) => (
@@ -133,7 +139,7 @@ export function DeleteAllPanel({ onDeleteAll, deleteReceipt }: DeleteAllPanelPro
           ))}
         </dl>
         <p className="mt-5 text-label text-ink-faint">
-          Simulated for the demo. No real data was deleted and no token was revoked.
+          This receipt reports the completed deletion response.
         </p>
       </div>
     );
@@ -142,13 +148,13 @@ export function DeleteAllPanel({ onDeleteAll, deleteReceipt }: DeleteAllPanelPro
   return (
     <div className="neu-raised-sm rounded-xl p-6">
       <p className="font-sans text-base text-ink">
-        <strong className="text-ink">Delete everything.</strong> This revokes PaperTrail&apos;s
-        Gmail access and permanently erases all stored data: purchases, the refunds and deadlines
+        <strong className="text-ink">Delete everything.</strong> {gmailConnected ? "This revokes Gmail access and permanently erases" : "This permanently erases"} all stored data: purchases, the refunds and deadlines
         we found, drafts and the audit log. This cannot be undone.
       </p>
 
+      {error ? <p role="alert" className="mt-3 text-sm">{error}</p> : null}
       {stage === "idle" ? (
-        <button type="button" className={`mt-5 ${destructive}`} onClick={startConfirm}>
+        <button type="button" disabled={pending} className={`mt-5 ${destructive}`} onClick={startConfirm}>
           Delete everything
         </button>
       ) : (
@@ -157,6 +163,7 @@ export function DeleteAllPanel({ onDeleteAll, deleteReceipt }: DeleteAllPanelPro
             Type <span className="font-bold text-[#b0574c]">{CONFIRM_WORD}</span> to confirm.
           </label>
           <input
+            disabled={pending}
             id="delete-confirm"
             type="text"
             value={typed}
@@ -168,12 +175,12 @@ export function DeleteAllPanel({ onDeleteAll, deleteReceipt }: DeleteAllPanelPro
             <button
               type="button"
               className={destructive}
-              disabled={typed !== CONFIRM_WORD}
+              disabled={pending || typed !== CONFIRM_WORD}
               onClick={confirmDelete}
             >
-              Revoke access and erase all data
+              {pending ? "Erasing data…" : "Revoke access and erase all data"}
             </button>
-            <Button variant="ghost" onClick={cancel}>
+            <Button variant="ghost" disabled={pending} onClick={cancel}>
               Cancel
             </Button>
           </div>

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ErrorState } from "@/components/states";
 import { ClaimView } from "@/components/views/ClaimView";
-import { useApproveClaim, useSaveClaim } from "@/hooks";
+import { useApproveClaim, useSaveClaim, useSetFindingStatus } from "@/hooks";
 import type { ClaimResponse } from "@/lib/api/types";
 import { saveThenApproveClaim, type ApproveClaimOutcome } from "./approveClaimFlow";
 
@@ -12,7 +12,7 @@ import { saveThenApproveClaim, type ApproveClaimOutcome } from "./approveClaimFl
 // (save edits -> approve -> copy, see approveClaimFlow.ts) and feeds the props-only ClaimView. `confirmed` (the view's
 // "Approved and copied" banner) is set only after all three steps succeeded.
 
-type Notice = Exclude<ApproveClaimOutcome["status"], "approved"> | "approve_first";
+type Notice = Exclude<ApproveClaimOutcome["status"], "approved">;
 
 async function copyToClipboard(text: string): Promise<void> {
   await navigator.clipboard.writeText(text);
@@ -21,62 +21,54 @@ async function copyToClipboard(text: string): Promise<void> {
 export function ClaimWrapper({
   claim,
   simulatedLabel,
-  demo,
+  demo, initialMailtoUrl,
 }: {
   claim: ClaimResponse;
   simulatedLabel: string;
   demo: boolean;
+  initialMailtoUrl?: string | null;
 }) {
   const findingId = claim.finding.id;
   const save = useSaveClaim();
+  const statusChange = useSetFindingStatus();
+  const [findingStatus, setFindingStatus] = useState(claim.finding.status);
   const approve = useApproveClaim();
-  const [confirmed, setConfirmed] = useState(false);
-  const [approvedMailtoUrl, setApprovedMailtoUrl] = useState<string | null>(null);
+  const [currentDraft, setCurrentDraft] = useState(claim.draft);
+  const [approved, setApproved] = useState(Boolean(claim.draft.approvedAt));
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const [pending, setPending] = useState(false);
+  const [approvedMailtoUrl, setApprovedMailtoUrl] = useState<string | null>(initialMailtoUrl ?? null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const inFlight = useRef(false);
 
-  // TEMPORARY guard for hard rule 2 until ClaimView takes approved/mailtoUrl props (#101); delete when that lands.
-  // ClaimView always renders an "Open in email" link built from its local text. Before a successful approval the
-  // click is blocked; after it, the click opens the server's mailtoUrl (the approved text), never the local one.
-  useEffect(() => {
-    function onMailtoClick(event: MouseEvent) {
-      const link = event.target instanceof Element ? event.target.closest('a[href^="mailto:"]') : null;
-      if (!link) return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (event.type !== "click") return;
-      if (approvedMailtoUrl) window.location.assign(approvedMailtoUrl);
-      else setNotice("approve_first");
-    }
-    document.addEventListener("click", onMailtoClick, true);
-    document.addEventListener("auxclick", onMailtoClick, true);
-    return () => {
-      document.removeEventListener("click", onMailtoClick, true);
-      document.removeEventListener("auxclick", onMailtoClick, true);
-    };
-  }, [approvedMailtoUrl]);
-
-  async function handleApprove(edited: { subject: string; body: string }) {
+  async function handleApprove(edited: { subject: string; body: string; recipient: string }) {
     if (inFlight.current) return;
     inFlight.current = true;
     // Saving clears any earlier approval on the server, so the page drops it too until the new approval succeeds.
-    setConfirmed(false);
+    setApproved(false);
+    setPending(true);
+    setCopyStatus("idle");
     setApprovedMailtoUrl(null);
     setNotice(null);
     try {
       const outcome = await saveThenApproveClaim(
-        { ...edited, recipient: claim.draft.recipient },
+        edited,
         {
           save: (edits) => save.run(findingId, edits),
-          approve: () => approve.run(findingId),
+          approve: async () => {
+            const result = await approve.run(findingId);
+            if (result) { setCurrentDraft(result.draft); setApproved(true); }
+            return result;
+          },
           copy: copyToClipboard,
         },
       );
       if (outcome.status === "approved" || outcome.status === "copy_failed") setApprovedMailtoUrl(outcome.mailtoUrl);
-      if (outcome.status === "approved") setConfirmed(true);
-      else setNotice(outcome.status);
+      if (outcome.status === "approved") setCopyStatus("copied");
+      else { setNotice(outcome.status); if (outcome.status === "copy_failed") setCopyStatus("failed"); }
     } finally {
       inFlight.current = false;
+      setPending(false);
     }
   }
 
@@ -85,18 +77,26 @@ export function ClaimWrapper({
       <ClaimView
         finding={claim.finding}
         order={claim.order}
-        draft={claim.draft}
+        draft={currentDraft}
         simulatedLabel={simulatedLabel}
         onApprove={handleApprove}
-        confirmed={confirmed}
+        approved={approved}
+        approvedAt={currentDraft.approvedAt}
+        mailtoUrl={approvedMailtoUrl}
+        copyStatus={copyStatus}
+        pending={pending || save.pending || statusChange.pending}
+        findingStatus={findingStatus}
+        onSetStatus={async status => { const result = await statusChange.run(findingId, status); if (result) setFindingStatus(result.finding.status); }}
+        onSave={async edited => {
+          setApproved(false); setApprovedMailtoUrl(null); setCopyStatus("idle");
+          const result = await save.run(findingId, edited);
+          if (result) setCurrentDraft(result.draft);
+        }}
+        error={save.error ?? approve.error ?? statusChange.error}
+        warnings={currentDraft.warnings}
+        note={currentDraft.note}
+        recipientVerified={currentDraft.recipientVerified}
       />
-      {notice === "approve_first" ? (
-        <ErrorState
-          title="Approve the draft to open it in email"
-          what="Your email app opens only after you approve this draft on this page."
-          fix="Approving logs it to your audit trail. You still send the email yourself."
-        />
-      ) : null}
       {notice === "save_failed" ? (
         <ErrorState
           title="Couldn't save your edits"

@@ -29,7 +29,19 @@ export interface ClaimViewProps {
   order: NormalizedOrder;
   draft: Draft;
   simulatedLabel: string;
-  onApprove: (edited: { subject: string; body: string }) => void;
+  onApprove: (edited: { subject: string; body: string; recipient: string }) => void;
+  approved?: boolean;
+  approvedAt?: string;
+  mailtoUrl?: string | null;
+  copyStatus?: "idle" | "copied" | "failed";
+  pending?: boolean;
+  error?: string | null;
+  warnings?: string[];
+  note?: string;
+  recipientVerified?: boolean;
+  onSave?: (edited: { subject: string; body: string; recipient: string }) => void;
+  onSetStatus?: (status: "open" | "resolved" | "dismissed") => void;
+  findingStatus?: Finding["status"];
   /** When provided, drives the confirmation banner instead of local state. */
   confirmed?: boolean;
 }
@@ -40,30 +52,19 @@ export function ClaimView({
   draft,
   simulatedLabel,
   onApprove,
-  confirmed,
+  approved = false, approvedAt, mailtoUrl, copyStatus = "idle", pending = false, error, warnings = [], note, recipientVerified, onSave, onSetStatus, findingStatus = finding.status,
 }: ClaimViewProps) {
   const [subject, setSubject] = useState(draft.subject);
   const [body, setBody] = useState(draft.body);
-  const [approvedLocal, setApprovedLocal] = useState(false);
+  const [recipient, setRecipient] = useState(draft.recipient);
 
   const subjectId = useId();
   const bodyId = useId();
 
   const amount = formatMoney(finding.amountAtStake, finding.currency);
-  const recipient = draft.recipient;
-
-  // mailto is an email affordance, not app routing — a plain anchor is fine.
-  const mailtoHref = `mailto:${recipient}?subject=${encodeURIComponent(
-    subject,
-  )}&body=${encodeURIComponent(body)}`;
-
-  const approved = confirmed ?? approvedLocal;
-
-  function handleApprove() {
-    onApprove({ subject, body });
-    // Only drive local confirmation when the parent isn't controlling it.
-    if (confirmed === undefined) setApprovedLocal(true);
-  }
+  const dirty = subject !== draft.subject || body !== draft.body || recipient !== draft.recipient;
+  const canOpenEmail = approved && !dirty && !pending && mailtoUrl?.startsWith("mailto:");
+  function handleApprove() { onApprove({ subject, body, recipient }); }
 
   return (
     <div>
@@ -83,11 +84,15 @@ export function ClaimView({
         ) : null}
       </header>
 
+      {recipientVerified === false ? <p className="mt-3 text-sm text-ink-muted">Check the recipient address before sending. It was inferred from the merchant.</p> : null}
+      {warnings.length ? <ul className="neu-inset mt-4 rounded-lg p-4 text-sm">{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul> : null}
+      {note ? <p className="mt-3 text-sm text-ink-muted">{note}</p> : null}
+      {error ? <p role="alert" className="mt-3 text-sm">{error}</p> : null}
       {/* The letter — editable, reads like paper */}
       <section className="neu-raised mt-8 rounded-xl p-6 md:p-8">
         <div className="flex items-baseline justify-between gap-4">
           <p className="eyebrow">To</p>
-          <p className="truncate text-sm text-ink-muted">{recipient}</p>
+          <label className="flex-1 text-sm text-ink-muted">Recipient<input aria-label="Recipient" disabled={pending} value={recipient} onChange={e => setRecipient(e.target.value)} className="neu-inset mt-2 w-full rounded-lg bg-transparent px-3 py-2" /></label>
         </div>
 
         <hr className="mt-4 border-0 border-t border-rule/70" />
@@ -97,6 +102,7 @@ export function ClaimView({
             Subject
           </label>
           <input
+            disabled={pending}
             id={subjectId}
             type="text"
             value={subject}
@@ -110,6 +116,7 @@ export function ClaimView({
             Message
           </label>
           <textarea
+            disabled={pending}
             id={bodyId}
             value={body}
             onChange={(e) => setBody(e.target.value)}
@@ -126,29 +133,35 @@ export function ClaimView({
         </p>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <Button type="button" variant="primary" onClick={handleApprove}>
-            Approve and copy
+          <Button type="button" variant="primary" disabled={pending} onClick={handleApprove}>
+            {pending ? "Saving approval…" : "Approve and copy"}
           </Button>
-          <a
-            href={mailtoHref}
+          {onSave ? <Button variant="secondary" disabled={pending} onClick={() => onSave({ subject, body, recipient })}>Save changes</Button> : null}
+          {canOpenEmail ? <a
+            href={mailtoUrl!}
             className="neu-raised-sm inline-flex items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-bold text-teal-deep transition-[box-shadow,transform] active:scale-[0.99]"
           >
             Open in email
-          </a>
+          </a> : null}
         </div>
       </section>
 
+      {onSetStatus ? <div className="mt-5 flex flex-wrap gap-3">
+        {findingStatus !== "resolved" ? <Button variant="secondary" disabled={pending} onClick={() => onSetStatus("resolved")}>Mark resolved</Button> : null}
+        {findingStatus !== "dismissed" ? <Button variant="secondary" disabled={pending} onClick={() => onSetStatus("dismissed")}>Dismiss</Button> : null}
+        {findingStatus === "resolved" || findingStatus === "dismissed" ? <Button variant="secondary" disabled={pending} onClick={() => onSetStatus("open")}>Reopen</Button> : null}
+      </div> : null}
       {/* Approval confirmation. The role=status live region is always mounted so
           screen readers observe it before the text appears; only its inner
           content is toggled on approval. */}
       <div role="status" aria-live="polite">
-        {approved ? (
+        {approved && !dirty ? (
           <div className="neu-inset animate-fade-rise mt-6 rounded-xl px-5 py-4">
             <p className="font-serif text-lg text-teal-deep">
-              Approved and copied to clipboard
+              {copyStatus === "copied" ? "Approved and copied to clipboard" : copyStatus === "failed" ? "Approved, but not copied" : "Claim approved"}
             </p>
             <p className="mt-1 text-sm text-ink-muted">
-              This approval is logged to your audit trail. You still send the
+              {approvedAt ? `Approved ${new Date(approvedAt).toLocaleString()}. ` : ""}This approval is logged to your audit trail. You still send the
               email yourself. PaperTrail never sends it for you.
             </p>
           </div>

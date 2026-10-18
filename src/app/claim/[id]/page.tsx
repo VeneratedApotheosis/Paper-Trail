@@ -1,3 +1,4 @@
+import { mailtoUrl } from "@/lib/claims/mailto";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState } from "@/components/states";
@@ -35,5 +36,5 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  return <ClaimWrapper claim={opened.claim} simulatedLabel={API_LABELS.simulatedPrice} demo={demo} />;
+  return <ClaimWrapper claim={opened.claim} simulatedLabel={API_LABELS.simulatedPrice} demo={demo} initialMailtoUrl={opened.claim.draft.approvedAt ? mailtoUrl(opened.claim.draft) : null} />;
 }

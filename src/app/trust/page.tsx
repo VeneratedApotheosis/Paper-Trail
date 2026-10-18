@@ -1,22 +1,18 @@
 "use client";
 
+import type { MerchantItem } from "@/components/DeleteAllPanel";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ErrorState, LedgerSkeleton } from "@/components/states";
 import { Button } from "@/components/ui/Button";
-import { TrustView } from "@/components/views/TrustView";
-import { useAction, useAudit, useLedger } from "@/hooks";
+import { TrustView, type DeleteReceipt } from "@/components/views/TrustView";
+import { useAction, useAudit, useLedger, useSession } from "@/hooks";
 import { deleteAll, excludeMerchant, includeMerchant } from "@/lib/api/client";
 import type { LedgerResponse } from "@/lib/api/types";
 
 // Thin wrapper for "/trust" (issue #69): real audit log (GET /api/audit), merchant exclusions
 // (POST/DELETE /api/merchants/exclude) and delete-all (POST /api/delete-all, same origin).
 //
-// The deletion receipt is NOT passed to TrustView: DeleteAllPanel's receipt always says "OAuth token revoked" and
-// "Simulated for the demo. No real data was deleted", both false for the real response. The real receipt (time,
-// purged counts, whether the token was revoked) is the single `delete` audit entry the API leaves behind, which the
-// refetched audit log shows. Real receipt props on DeleteAllPanel are an INTERFACE request for the view owner.
-
 // Same normalization as normalizeMerchantKey (src/lib/pipeline/run.ts, which pulls Node-only ingestion code into a
 // client bundle): the API returns excluded merchants as these lowercase keys.
 function merchantKey(name: string): string {
@@ -24,7 +20,7 @@ function merchantKey(name: string): string {
 }
 
 interface MerchantList {
-  merchants: string[];
+  merchants: MerchantItem[];
   excludedMerchants: string[];
 }
 
@@ -36,7 +32,7 @@ function buildMerchantList(ledger: LedgerResponse, excludedNames: Record<string,
   const excludedMerchants = ledger.excludedMerchants.map((key) => names.get(key) ?? excludedNames[key] ?? key);
   const merchants = new Set([...names.values(), ...excludedMerchants]);
   return {
-    merchants: [...merchants].sort((a, b) => a.localeCompare(b)),
+    merchants: [...merchants].sort((a, b) => a.localeCompare(b)).map(name => ({ key: merchantKey(name), displayName: name, excluded: ledger.excludedMerchants.includes(merchantKey(name)) })),
     excludedMerchants,
   };
 }
@@ -48,12 +44,12 @@ function setMerchantExcluded(name: string, shouldExclude: boolean) {
 
 export default function TrustPage() {
   const ledger = useLedger();
+  const session = useSession();
+  const [receipt, setReceipt] = useState<DeleteReceipt | null>(null);
   const audit = useAudit();
   const deletion = useAction(deleteAll);
   const merchantToggle = useAction(setMerchantExcluded);
   const [excludedNames, setExcludedNames] = useState<Record<string, string>>({});
-  // useAction keeps its error until the next run; "Back to your data" hides it until then.
-  const [actionErrorDismissed, setActionErrorDismissed] = useState(false);
 
   function refetchAll() {
     ledger.refetch();
@@ -61,17 +57,19 @@ export default function TrustPage() {
   }
 
   async function handleToggleMerchant(name: string, shouldExclude: boolean) {
-    if (merchantToggle.pending || deletion.pending) return;
-    if (shouldExclude) setExcludedNames((prev) => ({ ...prev, [merchantKey(name)]: name }));
-    setActionErrorDismissed(false);
+    if (merchantToggle.pending) return;
+    if (shouldExclude) setExcludedNames((prev) => ({ ...prev, [merchantKey(name)]: ledger.data?.orders.find(order => merchantKey(order.merchant.name) === merchantKey(name))?.merchant.name ?? name }));
+
     // useAction refreshes the shared cache (ledger and audit) after a successful toggle.
     await merchantToggle.run(name, shouldExclude);
   }
 
   async function handleDeleteAll() {
     if (deletion.pending || merchantToggle.pending) return;
-    setActionErrorDismissed(false);
-    if (!(await deletion.run())) return;
+
+    const result = await deletion.run();
+    if (!result) return;
+    setReceipt(result);
     setExcludedNames({});
     // Only the delete record remains: useAction already refetched the audit log, which is the real receipt.
   }
@@ -96,31 +94,11 @@ export default function TrustPage() {
     );
   }
 
-  // `deletion.pending` (which also covers the post-delete cache refresh) swaps in the skeleton, which remounts
-  // DeleteAllPanel out of its confirm step. Merchant toggles keep the view.
-  if (!ledger.data || !audit.data || deletion.pending) {
+  // Keep the controls mounted during mutations so pending state and receipts stay visible.
+  if (!ledger.data || !audit.data) {
     return (
       <AppShell demo={showsDemo}>
         <LedgerSkeleton />
-      </AppShell>
-    );
-  }
-
-  const actionError = actionErrorDismissed ? null : (deletion.error ?? merchantToggle.error);
-  if (actionError) {
-    const deleteFailed = deletion.error !== null;
-    return (
-      <AppShell demo={showsDemo}>
-        <ErrorState
-          title={deleteFailed ? "Couldn't delete your data" : "Couldn't update merchant exclusions"}
-          what={actionError}
-          fix="Go back to your data and try again."
-          actions={
-            <Button type="button" onClick={() => setActionErrorDismissed(true)}>
-              Back to your data
-            </Button>
-          }
-        />
       </AppShell>
     );
   }
@@ -134,6 +112,12 @@ export default function TrustPage() {
       excludedMerchants={excludedMerchants}
       onToggleMerchant={handleToggleMerchant}
       onDeleteAll={handleDeleteAll}
+      deleteReceipt={receipt}
+      deletePending={deletion.pending}
+      deleteError={deletion.error}
+      merchantPending={merchantToggle.pending || deletion.pending}
+      merchantError={merchantToggle.error}
+      gmailConnected={session.data?.connected ?? false}
     />
   );
 }

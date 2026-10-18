@@ -49,15 +49,17 @@ function parseNumericInput(raw: string): number | null {
 export function ReviewCard({
   order,
   onEdit,
-  onConfirm,
+  onConfirm, pending = false, saveState,
 }: {
   order: NormalizedOrder;
+  pending?: boolean;
+  saveState?: "unsaved" | "saving" | "saved";
   onEdit: (orderId: string, edit: OrderFieldEdit) => void;
   onConfirm: (orderId: string) => void;
 }) {
   // View state: read-only by default, Edit unlocks the input wells.
   const [isEditing, setIsEditing] = useState(false);
-  // Whether the user has touched any field, so we can surface the stubbed audit note.
+  // Whether the user has touched any field, so we can show unsaved changes.
   const [edited, setEdited] = useState(false);
 
   function handleEdit(edit: OrderFieldEdit) {
@@ -85,6 +87,7 @@ export function ReviewCard({
           <FieldLabel>Merchant</FieldLabel>
           {isEditing ? (
             <input
+              disabled={pending}
               className={inputClass}
               value={order.merchant.name}
               onChange={(e) => handleEdit({ field: "merchantName", value: e.target.value })}
@@ -98,6 +101,7 @@ export function ReviewCard({
           <FieldLabel>Order reference</FieldLabel>
           {isEditing ? (
             <input
+              disabled={pending}
               className={inputClass}
               value={order.orderRef ?? ""}
               onChange={(e) => handleEdit({ field: "orderRef", value: e.target.value })}
@@ -111,6 +115,7 @@ export function ReviewCard({
           <FieldLabel>Placed on</FieldLabel>
           {isEditing ? (
             <input
+              disabled={pending}
               type="date"
               className={inputClass}
               value={order.placedAt.slice(0, 10)}
@@ -127,6 +132,7 @@ export function ReviewCard({
           <FieldLabel>Order total ({order.currency})</FieldLabel>
           {isEditing ? (
             <input
+              disabled={pending}
               type="number"
               step="0.01"
               className={`${inputClass} tabular-nums`}
@@ -156,6 +162,7 @@ export function ReviewCard({
                 {isEditing ? (
                   <>
                     <input
+              disabled={pending}
                       aria-label="Line item name"
                       className={`${inputClass} min-w-0 flex-1`}
                       value={item.name}
@@ -168,6 +175,7 @@ export function ReviewCard({
                       }
                     />
                     <input
+              disabled={pending}
                       aria-label="Quantity"
                       type="number"
                       min="1"
@@ -180,6 +188,7 @@ export function ReviewCard({
                       }}
                     />
                     <input
+              disabled={pending}
                       aria-label="Unit price"
                       type="number"
                       step="0.01"
@@ -226,12 +235,12 @@ export function ReviewCard({
       </p>
 
       <footer className="mt-4 flex flex-wrap items-center gap-3">
-        <Button onClick={() => onConfirm(order.id)}>Confirm</Button>
-        <Button variant="secondary" onClick={() => setIsEditing((v) => !v)}>
+        <Button disabled={pending} onClick={() => onConfirm(order.id)}>Confirm</Button>
+        <Button disabled={pending} variant="secondary" onClick={() => setIsEditing((v) => !v)}>
           {isEditing ? "Done" : "Edit"}
         </Button>
         <span className="text-sm text-ink-faint">
-          {edited ? "Your edits are saved when you confirm" : "Not counted in what you're owed until you confirm"}
+          {saveState === "saving" ? "Saving changes…" : saveState === "saved" ? "Changes saved to the audit trail" : edited || saveState === "unsaved" ? "Unsaved changes. Confirm to save and check this purchase." : "Not counted in what you're owed until you confirm"}
         </span>
       </footer>
     </article>

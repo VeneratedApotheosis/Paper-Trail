@@ -1,5 +1,8 @@
 "use client";
 
+import type { ReactNode } from "react";
+import type { ReviewQueueItem } from "@/lib/pipeline/run";
+import { Button } from "@/components/ui/Button";
 import { ReviewCard, type OrderFieldEdit } from "@/components/ReviewCard";
 import { EmptyState } from "@/components/states";
 import type { NormalizedOrder } from "@/lib/contracts";
@@ -11,13 +14,18 @@ import type { NormalizedOrder } from "@/lib/contracts";
 // local UI state; only queue/confirm data operations leave the view.
 export interface ReviewViewProps {
   items: NormalizedOrder[];
+  pendingOrderId?: string | null;
+  saveStates?: Record<string, "unsaved" | "saving" | "saved">;
+  notice?: ReactNode;
+  unreadableItems?: ReviewQueueItem[];
+  onLoadDemo?: () => void;
   onConfirm: (orderId: string) => void;
   // Field edits bubble as the typed OrderFieldEdit ReviewCard emits (numeric
   // fields stay numbers) so the edit flow is type-safe end to end.
   onEditField: (orderId: string, edit: OrderFieldEdit) => void;
 }
 
-export function ReviewView({ items, onConfirm, onEditField }: ReviewViewProps) {
+export function ReviewView({ items, onConfirm, onEditField, pendingOrderId, saveStates = {}, notice, unreadableItems = [], onLoadDemo }: ReviewViewProps) {
   return (
     <>
       <div className="mb-6">
@@ -28,8 +36,10 @@ export function ReviewView({ items, onConfirm, onEditField }: ReviewViewProps) {
         </p>
       </div>
 
+      {notice ? <div role="status" className="mb-5">{notice}</div> : null}
+      {unreadableItems.length ? <section className="neu-inset mb-5 rounded-lg p-5"><h2 className="font-serif text-xl">Emails that need a manual check</h2><p className="mt-2 text-sm">These emails could not become purchases and are excluded from your owed total. Check the receipts in your inbox.</p><ul className="mt-3 space-y-2 text-sm">{unreadableItems.map((item, i) => <li key={`${item.emailId}-${i}`}>{item.emailId}: {item.reason}</li>)}</ul></section> : null}
       {items.length === 0 ? (
-        <EmptyState title="Nothing needs a quick check">
+        <EmptyState title="Nothing needs a quick check" actions={onLoadDemo ? <Button onClick={onLoadDemo}>Try demo data</Button> : undefined}>
           Orders we aren&apos;t sure about will show up here.
         </EmptyState>
       ) : (
@@ -43,6 +53,8 @@ export function ReviewView({ items, onConfirm, onEditField }: ReviewViewProps) {
               <ReviewCard
                 key={order.id}
                 order={order}
+                pending={Boolean(pendingOrderId)}
+                saveState={pendingOrderId === order.id ? "saving" : saveStates[order.id]}
                 onEdit={onEditField}
                 onConfirm={onConfirm}
               />

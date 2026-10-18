@@ -4,7 +4,7 @@ import { AuditLogTable } from "@/components/AuditLogTable";
 import {
   DeleteAllPanel,
   MerchantExcludePanel,
-  type DeleteReceipt,
+  type DeleteReceipt, type MerchantExcludePanelProps,
 } from "@/components/DeleteAllPanel";
 
 export type { DeleteReceipt };
@@ -17,11 +17,14 @@ export type { DeleteReceipt };
 // routing. Data is typed via @/lib/types.
 export interface TrustViewProps {
   auditEntries: AuditEntry[];
-  merchants: string[];
+  merchants: MerchantExcludePanelProps["merchants"];
   excludedMerchants: string[];
   onToggleMerchant: (name: string, exclude: boolean) => void;
   onDeleteAll: () => void;
   deleteReceipt?: DeleteReceipt | null;
+  deletePending?: boolean; deleteError?: string | null;
+  merchantPending?: boolean; merchantError?: string | null;
+  gmailConnected?: boolean;
 }
 
 // What the app keeps. Lean copy, no em dashes.
@@ -43,7 +46,7 @@ export function TrustView({
   excludedMerchants,
   onToggleMerchant,
   onDeleteAll,
-  deleteReceipt,
+  deleteReceipt, deletePending, deleteError, merchantPending, merchantError, gmailConnected,
 }: TrustViewProps) {
   return (
     <AppShell>
@@ -114,6 +117,8 @@ export function TrustView({
           merchants={merchants}
           excludedMerchants={excludedMerchants}
           onToggleMerchant={onToggleMerchant}
+          pending={merchantPending}
+          error={merchantError}
         />
       </section>
 
@@ -123,9 +128,9 @@ export function TrustView({
           Delete everything
         </h2>
         <p className="mb-5 mt-2 font-sans text-sm text-ink-muted">
-          Revoke Gmail access and erase all stored data, with a confirmation receipt.
+          Erase stored data and remove any connected Gmail access, with a confirmation receipt.
         </p>
-        <DeleteAllPanel onDeleteAll={onDeleteAll} deleteReceipt={deleteReceipt} />
+        <DeleteAllPanel onDeleteAll={onDeleteAll} deleteReceipt={deleteReceipt} pending={deletePending} error={deleteError} gmailConnected={gmailConnected} />
       </section>
     </AppShell>
   );
