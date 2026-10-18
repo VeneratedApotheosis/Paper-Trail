@@ -5,7 +5,7 @@ import { createFileCache, extract, type ExtractionCache } from "@/lib/ingestion"
 import { FixtureLlmClient } from "@/lib/llm";
 import { llmCallAuditEvent } from "@/lib/pipeline/extractors";
 import { extractionFromGoldLabel } from "@/lib/pipeline/gold";
-import { runPipeline, type PipelineAuditEvent, type PipelineExtractor, type PipelineResult } from "@/lib/pipeline/run";
+import { runPipeline, type PipelineAuditEvent, type PipelineDeps, type PipelineExtractor, type PipelineResult } from "@/lib/pipeline/run";
 import { PriceFeedSchema, type PriceFeed } from "@/lib/prices/feed";
 import goldJson from "../../../seed/gold_labels.json";
 import inboxJson from "../../../seed/inbox.json";
@@ -73,6 +73,9 @@ export interface SeedDemoOptions {
   /** Defaults to SEED_LLM_CACHE_PATH. */
   cachePath?: string;
   auditClock?: () => Date;
+  /** Quality tracking hooks (#117), passed straight to the pipeline. */
+  observer?: PipelineDeps["observer"];
+  classOverride?: PipelineDeps["classOverride"];
 }
 
 export interface SeedDemoResult extends PipelineResult {
@@ -95,6 +98,8 @@ export async function loadSeedDemo(options: SeedDemoOptions = {}): Promise<SeedD
     applyPrefilter: true,
     sourceLabel: "demo, synthetic seed inbox",
     auditClock: options.auditClock,
+    observer: options.observer,
+    classOverride: options.classOverride,
   });
   return { ...result, asOf: seedInbox.asOf, simulatedPriceFeed: seedPriceFeed.simulated };
 }

@@ -70,7 +70,7 @@ export interface SyncAccountsOptions {
   accounts: readonly GmailAccountTarget[];
   signal: AbortSignal;
   /** Fresh pipeline deps for each account (extractor, audit, exclusions). */
-  pipeline: () => PipelineDeps;
+  pipeline: (account: GmailAccountTarget) => PipelineDeps;
   /** Reporter per account; the route wires it to gmailProgress. */
   reporter: (account: GmailAccountTarget) => {
     update: (progress: GmailWorkProgress) => void;
@@ -81,7 +81,7 @@ export interface SyncAccountsOptions {
    * Commits one account's finished sync. Returns false when the store was reset meanwhile (delete-all, demo reset):
    * the whole sync stops with `data_deleted` and nothing further is published.
    */
-  publish: (accountId: string, result: PipelineResult) => boolean;
+  publish: (accountId: string, result: PipelineResult, synced: GmailSyncResult) => boolean;
   /** Total budget across accounts; defaults to SYNC_BUDGET_MS. Server-side/test injection only. */
   totalBudgetMs?: number;
 }
@@ -115,10 +115,10 @@ export async function syncGmailAccounts(options: SyncAccountsOptions): Promise<S
       if (!account.connected) throw new AuthError("token_expired");
       const budgetMs = Math.max(1, Math.floor((total - (Date.now() - startedAt)) / (options.accounts.length - index)));
       const synced = await syncGmail({ ...account.deps, sourceAccount: account.id, budgetMs, onProgress: report.update,
-        pipeline: options.pipeline() });
+        pipeline: options.pipeline(account) });
       options.signal.throwIfAborted();
       if (!account.active()) throw new GmailError(401, "token_expired");
-      if (!options.publish(account.id, synced.result)) {
+      if (!options.publish(account.id, synced.result, synced)) {
         report.fail();
         throw new GmailError(409, "data_deleted");
       }

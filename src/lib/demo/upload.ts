@@ -1,8 +1,8 @@
 import type { RawEmail } from "@/lib/contracts";
 import type { ExtractionCache } from "@/lib/ingestion";
 import type { LlmClient } from "@/lib/llm";
-import { createLlmExtractor } from "@/lib/pipeline/extractors";
-import { runPipeline, type PipelineAuditEvent, type PipelineResult } from "@/lib/pipeline/run";
+import { createLlmExtractor, type LlmExtractorOptions } from "@/lib/pipeline/extractors";
+import { runPipeline, type PipelineAuditEvent, type PipelineDeps, type PipelineResult } from "@/lib/pipeline/run";
 import { loadSeedLlmCache } from "./seed";
 
 /** Max total upload size accepted by POST /api/upload. */
@@ -24,6 +24,10 @@ export interface UploadPipelineOptions {
   excludedMerchants?: ReadonlySet<string>;
   /** Defaults to the Anthropic client; without ANTHROPIC_API_KEY, cache misses go to the review queue. */
   llm?: LlmClient;
+  /** Quality tracking hooks (#117). */
+  observer?: PipelineDeps["observer"];
+  classOverride?: PipelineDeps["classOverride"];
+  onUsage?: LlmExtractorOptions["onUsage"];
 }
 
 /** Runs uploaded .eml/.mbox emails through the shared pipeline with real (cached) LLM extraction. */
@@ -32,6 +36,7 @@ export function runUploadPipeline(emails: readonly RawEmail[], options: UploadPi
     cache: layeredCache(options.cache, loadSeedLlmCache()),
     llm: options.llm,
     audit: options.audit,
+    onUsage: options.onUsage,
   });
   return runPipeline(emails, {
     now: options.now,
@@ -40,5 +45,7 @@ export function runUploadPipeline(emails: readonly RawEmail[], options: UploadPi
     excludedMerchants: options.excludedMerchants,
     applyPrefilter: true,
     sourceLabel: "upload",
+    observer: options.observer,
+    classOverride: options.classOverride,
   });
 }

@@ -27,6 +27,8 @@ export interface LlmExtractorOptions {
   /** Defaults to extract()'s AnthropicLlmClient, which throws LlmUnavailableError without ANTHROPIC_API_KEY. */
   llm?: LlmClient;
   audit?: (event: PipelineAuditEvent) => void;
+  /** Sees every extract() audit row (token counts, cache hits, failures) for quality reports (#117). */
+  onUsage?: (entry: ExtractionAuditEntry) => void;
   now?: () => Date;
 }
 
@@ -37,6 +39,9 @@ export function createLlmExtractor(options: LlmExtractorOptions = {}): PipelineE
       cache: options.cache,
       llm: options.llm,
       now: options.now,
-      audit: (entry) => options.audit?.(llmCallAuditEvent(entry, redacted)),
+      audit: (entry) => {
+        options.onUsage?.(entry);
+        options.audit?.(llmCallAuditEvent(entry, redacted));
+      },
     });
 }

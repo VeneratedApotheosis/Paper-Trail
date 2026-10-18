@@ -309,3 +309,38 @@ return <OrderDetail order={data.order} findings={data.findings} />; // a client 
 // client component
 const { data, error, loading, refetch } = useLedger();
 ```
+
+## Quality tracking (issue #117)
+
+Tracks and optimizes receipt quality on real data. Everything is per store scope (the signed-in profile, or the anonymous
+demo), `Cache-Control: no-store`, and built from counts, safe metadata and **redacted** text: no raw bodies, addresses or
+`To` headers are kept. Code: `src/lib/quality/**`, `src/lib/eval/real.ts`.
+
+| Route | Purpose |
+|---|---|
+| `GET /api/quality` | `{ latest: SyncQualityReport \| null, history: SyncQualityReport[] }`: one report per finished run (Gmail: per account; upload; demo), history capped at 20, oldest first |
+| `GET /api/quality/skipped` | `{ skipped: SkippedEmail[], total }`: emails that produced no order |
+| `POST /api/quality/skipped/:emailId/receipt` `{ class? }` | "This is a receipt": extracts the email (receipt path forced; cache first, else Claude), merges it through the normal matcher + rules, saves a label, writes an audit row, removes it from the list. Returns `{ emailId, class, extracted, needsReview, orderId, excludedMerchant, labeled, summary }`. No Claude key / provider down: 503 with `details.labeled: true` (label saved, email stays listed) |
+| `POST /api/quality/skipped/:emailId/not-receipt` | For a false positive (an extracted email): removes its order when it was the order's only email, saves a label, lists the email as skipped. An order that also holds other emails is kept (`keptSharedOrders`): fix it in Review |
+| `GET /api/quality/eval` | Scores the saved labels: receipt-gate precision/recall (prefilter + classifier on the stored redacted text) and per-field extraction accuracy. **Cache only, never calls a model**: labels without a cached extraction are listed as `unscored` |
+| `POST /api/quality/experiment` `{ model?, promptVariant? }` | Runs the labeled set (at most 50 labels with corrected fields, newest first) through `model` / `promptVariant` (`default`, `conservative`, `itemized`) and the current setting, returns both side by side (accuracy, per-field, calls, tokens, estimated USD cost). **Calls Claude** (once per label per side; the current side is answered from the live cache where possible). Does not change `LLM_MODEL`, the live cache or the ledger. Audited. 400 without labels, 503 without a key, 409 while one is running |
+
+`SyncQualityReport`: `{ id, at, source: gmail|upload|demo, accountId?, fetched, prefilteredOut, classified: {class: n},
+skippedNonReceipt, extracted, lowConfidence, extractionFailures, matchedOrders, findings, llmCalls, inputTokens,
+outputTokens, bodySource: { plain, html } }`. `llmCalls` counts requests that left the machine (cache hits are free);
+`bodySource` counts decoded Gmail messages and `.eml` uploads (zero for the demo and `.mbox` uploads).
+`SkippedEmail`: `{ emailId, accountId?, from: { name, domain }, subject (redacted), date, reason: prefilter|marketing|not_receipt|phishing, classConfidence }`.
+
+**Labels** live in the `quality_label` table of the same SQLite file as the Gmail accounts (`DATABASE_URL`, default
+`./papertrail.sqlite`, gitignored), keyed by store scope and email id (latest correction wins): `{ emailId, accountId?,
+source: review|feedback, class, fields (corrected, or null), redactedText, textHash, subject, from (sanitized: name +
+domain), date, at }`. Review edits label only the edited field, a confirmation labels every field shown (orders built
+from one email only); "receipt / not a receipt" feedback labels the class only (`fields: null`), because model output is
+not ground truth. Feedback labels also override the classifier (and bypass the prefilter) on the next sync / upload of
+the same email id. `POST /api/delete-all` removes the scope's labels. The table is created on first write; reads and
+delete-all never create the database file.
+
+Redacted texts of the latest run are kept in memory only (max 400 emails, skipped ones first) so feedback and labels need
+no re-fetch; delete-all and a demo reset clear them. Typed client: `getQualityReports`, `getSkippedEmails`,
+`markSkippedAsReceipt`, `markNotReceipt`, `getQualityEval`, `runQualityExperiment`. UI: the "Quality" section of `/eval`
+(`QualitySection`, data via `useQuality`).

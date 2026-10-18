@@ -19,14 +19,21 @@ import type {
   GmailSyncResponse,
   GmailSyncStatus,
   LedgerResponse,
+  MarkNotReceiptResponse,
+  MarkReceiptResponse,
   MerchantExcludeResponse,
   OrderResponse,
   PipelineRunResponse,
   PrefilterResponse,
+  QualityEvalResponse,
+  QualityReportsResponse,
   ResetDemoResponse,
   SessionStatus,
+  SkippedEmailsResponse,
   UploadResponse,
 } from "./types";
+import type { EmailClass } from "@/lib/contracts";
+import type { ExperimentRequest, ExperimentResult } from "@/lib/quality/experiment";
 import { encodeIdSegment } from "./ids";
 
 export { safeDecode } from "./ids";
@@ -212,3 +219,41 @@ export function saveClaim(findingId: string, edits: ClaimEditRequest): Promise<C
 export function approveClaim(findingId: string): Promise<ClaimApproveResponse> {
   return request(`${claimPath(findingId)}/approve`, { method: "POST" });
 }
+
+/** GET /api/quality: latest sync quality report + history (oldest first, at most 20) for this account (#117). */
+export function getQualityReports(): Promise<QualityReportsResponse> {
+  return request("/api/quality");
+}
+
+/** GET /api/quality/skipped: emails that produced no order, with safe metadata and the reason (no bodies). */
+export function getSkippedEmails(): Promise<SkippedEmailsResponse> {
+  return request("/api/quality/skipped");
+}
+
+/**
+ * POST /api/quality/skipped/:emailId/receipt: "this is a receipt". Extracts the email (may call Claude when it is not
+ * cached), merges it into the ledger and saves a label. Without a Claude key it answers 503 with `details.labeled: true`
+ * (the correction is saved and applies on the next sync). `invalidate()` the ledger afterwards.
+ */
+export function markSkippedAsReceipt(emailId: string, options: { class?: EmailClass } = {}): Promise<MarkReceiptResponse> {
+  return request(`/api/quality/skipped/${encodeIdSegment(emailId)}/receipt`, sendJson("POST", options));
+}
+
+/** POST /api/quality/skipped/:emailId/not-receipt: removes a false positive from the ledger and saves a label. */
+export function markNotReceipt(emailId: string): Promise<MarkNotReceiptResponse> {
+  return request(`/api/quality/skipped/${encodeIdSegment(emailId)}/not-receipt`, { method: "POST" });
+}
+
+/** GET /api/quality/eval: gate precision/recall and field accuracy on the saved labels (cache only, no model calls). */
+export function getQualityEval(): Promise<QualityEvalResponse> {
+  return request("/api/quality/eval");
+}
+
+/**
+ * POST /api/quality/experiment: runs the labeled set (at most 50) through another model / prompt and returns accuracy
+ * and cost next to the current setting. CALLS CLAUDE; never changes the live setting. Takes a while.
+ */
+export function runQualityExperiment(options: ExperimentRequest = {}): Promise<ExperimentResult> {
+  return request("/api/quality/experiment", sendJson("POST", options));
+}
+

@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Finding, FindingStatus, NormalizedOrder } from "@/lib/contracts";
 import { createMemoryCache, type ExtractionCache } from "@/lib/ingestion";
+import { deleteScopeLabels } from "@/lib/quality/labels";
+import { emptyQualityData, type QualityData } from "@/lib/quality/types";
 import { mergeAccountResults, type AccountPipelineResult } from "@/lib/pipeline/accounts";
 import {
   isExcludedMerchant,
@@ -41,6 +43,8 @@ interface StoreData {
   excludedMerchants: Set<string>;
   extractionCache: ExtractionCache;
   revokeOAuth: RevokeOAuthHook | null;
+  /** Quality reports, skipped-email list and redacted texts (#117); cleared by delete-all and clearLedger. */
+  quality: QualityData;
   /** Bumped by deleteAll and clearLedger so in-flight work (upload, demo load) can tell its data was deleted. */
   generation: number;
 }
@@ -106,6 +110,7 @@ function emptyData(): StoreData {
     excludedMerchants: new Set(),
     extractionCache: createMemoryCache(),
     revokeOAuth: null,
+    quality: emptyQualityData(),
     generation: 0,
   };
 }
@@ -184,7 +189,9 @@ function applyPipelineResult(store: StoreData, mode: Exclude<StoreMode, "empty">
   store.mode = mode;
   store.asOf = asOf;
   // New snapshots invalidate stale review forms, including after a repeat sync.
-  store.orders = result.orders.map(order => ({ ...order, review: { revision: randomUUID() } }));
+  // Orders that came through unchanged (same object) keep their revision, so a feedback edit does not stale other forms.
+  const unchanged = new Set(store.orders);
+  store.orders = result.orders.map(order => unchanged.has(order) ? order : ({ ...order, review: { revision: randomUUID() } }));
   store.findings = result.findings.map((finding) => {
     const status = previousStatus.get(finding.id);
     return status === undefined || status === finding.status ? finding : { ...finding, status };
@@ -215,6 +222,34 @@ export function setAccountPipelineResult(accountId: string, asOf: string, result
   const merged = mergeAccountResults([...store.accountResults.values()], new Date(asOf));
   applyPipelineResult(store, "gmail", merged.asOf, merged.result);
   store.lastSyncAt = [...store.accountResults.values()].map((entry) => entry.syncedAt).sort().at(-1) ?? syncedAt;
+}
+
+/**
+ * Applies a pure change to the published ledger (#117 feedback: add or remove one email's contribution) and, when
+ * `accountId` has a stored Gmail result, to that result too, so a later sync of another account (which rebuilds the
+ * ledger from the stored results) keeps the change. Statuses and drafts carry over like any republish.
+ */
+export function updateLedgerResult(accountId: string | undefined, update: (result: PipelineResult) => PipelineResult): void {
+  const store = data();
+  if (store.mode === "empty" || !store.asOf) throw new Error("No ledger to update");
+  const current: PipelineResult = {
+    orders: store.orders, findings: store.findings, reviewQueue: store.reviewQueue,
+    stats: store.stats ?? { emails: 0, prefilteredOut: 0, classes: {}, extracted: 0, skipped: 0,
+      extractionOrigins: { llm: 0, cache: 0, gold: 0 }, orders: 0, excludedOrders: 0, findings: 0, needsReview: 0 },
+  };
+  applyPipelineResult(store, store.mode, store.asOf, update(current));
+  const part = accountId === undefined ? undefined : store.accountResults.get(accountId);
+  if (part) store.accountResults.set(part.accountId, { ...part, result: update(part.result) });
+}
+
+/** Quality data of the current store scope (#117); see src/lib/quality. */
+export function getQualityData(): QualityData {
+  return data().quality;
+}
+
+/** Key of the current store scope: the signed-in profile id, or "anonymous" for the demo. Keys the local label store. */
+export function currentStoreScope(): string {
+  return context.getStore() ?? "anonymous";
 }
 
 /** ISO time each linked account's last sync was published, by account id (cleared by delete-all and clearLedger). */
@@ -266,6 +301,7 @@ export function clearLedger(): void {
   store.reviewQueue = [];
   store.stats = null;
   store.accountResults = new Map();
+  store.quality = emptyQualityData();
 }
 
 /** Apply a fully validated review result to one visible order, without affecting other orders. */
@@ -365,6 +401,7 @@ export async function deleteAll(
     audit: store.audit.length,
   };
   const at = clock().toISOString();
+  const deletedLabels = deleteScopeLabels(currentStoreScope());
   const fresh = emptyData();
   fresh.revokeOAuth = store.revokeOAuth;
   fresh.generation = store.generation + 1;
@@ -372,7 +409,7 @@ export async function deleteAll(
   appendAudit({
     at,
     type: "delete",
-    detail: `Deleted everything: ${purged.orders} orders, ${purged.findings} findings, ${purged.drafts} drafts, ${purged.reviewItems} review items, ${purged.audit} audit entries, extraction cache, merchant exclusions; ${revokeNote}`,
+    detail: `Deleted everything: ${purged.orders} orders, ${purged.findings} findings, ${purged.drafts} drafts, ${purged.reviewItems} review items, ${purged.audit} audit entries, extraction cache, merchant exclusions${deletedLabels > 0 ? `, ${deletedLabels} quality labels` : ""}; ${revokeNote}`,
   });
   return { deleted: true, ok: true, at, revokedToken, purged };
 }

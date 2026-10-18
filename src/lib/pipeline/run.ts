@@ -46,6 +46,31 @@ export interface PipelineDeps {
   auditClock?: () => Date;
   /** Max extractor calls in flight at once (default 4; 1 = sequential). Output order never depends on it. */
   extractConcurrency?: number;
+  /**
+   * Called once per email in input order when the run finishes (#117 quality tracking). It sees redacted text only;
+   * what it keeps is its own business, so it must not persist anything but redacted data.
+   */
+  observer?: (observation: PipelineEmailObservation) => void;
+  /**
+   * Class the user set for an email by hand (#117 "this is a receipt" / "not a receipt" feedback). A receipt class
+   * overrides the classifier and bypasses the prefilter; marketing / not_receipt skips extraction.
+   */
+  classOverride?: (emailId: string) => EmailClass | undefined;
+}
+
+/** How one email ended up in a run; see PipelineDeps.observer. */
+export type PipelineEmailOutcome = "prefiltered" | "skipped" | "extracted" | "extraction_failed";
+
+export interface PipelineEmailObservation {
+  /** Redacted copy: `to` and `from` are still the raw headers, callers must not keep them as they are. */
+  email: RedactedEmail;
+  /** Absent for emails dropped by the prefilter (they are never classified). */
+  classification?: Classification;
+  /** True when `classOverride` decided the class instead of classify(). */
+  classOverridden: boolean;
+  outcome: PipelineEmailOutcome;
+  /** Lowest extraction confidence; set when `outcome` is "extracted". */
+  confMin?: number;
 }
 
 export const DEFAULT_EXTRACT_CONCURRENCY = 4;
@@ -100,6 +125,12 @@ export function isExcludedMerchant(order: NormalizedOrder, excluded: ReadonlySet
   return keys.some((key) => excluded.has(normalizeMerchantKey(key)));
 }
 
+function observedOutcome(outcome: EmailOutcome): PipelineEmailOutcome {
+  if (outcome.prefilteredOut) return "prefiltered";
+  if (outcome.extracted) return "extracted";
+  return outcome.skipped ? "skipped" : "extraction_failed";
+}
+
 function clip(text: string): string {
   return text.length <= MAX_REASON_CHARS ? text : `${text.slice(0, MAX_REASON_CHARS - 1)}…`;
 }
@@ -120,6 +151,8 @@ function orderReviewReason(order: NormalizedOrder, matcherReasons: readonly stri
 interface EmailOutcome {
   prefilteredOut: boolean;
   classification?: EmailClass;
+  /** Kept for the observer only. */
+  observed?: { email: RedactedEmail; classification?: Classification; classOverridden: boolean; confMin?: number };
   skipped: boolean;
   origin?: keyof PipelineStats["extractionOrigins"];
   extracted: boolean;
@@ -194,6 +227,7 @@ export function createPipelineRun(deps: PipelineDeps, expectedEmails?: number): 
 
     const { extraction } = result;
     outcome.extracted = true;
+    if (outcome.observed) outcome.observed.confMin = extraction.confMin;
     if (extraction.model === GOLD_EXTRACTION_MODEL) outcome.origin = "gold";
     else if (extraction.cached) outcome.origin = "cache";
     else outcome.origin = "llm";
@@ -218,15 +252,20 @@ export function createPipelineRun(deps: PipelineDeps, expectedEmails?: number): 
     if (finished) throw new Error("Pipeline run already finished");
     const outcome: EmailOutcome = { prefilteredOut: false, skipped: false, extracted: false, review: [] };
     outcomes.push(outcome);
-    if (deps.applyPrefilter && !isReceiptLike(raw).keep) {
+    const override = deps.classOverride?.(raw.id);
+    if (!override && deps.applyPrefilter && !isReceiptLike(raw).keep) {
       outcome.prefilteredOut = true;
+      if (deps.observer) outcome.observed = { email: redact(raw), classOverridden: false };
       return Promise.resolve();
     }
 
     // Classify the raw email: redaction tokenizes addresses, which hides look-alike sender domains in forwards.
-    const classification = classify(raw);
+    const classification: Classification = override
+      ? { emailId: raw.id, class: override, confidence: 1, reason: "set by the user" }
+      : classify(raw);
     outcome.classification = classification.class;
     const redacted = redact(raw);
+    if (deps.observer) outcome.observed = { email: redacted, classification, classOverridden: override !== undefined };
 
     if (SKIPPED_EXTRACTION_CLASSES.has(classification.class)) {
       outcome.skipped = true;
@@ -270,6 +309,7 @@ export function createPipelineRun(deps: PipelineDeps, expectedEmails?: number): 
       if (outcome.origin) stats.extractionOrigins[outcome.origin] += 1;
       reviewQueue.push(...outcome.review);
       if (outcome.matchInput) matchInputs.push(outcome.matchInput);
+      if (deps.observer && outcome.observed) deps.observer({ ...outcome.observed, outcome: observedOutcome(outcome) });
     }
 
     const matched = matchOrdersWithReasons(matchInputs);

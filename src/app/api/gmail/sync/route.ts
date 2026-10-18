@@ -4,7 +4,10 @@ import { gmailErrorResponse, gmailRequest } from "@/lib/gmail/http";
 import { GmailError } from "@/lib/gmail/client";
 import { syncGmailAccounts } from "@/lib/gmail/accounts";
 import { createLlmExtractor } from "@/lib/pipeline/extractors";
-import { beginStoreWork, getExcludedMerchants, getExtractionCache, setAccountPipelineResult } from "@/lib/store";
+import { createSyncCollector, type SyncCollector } from "@/lib/quality/collector";
+import { classOverridesFor } from "@/lib/quality/labels";
+import { recordSyncQuality } from "@/lib/quality/state";
+import { beginStoreWork, currentStoreScope, getExcludedMerchants, getExtractionCache, setAccountPipelineResult } from "@/lib/store";
 import { buildPipelineRunResponse } from "@/lib/api/ledger";
 import { gmailProgress } from "@/lib/gmail/progress";
 
@@ -37,16 +40,24 @@ async function handlePOST(request: Request): Promise<Response> {
     // Same guard as upload/demo (#93): capture the store before the long await, write in-flight audit rows to that
     // store only, and don't publish results if delete-all (or a demo reset) ran meanwhile.
     const work = beginStoreWork();
+    const collectors = new Map<string, SyncCollector>();
+    const classOverride = classOverridesFor(currentStoreScope());
     const synced = await syncGmailAccounts({
       accounts: authenticated.accounts, signal: request.signal,
       // Per-account progress only when several accounts are synced; one account keeps the plain status shape.
       reporter: account => authenticated.accounts.length > 1 ? run.forAccount(account.id, account.mailbox)
         : { update: run.update, complete: () => undefined, fail: () => undefined },
-      pipeline: () => ({ now, audit: work.appendAudit, excludedMerchants: getExcludedMerchants(),
-        extractor: createLlmExtractor({ cache: getExtractionCache(), audit: work.appendAudit }) }),
-      publish: (accountId, result) => {
+      pipeline: account => {
+        const collector = createSyncCollector({ source: "gmail", accountId: account.id });
+        collectors.set(account.id, collector);
+        return { now, audit: work.appendAudit, excludedMerchants: getExcludedMerchants(), observer: collector.observe, classOverride,
+          extractor: createLlmExtractor({ cache: getExtractionCache(), audit: work.appendAudit, onUsage: collector.recordUsage }) };
+      },
+      publish: (accountId, result, accountSync) => {
         if (!work.isCurrent()) return false;
         setAccountPipelineResult(accountId, now.toISOString(), result, new Date().toISOString());
+        const collector = collectors.get(accountId);
+        if (collector) recordSyncQuality(collector.finish(result, { fetched: accountSync.fetched, bodySource: accountSync.bodySources }));
         return true;
       },
     });

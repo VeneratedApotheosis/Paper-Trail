@@ -5,7 +5,7 @@ import {
   createGmailClient, createRequestPacer, GMAIL_FETCH_BURST, GMAIL_FETCH_PER_SECOND, GmailError, MAX_GMAIL_MESSAGES,
   type GmailDeps,
 } from "./client";
-import { decodeGmailMessage } from "./decode";
+import { decodeGmailMessageDetailed } from "./decode";
 import type { GmailWorkProgress } from "./progress";
 
 export interface GmailSyncOptions extends GmailDeps {
@@ -25,6 +25,8 @@ export interface GmailSyncResult {
   fetched: number;
   capped: boolean;
   parseErrors: Array<{ id: string; reason: string }>;
+  /** Decoded messages by the MIME part their text came from (#117 quality report). */
+  bodySources?: { plain: number; html: number };
 }
 export async function previewGmail(deps: GmailDeps) {
   const estimatedMessages = await createGmailClient(deps).preview();
@@ -97,6 +99,7 @@ async function syncWithinBudget(options: GmailSyncOptions & { signal: AbortSigna
   const pipelineRun = () => run ??= createPipelineRun(pipeline, total);
   const failIfExtractionUnavailable = () => { if (extractionFailed) throw new GmailError(503, "extraction_unavailable"); };
 
+  const bodySources = { plain: 0, html: 0 };
   async function fetchOne(id: string): Promise<FetchedSlot> {
     let message: unknown;
     try { message = await client.message(id); }
@@ -105,8 +108,9 @@ async function syncWithinBudget(options: GmailSyncOptions & { signal: AbortSigna
       throw error; // Transient fetch failures must not replace a complete ledger with partial data.
     }
     try {
-      const decoded = decodeGmailMessage(message);
+      const { email: decoded, bodySource } = decodeGmailMessageDetailed(message);
       if (decoded.id !== id) throw new Error("id mismatch");
+      bodySources[bodySource] += 1;
       return { email: options.sourceAccount ? { ...decoded, sourceAccount: options.sourceAccount } : decoded };
     } catch {
       return { parseError: "unsupported_or_malformed_message" };
@@ -159,5 +163,5 @@ async function syncWithinBudget(options: GmailSyncOptions & { signal: AbortSigna
   if (extractionFailed) throw new GmailError(503, "extraction_unavailable");
   for (const error of parseErrors) result.reviewQueue.push({ emailId: error.id, stage: "extract", reason: error.reason });
   result.stats.needsReview = result.reviewQueue.length;
-  return { result, fetched: total, capped: listed.capped, parseErrors };
+  return { result, fetched: total, capped: listed.capped, parseErrors, bodySources };
 }

@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/AppShell";
+import { QualitySection, type QualitySectionProps } from "./QualitySection";
 
 // Props-only view for the "real AI work" / model accuracy screen (screen 11,
 // the Visa accuracy proof). All data arrives as props; the page wrapper and
@@ -54,6 +55,8 @@ export interface EvalMetrics {
 
 export interface EvalViewProps {
   metrics: EvalMetrics;
+  /** Optional "Quality" section under the synthetic scores (#117): real sync reports, skipped emails, labels. Omit to hide. */
+  quality?: QualitySectionProps;
 }
 
 /** Ratio 0..1 as a whole-number percent, e.g. 0.912 -> "91%". */
@@ -70,7 +73,7 @@ function StatCard({ label, value }: { label: string; value: number }) {
   );
 }
 
-export function EvalView({ metrics }: EvalViewProps) {
+export function EvalView({ metrics, quality }: EvalViewProps) {
   const { title, subtitle, headline, breakdownLabel, classes, baseline, sampleNote } = metrics;
 
   return (
@@ -179,6 +182,8 @@ export function EvalView({ metrics }: EvalViewProps) {
         ) : null}
 
         <p className="text-sm text-ink-muted">{sampleNote}</p>
+
+        {quality ? <QualitySection {...quality} /> : null}
       </div>
     </AppShell>
   );

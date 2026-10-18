@@ -3,7 +3,10 @@ import { buildPipelineRunResponse } from "@/lib/api/ledger";
 import { jsonError } from "@/lib/api/http";
 import type { PipelineRunResponse, ResetDemoResponse } from "@/lib/api/types";
 import { loadSeedDemo } from "@/lib/demo";
-import { appendAudit, beginStoreWork, clearLedger, getExcludedMerchants, getState, setPipelineResult } from "@/lib/store";
+import { createSyncCollector } from "@/lib/quality/collector";
+import { classOverridesFor } from "@/lib/quality/labels";
+import { recordSyncQuality } from "@/lib/quality/state";
+import { appendAudit, beginStoreWork, clearLedger, currentStoreScope, getExcludedMerchants, getState, setPipelineResult } from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,11 +16,16 @@ async function handlePOST(_request: Request): Promise<Response> {
   void _request;
   // Captured before the await: delete-all or a demo reset during the load must not be undone by this commit.
   const work = beginStoreWork();
-  const result = await loadSeedDemo({ audit: work.appendAudit, excludedMerchants: getExcludedMerchants() });
+  const collector = createSyncCollector({ source: "demo" });
+  const result = await loadSeedDemo({
+    audit: work.appendAudit, excludedMerchants: getExcludedMerchants(),
+    observer: collector.observe, classOverride: classOverridesFor(currentStoreScope()),
+  });
   if (!work.isCurrent()) {
     return jsonError(409, "Your data was deleted while the demo was loading; nothing was saved. Load the demo again to continue.");
   }
   setPipelineResult("demo", result.asOf, result);
+  recordSyncQuality(collector.finish(result));
   const body: PipelineRunResponse = buildPipelineRunResponse();
   return Response.json(body);
 }

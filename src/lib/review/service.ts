@@ -4,6 +4,7 @@ import { seedPriceFeed } from "@/lib/demo/seed";
 import { defaultRules, runRules } from "@/lib/rules";
 import { isExcludedMerchant } from "@/lib/pipeline/run";
 import { appendAudit, getExcludedMerchants, getOrder, getState, saveReviewedOrder } from "@/lib/store";
+import { recordReviewLabel } from "@/lib/quality/feedback";
 import { orderNeedsReview } from "@/lib/view";
 import type { ReviewEdit } from "./schema";
 
@@ -47,7 +48,7 @@ function applyEdit(order: NormalizedOrder, edit: ReviewEdit): NormalizedOrder {
     }
   }
 }
-function commitReview(original: NormalizedOrder, order: NormalizedOrder, action: "edit" | "confirm", at: Date, field?: string) {
+function commitReview(original: NormalizedOrder, order: NormalizedOrder, action: "edit" | "confirm", at: Date, field?: string, edit?: ReviewEdit) {
   const parsed = NormalizedOrderSchema.safeParse(order);
   const amounts = [order.total, order.subtotal, order.tax, order.shipping, order.discount];
   if (!parsed.success || amounts.some(amount => amount !== null && (!Number.isFinite(amount) || amount < 0)) ||
@@ -66,6 +67,7 @@ function commitReview(original: NormalizedOrder, order: NormalizedOrder, action:
     now: ruleNow, ...(state.mode === "demo" ? { priceFeed: seedPriceFeed } : {}),
   }).map(finding => ({ ...finding, status: previousStatuses.get(finding.id) ?? finding.status }));
   saveReviewedOrder(parsed.data, findings);
+  recordReviewLabel(parsed.data, action, edit); // #117: corrections become labeled examples (best effort, never throws)
   pendingStatuses.delete(original);
   if (action === "edit") pendingStatuses.set(parsed.data, previousStatuses);
   appendAudit({ at: at.toISOString(), type: "approval",
@@ -76,7 +78,7 @@ function commitReview(original: NormalizedOrder, order: NormalizedOrder, action:
 export function editReviewedOrder(id: string, revision: string, edit: ReviewEdit, at: Date = new Date()) {
   const original = currentOrder(id, revision);
   const order = { ...applyEdit(original, edit), needsReview: true, review: { revision: randomUUID() } };
-  return commitReview(original, order, "edit", at, edit.field);
+  return commitReview(original, order, "edit", at, edit.field, edit);
 }
 export function confirmReviewedOrder(id: string, revision: string, at: Date = new Date()) {
   const current = getOrder(id);

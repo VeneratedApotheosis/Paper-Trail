@@ -3,8 +3,11 @@ import type { RawEmail } from "@/lib/contracts";
 import { buildPipelineRunResponse } from "@/lib/api/ledger";
 import { jsonError } from "@/lib/api/http";
 import type { UploadResponse } from "@/lib/api/types";
-import { MAX_UPLOAD_BYTES, parseEml, parseMboxDetailed, runUploadPipeline } from "@/lib/demo";
-import { beginStoreWork, getExcludedMerchants, getExtractionCache, setPipelineResult } from "@/lib/store";
+import { MAX_UPLOAD_BYTES, parseEmlDetailed, parseMboxDetailed, runUploadPipeline } from "@/lib/demo";
+import { createSyncCollector } from "@/lib/quality/collector";
+import { classOverridesFor } from "@/lib/quality/labels";
+import { recordSyncQuality } from "@/lib/quality/state";
+import { beginStoreWork, currentStoreScope, getExcludedMerchants, getExtractionCache, setPipelineResult } from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +38,7 @@ async function handlePOST(request: Request): Promise<Response> {
   if (totalBytes > MAX_UPLOAD_BYTES) return jsonError(413, "Upload exceeds the 5 MB limit");
 
   const emails: RawEmail[] = [];
+  const bodySource = { plain: 0, html: 0 };
   const fileSummaries: UploadResponse["files"] = [];
   const parseErrors: UploadResponse["parseErrors"] = [];
   for (const file of files) {
@@ -47,7 +51,9 @@ async function handlePOST(request: Request): Promise<Response> {
       continue;
     }
     try {
-      emails.push(parseEml(text));
+      const parsedEml = parseEmlDetailed(text);
+      emails.push(parsedEml.email);
+      if (parsedEml.bodySource) bodySource[parsedEml.bodySource] += 1;
       fileSummaries.push({ name: file.name, emails: 1 });
     } catch (error) {
       parseErrors.push({ file: file.name, index: 0, reason: error instanceof Error ? error.message : "unparseable" });
@@ -58,9 +64,14 @@ async function handlePOST(request: Request): Promise<Response> {
   if (!work.isCurrent()) return jsonError(409, DELETED_DURING_UPLOAD);
 
   const now = new Date();
-  const result = await runUploadPipeline(emails, { cache, now, audit: work.appendAudit, excludedMerchants });
+  const collector = createSyncCollector({ source: "upload" });
+  const result = await runUploadPipeline(emails, {
+    cache, now, audit: work.appendAudit, excludedMerchants,
+    observer: collector.observe, onUsage: collector.recordUsage, classOverride: classOverridesFor(currentStoreScope()),
+  });
   if (!work.isCurrent()) return jsonError(409, DELETED_DURING_UPLOAD);
   setPipelineResult("upload", now.toISOString(), result);
+  recordSyncQuality(collector.finish(result, { fetched: emails.length + parseErrors.length, bodySource }));
   const body: UploadResponse = { ...buildPipelineRunResponse(), files: fileSummaries, parseErrors };
   return Response.json(body);
 }
