@@ -52,7 +52,7 @@ export function PromotionsRail({ ending, stores, activeStore, onPickStore }: Pro
                     type="button"
                     onClick={() => onPickStore(selected ? null : store)}
                     aria-pressed={selected}
-                    className={`flex h-9 w-full items-center justify-between gap-3 rounded-full px-3 text-left text-sm transition-shadow -mx-3 w-[calc(100%+1.5rem)] ${selected ? "neu-inset font-semibold text-teal-deep" : "text-ink"}`}
+                    className={`flex h-9 items-center justify-between gap-3 rounded-full px-3 text-left text-sm transition-shadow -mx-3 w-[calc(100%+1.5rem)] ${selected ? "neu-inset font-semibold text-teal-deep" : "text-ink"}`}
                   >
                     <span className="truncate">{store}</span>
                     <span className="neu-inset flex h-6 min-w-8 shrink-0 items-center justify-center rounded-full px-2 text-[11px] font-semibold leading-[14px] text-ink-muted">

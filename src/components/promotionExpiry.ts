@@ -16,13 +16,13 @@ function sameLocalDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-/** "Ends tonight", "Ends in 5 hours", "3 days left", "Ends Oct 31", "Expired Oct 15", or "No end date". */
+/** "Ends tonight", "Ends in 5 hours", "3 days left", "Ends Oct 31", "Ended Oct 15", or "No end date". */
 export function expiryLabel(expiresAt: string | null, now: Date): ExpiryLabel {
   if (expiresAt === null) return { text: "No end date", tone: "none" };
   const end = new Date(expiresAt);
   if (Number.isNaN(end.getTime())) return { text: "No end date", tone: "none" };
   const left = end.getTime() - now.getTime();
-  if (left <= 0) return { text: `Expired ${shortDate(end)}`, tone: "expired" };
+  if (left <= 0) return { text: `Ended ${shortDate(end)}`, tone: "expired" };
   if (left < DAY_MS) {
     if (sameLocalDay(end, now) && end.getHours() >= 20) return { text: "Ends tonight", tone: "urgent" };
     if (left < HOUR_MS) return { text: "Ends in under an hour", tone: "urgent" };

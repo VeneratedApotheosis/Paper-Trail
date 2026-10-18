@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { Promotion } from "@/lib/contracts";
 import { SourceBadge } from "@/components/SourceBadge";
 import { orderSources, type SourceAccount } from "@/components/sourceAccounts";
@@ -20,9 +20,13 @@ export function PromotionCard({ promotion, now, accounts, onCopyCode }: { promot
   const note = minSpendLine(promotion.discount);
   const sources = orderSources(promotion.accountId ? [promotion.accountId] : undefined, accounts);
   const more = promotion.emailIds.length - 1;
+  const showsMeta = Boolean(promotion.channel) || sources.length > 0;
+  // Rows in the left column below the store line (headline, note, tags, received): the codes span them on desktop.
+  const leftRows = 2 + (note ? 1 : 0) + (showsMeta ? 1 : 0);
   return (
     <article
       aria-label={`${promotion.store}: ${promotion.headline}`}
+      style={{ "--left-rows": leftRows } as CSSProperties}
       className={`grid grid-cols-[minmax(0,1fr)_auto] content-start gap-3 rounded-lg p-5 xl:grid-cols-[minmax(0,1fr)_17rem] xl:gap-x-6 xl:p-6 ${
         expired ? "neu-raised-sm opacity-80" : "neu-raised"
       }`}
@@ -46,7 +50,7 @@ export function PromotionCard({ promotion, now, accounts, onCopyCode }: { promot
       <h2 className={`col-span-2 font-serif text-[22px] leading-7 xl:col-span-1 xl:text-2xl xl:leading-[30px] ${expired ? "text-ink-muted" : "text-ink"}`}>{promotion.headline}</h2>
       {note ? <p className="col-span-2 text-sm text-ink-muted xl:col-span-1">{note}</p> : null}
 
-      <div className="col-span-2 xl:col-span-1 xl:col-start-2 xl:row-start-2 xl:row-span-4 xl:self-end">
+      <div className="col-span-2 xl:col-span-1 xl:col-start-2 xl:row-start-2 xl:[grid-row-end:span_var(--left-rows)] xl:self-end">
         {promotion.codes.length > 0 ? (
           <ul aria-label="Promo codes" className="space-y-2.5">
             {promotion.codes.map((code) => (
@@ -66,7 +70,7 @@ export function PromotionCard({ promotion, now, accounts, onCopyCode }: { promot
         )}
       </div>
 
-      {promotion.channel || sources.length > 0 ? (
+      {showsMeta ? (
         <div className="col-span-2 flex flex-wrap items-center gap-2 xl:col-span-1">
           {promotion.channel ? <Pill>{CHANNEL_LABELS[promotion.channel]}</Pill> : null}
           <SourceBadge sources={sources} />
@@ -86,14 +90,14 @@ function Pill({ children }: { children: string }) {
   return <span className="neu-inset inline-flex h-6 items-center rounded-full px-3 text-[11px] font-semibold leading-[14px] tracking-normal text-ink-muted">{children}</span>;
 }
 
-// Urgent and soon offers get the teal text; the rest stay quiet. Under 24 hours also gets a small clock.
+// Only offers ending within 24 hours get the teal text and a small clock; the rest stay quiet.
 function ExpiryPill({ text, tone }: { text: string; tone: ExpiryTone }) {
   const urgent = tone === "urgent";
   return (
     <span
       className={`neu-inset inline-flex items-center gap-1.5 rounded-full px-3 font-bold leading-4 ${
         urgent ? "h-7 text-label tracking-normal text-teal-deep" : "h-6 text-[11px] leading-[14px] tracking-normal"
-      } ${tone === "soon" ? "text-teal-deep" : urgent ? "" : "font-semibold text-ink-muted"}`}
+      } ${urgent ? "" : "font-semibold text-ink-muted"}`}
     >
       {urgent ? (
         <svg aria-hidden viewBox="0 0 16 16" className="size-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

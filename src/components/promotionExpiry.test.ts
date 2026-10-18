@@ -27,7 +27,7 @@ describe("expiryLabel", () => {
   });
 
   it("marks ended offers as expired", () => {
-    expect(expiryLabel(iso(at(10, 10, 23, 59)), now)).toEqual({ text: "Expired Oct 10", tone: "expired" });
+    expect(expiryLabel(iso(at(10, 10, 23, 59)), now)).toEqual({ text: "Ended Oct 10", tone: "expired" });
     expect(expiryLabel(iso(now), now).tone).toBe("expired");
   });
 });
