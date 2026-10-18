@@ -53,7 +53,7 @@ it("runs real classification/redaction/matching/rules and reports malformed mess
 it("returns preview cap and estimate without fetching bodies", async () => {
   const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ resultSizeEstimate: 901 }));
   const preview = await previewGmail({ fetcher, accessToken: async () => "synthetic-access", audit: vi.fn() });
-  expect(preview).toMatchObject({ estimatedMessages: 901, messagesToFetch: 300, countIsEstimate: true, windowDays: 90, maxMessages: 300 });
+  expect(preview).toMatchObject({ estimatedMessages: 901, messagesToFetch: 50, countIsEstimate: true, windowDays: 90, maxMessages: 50 });
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
 it("does not call the pipeline on transient fetch failure or all-malformed messages", async () => {
@@ -102,4 +102,17 @@ it("fails an atomic Gmail snapshot on extractor exceptions and stops further pro
   await expect(syncGmail({ accessToken: async () => "synthetic", fetcher, audit: vi.fn(), pace: async () => {},
     pipeline: { now, extractor } })).rejects.toMatchObject({ status: 503, code: "extraction_unavailable" });
   expect(extractor).toHaveBeenCalledTimes(1);
+});
+
+it("returns a safe timeout instead of waiting indefinitely on a provider", async () => {
+  let signal: AbortSignal | undefined;
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    signal = init?.signal ?? undefined;
+    return new Promise<Response>((_resolve, reject) => signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true }));
+  });
+  const extractor = vi.fn();
+  await expect(syncGmail({ budgetMs: 10, fetcher, accessToken: async () => "synthetic", audit: vi.fn(),
+    pipeline: { now, extractor } })).rejects.toMatchObject({ status: 504, code: "sync_timeout" });
+  expect(signal?.aborted).toBe(true);
+  expect(extractor).not.toHaveBeenCalled();
 });

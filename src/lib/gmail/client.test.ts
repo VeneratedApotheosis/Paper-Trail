@@ -18,16 +18,17 @@ describe("read-only Gmail client", () => {
     expect(fetcher.mock.calls[0][1]?.method).toBe("GET");
     expect(JSON.stringify(audit.mock.calls)).not.toContain("synthetic-access");
   });
-  it("paginates, deduplicates IDs, and caps at exactly 300", async () => {
+  it("paginates, deduplicates IDs, and caps a synchronous batch at 50", async () => {
     let page = 0;
-    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => {
-      const start = page++ * 99;
-      return Response.json({ messages: Array.from({ length: 100 }, (_, i) => ({ id: `m${start + i}` })), nextPageToken: `page${page}`, resultSizeEstimate: 600 });
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async url => {
+      const count = Math.min(20, Number(new URL(String(url)).searchParams.get("maxResults")));
+      const start = page++ * 19;
+      return Response.json({ messages: Array.from({ length: count }, (_, i) => ({ id: `m${start + i}` })), nextPageToken: `page${page}`, resultSizeEstimate: 600 });
     });
     const { client } = setup(fetcher);
     const result = await client.listIds();
-    expect(result.ids).toHaveLength(300);
-    expect(new Set(result.ids).size).toBe(300);
+    expect(result.ids).toHaveLength(50);
+    expect(new Set(result.ids).size).toBe(50);
     expect(result.capped).toBe(true);
     expect(fetcher).toHaveBeenCalledTimes(4);
     expect(new URL(fetcher.mock.calls[1][0] as string).searchParams.get("pageToken")).toBe("page1");
@@ -37,6 +38,14 @@ describe("read-only Gmail client", () => {
     const { client } = setup(fetcher);
     await expect(client.listIds()).rejects.toThrow("invalid_gmail_pagination");
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+  it.each([undefined, "more"])("reports capped by nextPageToken at the exact limit (%s)", async nextPageToken => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({
+      messages: Array.from({ length: 50 }, (_, i) => ({ id: `m${i}` })), nextPageToken,
+    }));
+    const result = await setup(fetcher).client.listIds();
+    expect(result.ids).toHaveLength(50);
+    expect(result.capped).toBe(Boolean(nextPageToken));
   });
   it("retries rate limits with Retry-After and audits every fetch", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(null, { status: 429, headers: { "retry-after": "2" } }))

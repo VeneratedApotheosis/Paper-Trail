@@ -10,6 +10,8 @@ export interface GmailSyncOptions extends GmailDeps {
   /** Production paces full-message requests conservatively; tests inject no-op sleep. */
   pace?: (ms: number) => Promise<void>;
   onProgress?: (progress: GmailWorkProgress) => void;
+  /** Server-side injection for tests; never accepted from a browser request. */
+  budgetMs?: number;
 }
 export interface GmailSyncResult {
   result: PipelineResult;
@@ -25,6 +27,23 @@ export async function previewGmail(deps: GmailDeps) {
 }
 
 export async function syncGmail(options: GmailSyncOptions): Promise<GmailSyncResult> {
+  const controller = new AbortController();
+  const signal = options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new GmailError(504, "sync_timeout");
+      // Reject first so an in-flight request's abort cannot mask the timeout.
+      reject(error); controller.abort(error);
+    }, options.budgetMs ?? 240000);
+  });
+  try {
+    // The route can never publish a late worker result once this race rejects.
+    return await Promise.race([syncWithinBudget({ ...options, signal }), deadline]);
+  } finally { clearTimeout(timer); }
+}
+
+async function syncWithinBudget(options: GmailSyncOptions): Promise<GmailSyncResult> {
   const client = createGmailClient(options);
   options.onProgress?.({ stage: "listing", fetched: 0, total: null, skipped: 0 });
   const listed = await client.listIds();
@@ -66,8 +85,13 @@ export async function syncGmail(options: GmailSyncOptions): Promise<GmailSyncRes
   let extractionFailed = false;
   const result = await runPipeline(emails, { ...options.pipeline, applyPrefilter: true, sourceLabel: "gmail",
     extractor: async (...args) => {
+      options.signal?.throwIfAborted();
       if (extractionFailed) throw new GmailError(503, "extraction_unavailable");
-      try { return await options.pipeline.extractor(...args); }
+      try {
+        const extracted = await options.pipeline.extractor(...args);
+        options.signal?.throwIfAborted();
+        return extracted;
+      }
       catch {
         extractionFailed = true;
         // Neither the provider payload nor arbitrary exception text is exposed.
@@ -75,6 +99,7 @@ export async function syncGmail(options: GmailSyncOptions): Promise<GmailSyncRes
       }
     },
   });
+  options.signal?.throwIfAborted();
   if (extractionFailed) throw new GmailError(503, "extraction_unavailable");
   for (const error of parseErrors) result.reviewQueue.push({ emailId: error.id, stage: "extract", reason: error.reason });
   result.stats.needsReview = result.reviewQueue.length;

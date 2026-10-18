@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { GMAIL_RECEIPT_QUERY } from "@/lib/ingestion/prefilter";
 
-export const MAX_GMAIL_MESSAGES = 300;
+// A bounded synchronous batch, below the product's absolute 300-message maximum.
+export const MAX_GMAIL_MESSAGES = 50;
 const listSchema = z.object({
   messages: z.array(z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]+$/) })).default([]),
   nextPageToken: z.string().optional(), resultSizeEstimate: z.number().int().nonnegative().default(0),
@@ -79,7 +80,7 @@ export function createGmailClient(deps: GmailDeps) {
       for (let page = 0; page < 10; page++) {
         const result = await list(Math.min(100, MAX_GMAIL_MESSAGES - ids.size), pageToken);
         for (const message of result.messages) { if (ids.size < MAX_GMAIL_MESSAGES) ids.add(message.id); }
-        if (!result.nextPageToken || ids.size === MAX_GMAIL_MESSAGES) return { ids: [...ids], capped: Boolean(result.nextPageToken) || ids.size === MAX_GMAIL_MESSAGES };
+        if (!result.nextPageToken || ids.size === MAX_GMAIL_MESSAGES) return { ids: [...ids], capped: Boolean(result.nextPageToken) };
         if (pages.has(result.nextPageToken)) throw new GmailError(502, "invalid_gmail_pagination");
         pages.add(result.nextPageToken); pageToken = result.nextPageToken;
       }

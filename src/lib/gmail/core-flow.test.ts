@@ -105,7 +105,7 @@ it("connects OAuth, previews and syncs through real handlers, preserves a failed
   const cookie = authenticated.cookies.get(SESSION_COOKIE)!.value;
   expect(await (await session(req("auth/session", cookie))).json()).toEqual({ connected: true });
   const callsBeforePreview = fetcher.mock.calls.length;
-  expect(await (await preview(req("gmail/preview", cookie))).json()).toMatchObject({ messagesToFetch: 2, maxMessages: 300 });
+  expect(await (await preview(req("gmail/preview", cookie))).json()).toMatchObject({ messagesToFetch: 2, maxMessages: 50 });
   expect(fetcher.mock.calls.length).toBe(callsBeforePreview + 1);
   expect(llmInputs).toEqual([]);
   const synced = await sync(req("gmail/sync", cookie, { confirmed: true }));

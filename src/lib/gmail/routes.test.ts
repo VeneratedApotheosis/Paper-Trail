@@ -45,7 +45,7 @@ it("requires authentication and returns no bodies or credentials in preview", as
   const { cookie } = account("one@example.test");
   const response = await preview(req("gmail/preview", cookie));
   expect(response.status).toBe(200);
-  expect(await response.json()).toMatchObject({ estimatedMessages: 430, messagesToFetch: 300, countIsEstimate: true });
+  expect(await response.json()).toMatchObject({ estimatedMessages: 430, messagesToFetch: 50, countIsEstimate: true });
   expect(response.headers.get("cache-control")).toBe("no-store");
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
