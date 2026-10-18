@@ -41,38 +41,41 @@ export function FindingCard({
   const confidence = explainConfidence(finding.explain);
 
   return (
-    <article className="neu-raised rounded-lg p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="font-serif text-xl text-ink">{KIND_LABELS[finding.kind]}</h3>
-          <p className="mt-0.5 text-sm text-ink-muted">{merchant}</p>
+    <article className="neu-raised rounded-lg p-5 md:px-5 md:py-4">
+      {/* Phones: title and amount, then chips, then Why? and the claim button. From md the same pieces sit in one row (display: contents on the wrappers). */}
+      <div className="space-y-3 md:grid md:grid-cols-[minmax(0,1fr)_10rem_5rem_auto] md:items-center md:gap-x-3 md:space-y-0">
+        <div className="flex items-start justify-between gap-3 md:contents">
+          <div className="min-w-0 md:col-start-1 md:row-start-1">
+            <h3 className="font-serif text-lg text-ink">{KIND_LABELS[finding.kind]}</h3>
+            <p className="truncate text-sm text-ink-muted">{merchant}</p>
+          </div>
+          <span className="flex-none text-right font-serif text-xl font-semibold text-money tabular-nums md:col-start-3 md:row-start-1">
+            {formatMoney(finding.amountAtStake, finding.currency)}
+          </span>
         </div>
-        <span className="font-serif text-2xl font-semibold text-money tabular-nums">
-          {formatMoney(finding.amountAtStake, finding.currency)}
-        </span>
-      </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        {finding.dueAt ? (
-          <Chip tone={overdue ? "owed" : "deadline"}>{countdownLabel(finding.dueAt)}</Chip>
-        ) : null}
-        {finding.simulated ? <Chip tone="neutral">{simulatedLabel}</Chip> : null}
-        <SourceBadge sources={sources} />
-      </div>
+        <div className="flex flex-wrap items-center gap-2 md:col-start-2 md:row-start-1">
+          {finding.dueAt ? (
+            <Chip tone={overdue ? "owed" : "deadline"}>{countdownLabel(finding.dueAt)}</Chip>
+          ) : null}
+          {finding.simulated ? <Chip tone="neutral">{simulatedLabel}</Chip> : null}
+          <SourceBadge sources={sources} />
+        </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <Button type="button" variant="primary" onClick={onDraftClaim}>
-          Draft a claim
-        </Button>
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
-          aria-controls={panelId}
-          className="inline-flex min-h-[44px] items-center rounded-sm px-3 py-2 text-sm font-bold text-teal-deep transition-shadow hover:shadow-inset-sm md:min-h-[36px]"
-        >
-          {expanded ? "Hide why" : "Why?"}
-        </button>
+        <div className="flex items-center justify-between gap-1 md:col-start-4 md:row-start-1 md:justify-end">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            aria-controls={panelId}
+            className="inline-flex min-h-[44px] items-center rounded-sm px-3 py-2 text-sm font-bold text-teal-deep transition-shadow hover:shadow-inset-sm md:min-h-[36px]"
+          >
+            {expanded ? "Hide why" : "Why?"}
+          </button>
+          <Button type="button" variant="primary" onClick={onDraftClaim} className="md:min-h-[36px] md:px-4 md:py-2">
+            Draft a claim
+          </Button>
+        </div>
       </div>
 
       {/* Panel stays mounted so aria-controls always resolves; `hidden` toggles
@@ -80,7 +83,7 @@ export function FindingCard({
       <div
         id={panelId}
         hidden={!expanded}
-        className={`mt-5 space-y-5 ${expanded ? "animate-fade-rise" : ""}`}
+        className={`mt-4 space-y-5 ${expanded ? "animate-fade-rise" : ""}`}
       >
         <p className="text-base text-ink">{finding.summary}</p>
 
