@@ -1,251 +1,102 @@
 # PaperTrail architecture
 
-How an email becomes a finding, as implemented on `main`. Function and file names below are the real ones; anything
-not built yet is marked with its issue number. HTTP routes are documented in [api.md](api.md).
+This describes the implementation checked against the source, rather than the original build plan. Route contracts are in [api.md](api.md); Gmail operational details are in [gmail-sync.md](gmail-sync.md).
 
-## 1. Pipeline overview
+## 1. Inputs and shared pipeline
 
-Every input source goes through one code path, `runPipeline(emails, deps)` in `src/lib/pipeline/run.ts`:
+`src/lib/pipeline/run.ts` exposes both `runPipeline(emails, deps)` and the incremental `createPipelineRun(deps, total)` interface. The batch runner feeds the same incremental pipeline used by Gmail.
 
-```
-RawEmail[] ─► [isReceiptLike]  ─► classify(raw) ─► redact ─► extractor(redacted) ─► matchOrders ─► runRules ─► Finding[]
-              demo/upload only     rules, no LLM    PII→tokens  Claude / cache / gold                    R1, R2, R3
-```
-
-| Input source | Entry point | Prefilter | Extractor | Rule clock |
-|---|---|---|---|---|
-| Demo seed (`seed/inbox.json`) | `loadSeedDemo()` in `src/lib/demo/seed.ts`, called by `POST /api/demo` | `isReceiptLike` | `createSeedExtractor`: `seed/llm-cache.json` if present, else gold labels (offline, never calls a provider) | seed `asOf` (`2026-10-17T19:00:00Z`) |
-| `.eml` / `.mbox` upload | `runUploadPipeline()` in `src/lib/demo/upload.ts`, called by `POST /api/upload` | `isReceiptLike` | `createLlmExtractor`: session cache, then the seed cache, then Claude | request time |
-| Gmail | OAuth connect only (`src/lib/auth`, `/api/auth/*`). Message sync into `runPipeline` is **not built yet** (#3 follow-up) | `GMAIL_RECEIPT_QUERY` (planned as the `messages.list` query) | `createLlmExtractor` (planned) | sync time |
-
-`runPipeline` never drops an email silently. Anything uncertain or failed becomes a `ReviewQueueItem`
-`{ emailId, stage: "classify" | "extract" | "match", reason, orderId? }`. It also returns `PipelineStats` (per-class
-counts, extraction origins `llm` / `cache` / `gold`, orders, findings, review count) and emits audit events.
-
-## 2. Stages
-
-### 2.1 Prefilter (`src/lib/ingestion/prefilter.ts`)
-
-- `GMAIL_RECEIPT_QUERY`: `newer_than:90d` plus subject terms (order, receipt, shipped, delivered, return, refund,
-  price adjustment, invoice, and Spanish pedido / reembolso / devolución) or sender terms (orders, receipts, shipping,
-  returns, refunds, billing, auto-confirm). `describePrefilterQuery()` gives the plain-language version;
-  `GET /api/prefilter` serves both.
-- `isReceiptLike(email)` for inputs that skip Gmail search (demo, uploads): keep when the subject has a receipt
-  keyword, the sender local part is transactional, the subject/body has an order number, or the body has at least
-  two receipt phrases. Returns `{ keep, reason }`.
-
-### 2.2 Classify (`src/lib/ingestion/classify.ts`)
-
-`classify(email)` is deterministic regex rules, no LLM. Order of checks: unwrap forwarded mail, then phishing
-look-alike signals (never a receipt class), then marketing (never an order), then lifecycle class by subject, then by
-body, in the precedence cancel > refund > return_received > return_started > price_adjust > delivered > shipped >
-order (subject hits win over body hits; a body lifecycle event wins over body order wording). Since #33, "shipped"
-hits are ignored in return emails and in order confirmations without strong shipping evidence. Classes: `order`, `shipped`, `delivered`, `return_started`, `return_received`, `refund`, `price_adjust`, `cancel`,
-`marketing`, `not_receipt`. Forwarded mail loses 0.05 confidence (0.15 when the original sender is unknown).
-
-`runPipeline` classifies the **raw** email: redaction tokenizes addresses inside forwarded bodies, which would hide
-a look-alike sender domain. Classification is local code, so no unredacted text leaves the process.
-`marketing` and `not_receipt` emails are never extracted (`SKIPPED_EXTRACTION_CLASSES`); if their classification
-confidence is below 0.7 they go to the review queue with stage `classify`.
-
-### 2.3 Redact (`src/lib/ingestion/redact.ts`)
-
-`redact(email): RedactedEmail` replaces, in subject and body:
-
-| Kind | Token | Detection |
+| Source | Entry point | Extraction / clock |
 |---|---|---|
-| email address | `[EMAIL_n]` | address pattern |
-| card number | `[PAN_n]` | 13–19 digits with optional single separators, must pass Luhn |
-| phone | `[PHONE_n]` | US formats with required separators |
-| street address | `[ADDRESS_n]` | house number + capitalized street words + suffix, optional unit and `City, ST 12345` |
+| Synthetic demo | `src/lib/demo/seed.ts: loadSeedDemo`, `POST /api/demo` | Recorded seed cache if available, otherwise gold labels; seed `asOf`; no provider calls |
+| `.eml` / `.mbox` import | `src/lib/demo/eml.ts`, `upload.ts: runUploadPipeline`, `POST /api/upload` | Scoped memory cache, seed-cache fallback, then Claude; request time |
+| Gmail | `src/lib/gmail/service.ts: syncGmail`, `POST /api/gmail/sync` | Scoped cache then Claude; sync time |
 
-The same value maps to the same token within one email. Digit runs right after labels like "order", "tracking",
-"SKU" or "#" are kept (they are references, not PII) unless card/phone words are also present. "Ending in 4242"
-style last-4 mentions are kept. `html` is dropped. `redactions` counts replacements per kind, and
-`textHash = sha256(redacted text)` is the cache key. `From`/`To` headers pass through unchanged on the
-`RedactedEmail`, but they are never put in the LLM prompt (see section 5).
+```text
+RawEmail -> receipt prefilter -> classify(raw, locally) -> redact
+         -> validated extraction -> matchOrders -> runRules -> orders/findings/review
+```
 
-### 2.4 Extract (`src/lib/ingestion/extract.ts`, `extract-prompt.ts`, `src/lib/llm/`)
+The classifier sees the raw email locally to recognize forwarded sender domains and phishing look-alikes. Marketing and non-receipt classes are skipped for extraction. Excluded merchants are filtered from matched orders before rules and from store responses; exclusion does not prevent Gmail retrieval or extraction. Review items retain a reason and stage, including failures that cannot produce an editable order.
 
-`extract(redacted, classification, deps): ExtractResult`
+`PipelineDeps` supplies the extractor, audit sink, excluded merchants, clock and optional price feed. Extraction has bounded concurrency (default four), backpressure, and deterministic input ordering despite out-of-order completion. The matcher/rules operate on completed extraction results. `PipelineStats` distinguishes extraction origins (`llm`, `cache`, `gold`).
 
-1. Skipped classes return `{ ok: false, skipped: true }`.
-2. Cache hit on `textHash` returns the cached extraction (`cached: true`) and audits a zero-token `llm_call`.
-3. Otherwise the LLM is forced to call the `record_extraction` tool. `AnthropicLlmClient` posts to the Anthropic
-   Messages API over `fetch` (`ANTHROPIC_API_KEY`, model `LLM_MODEL` or `claude-haiku-5-5`, 30 s timeout).
-4. The tool input is validated with `ExtractionSchema` (evidence quotes truncated to 200 chars first). On failure the
-   prompt is re-sent once with the validation error appended (`buildRetryPrompt`). A second failure returns
-   `{ ok: false, needsReview: true, reason }`.
-5. `confMin` = the lowest confidence over present fields (a present field without a confidence counts as 0). Valid
-   results are written to the cache.
+## 2. Gmail sync and progress
 
-Provider errors (`LlmUnavailableError` with no key, `LlmHttpError`, `LlmTimeoutError`, `LlmResponseError`) are thrown;
-`runPipeline` catches them and queues the email for review with stage `extract`. Extractions with `confMin < 0.7`
-also get a review item but still go to the matcher, where they mark the order `needsReview`.
+`src/lib/gmail/client.ts` performs Gmail API listing and full-message retrieval, with receipt query/window from `src/lib/ingestion/prefilter.ts`. The current cap is 50 messages from the last 90 days. `capped` follows the list response's `nextPageToken` at the limit. `previewGmail()` returns the query, estimated matching count and fetch limit before the user confirms.
 
-`FixtureLlmClient` answers from canned tool inputs keyed by `textHash`, for tests and offline demo.
-`extractionFromGoldLabel` (`src/lib/pipeline/gold.ts`) builds extractions from seed gold labels; these carry
-`model: "gold"` and are audited as "Precomputed extraction from seed gold label, no LLM call".
+`service.ts` uses two bounded fetch workers and a shared request pacer. Messages enter `createPipelineRun` in listing order as soon as they can be accepted; fetching and extraction overlap. It has a sync budget and aborts workers on completion/failure. A fetch/provider outage fails the replacement sync instead of publishing a partial ledger; malformed/unavailable individual messages can become review items. A batch with messages but none parseable fails.
 
-### 2.5 Match (`src/lib/orders/matcher.ts`)
+`src/app/api/gmail/sync/route.ts` requires `{confirmed:true}`, prevents overlapping syncs for one account, and publishes a successful result with `setPipelineResult`. `beginStoreWork()` in `src/lib/store/index.ts` captures a generation: a concurrent delete/reset invalidates the in-flight result so it cannot repopulate deleted data. The route also checks that the authorization is still active before publication.
 
-`matchOrders(inputs: MatchInput[]): NormalizedOrder[]`, pure and deterministic. The matcher receives the redacted
-email.
+`src/lib/gmail/progress.ts` retains per-account stages (`listing`, `fetching`, `processing`, terminal states). The progress route is polled by the client. The POST remains a bounded request, not a durable background job; progress and ledger state are process-local.
 
-- `marketing` / `not_receipt` are ignored.
-- Emails group by normalized merchant (name, else domain) + order ref (case-insensitive).
-- Emails without an order ref join the same-merchant order whose total is within max($0.50, 2%) and whose `placedAt`
-  is within 3 days; otherwise they form their own order.
-- The latest order confirmation wins for totals and line items; duplicate lifecycle emails produce one event.
-- Class to event: `return_started` becomes `return_dropped` when the text says "dropped off"; `refund` becomes
-  `store_credit` when `isStoreCredit` is set, else `refund_issued`.
-- Policy comes only from facts stated in the order's emails (`policySource: "email_text"` or `null`): window,
-  refund SLA, price-adjust days, policy quote. `windowAnchor` is `delivery` when the policy text says "of/after/from
-  delivery". `nonReturnable` when policy or confirmation text says "final sale", "non-returnable" or "cannot be
-  returned". There is no merchant default table yet; rules fall back to their own defaults.
-- `needsReview = confMin < 0.7 || no order confirmation || no currency`.
+### MIME and body selection
 
-### 2.6 Rules (`src/lib/rules/`)
+`src/lib/gmail/decode.ts` walks nested MIME parts, bounds decoding, ignores attachments and non-text content, and produces `RawEmail`. `src/lib/ingestion/mime.ts` is shared with `.eml` import: `selectBodyText` prefers plain text unless HTML contains richer purchase evidence, then `htmlToText` preserves useful table structure. Script/style/hidden content is stripped. This is string processing, not a browser: no email JavaScript executes and no remote images/resources are requested.
 
-`runRules(orders, rules, { now, priceFeed })` with `defaultRules = [refundRule, returnRule, priceDropRule]`:
+## 3. Redaction, extraction and caching
 
-- Orders with `needsReview` are skipped entirely (no findings until a human confirms them).
-- Finding id = `${kind}:${orderId}[:${lineItemId}]`; the first finding per id wins, so reruns never duplicate.
-- Every finding is validated with `FindingSchema`; an invalid one is a rule bug and throws.
-- Severity by amount: high ≥ 100, medium ≥ 25, else low.
-- Sorted by `dueAt` ascending (null last), then amount descending, then id.
-- Rules never read the system clock. All date math is in fixed 24 h UTC periods (`addDays`, `daysBetween`); money is
-  rounded to cents (`roundCents`).
+`src/lib/ingestion/redact.ts` tokenizes recognized email addresses, Luhn-valid card numbers, separated US phone formats and US-style street addresses in subject/body, preserving labeled order/tracking references and last-four mentions. HTML is dropped. Token numbering is shared within an email; `textHash` is SHA-256 of the redacted body.
 
-Exact semantics are in section 4.
+This is pattern-based redaction. International phones/addresses, postal lines and customer names are known gaps tracked in [#94](https://github.com/VeneratedApotheosis/Paper-Trail/issues/94). Do not describe it as complete anonymization. The existing extraction schema still includes `customerName`.
 
-### 2.7 Claim drafts (`src/lib/claims/`)
+`extract-prompt.ts` sends only the sender domain, email date, redacted subject and text to the forced `record_extraction` tool. `extract.ts` validates the response with the canonical Zod schema, retries invalid output once, and routes persistent invalid output to Review. Provider exceptions are audited, then handled by the pipeline; Gmail applies its stricter fail-the-replacement policy. Confidence is the minimum across present extracted fields.
 
-- `draftClaim(finding, order, options)` builds a template email for `refund_overdue`, `refund_short`,
-  `return_deadline` and `price_drop`. Every amount, date, order ref and policy quote is read from the finding, its
-  `explain` payload or the order. It signs with the receipt's `customerName`, else `profileName`. The recipient is
-  `supportEmail` when given, else guessed as `support@<merchant domain>` with `recipientVerified: false`.
-  Simulated-price findings get the warning "Price comes from a simulated feed; verify the current price before
-  sending."
-- `rephraseDraft(draft, { llm })` is an optional wording pass. It sends the body without the signature, plus the
-  list of facts that must survive. `factCheckRephrase` rejects the result if any fact value is missing or a new
-  number appears, and the template draft is kept.
-- `mailtoUrl` and `clipboardText` are the only hand-off paths. Nothing sends email.
-- HTTP routes for draft / edit / approve are in progress in **#35**.
+`src/lib/llm/anthropic.ts` uses the Anthropic Messages API over `fetch`, with the runtime environment key, configured/default model and timeout. `FixtureLlmClient` is the offline test client.
 
-### 2.8 Store and API (`src/lib/store/`, `src/app/api/**`, `src/lib/api/`)
+`src/lib/ingestion/cache.ts` supplies memory/file caches keyed by `textHash`. Valid results are cached; cache hits reuse fields with the current classification. Uploads layer the scoped memory cache over the read-only seed cache; Gmail uses its scoped memory cache. Demo mode falls back to `extractionFromGoldLabel` in `src/lib/pipeline/gold.ts` when recorded seed outputs are absent. Gold labels are precomputed data, not model measurements.
 
-The store is in memory on `globalThis` (a server restart empties it). It holds orders, findings, drafts, the review
-queue, the audit log, merchant exclusions and the session extraction cache, never raw emails. Excluded merchants are
-removed before rules run and hidden from every response. `deleteAll()` calls the OAuth revoke hook if one is
-registered (#3 has not registered it yet), purges everything, and leaves one `delete` audit record. Route list and
-response types: [api.md](api.md). The UI reads only through `src/lib/api/client.ts`.
+Current audit producers still emit legacy `llm_call` rows for cache/gold extraction with distinguishing detail strings. [#40](https://github.com/VeneratedApotheosis/Paper-Trail/issues/40) tracks removing this misleading category use. Extraction-origin statistics are the appropriate way to distinguish those paths from provider requests.
 
-### 2.9 Eval (`src/lib/eval/`)
+## 4. Matching, rules, review and claims
 
-`runEval({ extractionSource, split, now })` composes classify → extraction → `matchOrders` → `runRules` at the seed
-`asOf` and scores each stage against `seed/gold_labels.json` and `seed/expected_findings.json`: classification
-metrics with a confusion matrix per split (all / dev / holdout), a safety count of phishing or marketing routed as an
-order, extraction field accuracy (only when an extraction map of real model output is supplied), and finding
-precision/recall in `oracle-extraction` and `realistic-routing` modes. `GET /api/eval` serves the report;
-`gate.test.ts` enforces the CI thresholds. Current numbers are in the README.
+`src/lib/orders/matcher.ts: matchOrders` groups merchant/order references and lifecycle emails into canonical `NormalizedOrder` records. It deduplicates events and preserves evidence and stated policy. Missing confirmation/currency or low confidence marks an order for review.
 
-## 3. Data contracts (`src/lib/contracts/`)
+`src/lib/rules/index.ts` defines the default pure rules:
 
-All shared shapes are Zod schemas, imported from `@/lib/contracts`, never copied.
-
-| Schema | File | Purpose |
-|---|---|---|
-| `RawEmailSchema` | `email.ts` | Pipeline input from any source: `id`, `from`, `subject`, `date`, `text`, optional `html`, `threadId`, `to`, `labels` |
-| `RedactedEmailSchema` | `email.ts` | `RawEmail` minus `html`, with redacted `subject`/`text`, `redactions` counts per kind, `textHash`. Only this shape may reach an LLM |
-| `EmailClassSchema`, `ClassificationSchema` | `email.ts` | The 10 classes; `{ emailId, class, confidence, reason }` |
-| `ExtractedFieldsSchema` | `extraction.ts` | merchant, merchantDomain, orderRef, date, currency, lineItems, totals, last4, customerName, eventAmount, returnWindowDays, refundSlaDays, priceAdjustDays, policyQuote, isStoreCredit. All nullable: unknown is allowed, guessing is not |
-| `ExtractionSchema` | `extraction.ts` | `{ emailId, class, fields, confidence (per field), evidence (per field, ≤200 chars), confMin, model, cached }` |
-| `REVIEW_CONFIDENCE_THRESHOLD` | `extraction.ts` | `0.7` |
-| `OrderEventSchema`, `MerchantPolicySchema`, `NormalizedOrderSchema` | `orders.ts` | Matcher output and rules input: merchant + policy, order ref, totals, line items with `returnedQty`, sorted events, `messageIds`, `confMin`, `needsReview` |
-| `FindingSchema` | `findings.ts` | Rules output: `id`, `kind`, `orderId`, `lineItemId?`, `amountAtStake`, `currency`, `dueAt`, `severity`, `status`, `ruleVersion`, `summary`, `evidence[]` (≥1), `explain`, `simulated` |
-| `SeedInboxSchema`, `GoldLabelsFileSchema`, `ExpectedFindingsFileSchema` | `seed.ts` | Formats of the files in `seed/` |
-
-`FindingKindSchema` also contains `rewards_gap` for the unbuilt rewards layer (#18); no rule produces it.
-`PriceFeedSchema` / `PriceObservationSchema` live in `src/lib/prices/feed.ts` (sources `mock` and `email_promo`;
-`seed/price-feed.json` omits `source`, which defaults to `mock`).
-
-## 4. Rule semantics (exact, from `src/lib/rules/`)
-
-### R1 refund (`refund.ts`, `R1@1`): `refund_overdue`, `refund_short`
-
-- **Trigger T:** earliest `return_received` (strong); if none, earliest `return_dropped` or `return_started` (weak).
-  No trigger, no finding.
-- **SLA N:** `policy.refundSlaDays` when stated in the email, else 10 days (strong) or 14 days (weak).
-  Expected-by `E = T + N`.
-- **Expected amount:** Σ(returned qty × unit price) + tax × returnedSubtotal / subtotal, rounded to cents. Returned
-  items are the trigger event's `lineItemIds` (item `returnedQty` when > 0, else full qty). No line item ids, unknown
-  ids, or every item fully returned: the order total.
-- Only events at or after T count. Any `store_credit` at or after T counts as matched: no finding.
-- **`refund_overdue`:** no `refund_issued` at or after T and `now > E` (strictly). Amount = expected amount,
-  `dueAt = E`. `now ≤ E` produces nothing.
-- **`refund_short`:** refunds exist, all have amounts, and expected − Σ refunds > max($0.50, 2% of expected).
-  Amount = the shortfall, `dueAt = null`. A refund without a stated amount counts as matched and is not checked.
-- Confidence = lowest confidence of the events involved. Quote = policy quote, else the trigger event's evidence.
-
-### R2 return deadline (`return.ts`, `policies.ts`, `R2@1`): `return_deadline`
-
-- **Suppressed** when the policy is `nonReturnable`, or the order has any `cancel`, `return_started`, `return_dropped`
-  or `return_received` event.
-- **Window:** `policy.returnWindowDays` when stated; otherwise `DEFAULT_RETURN_WINDOW_DAYS = 30` counted from the
-  order date (source `default`).
-- **Anchor A:** earliest `delivered` event when the window counts from delivery and a delivered event exists, else
-  `placedAt`. `deadline = A + window`.
-- **Fires** when `0 ≤ deadline − now ≤ 7 days`. Amount = order total, `dueAt = deadline`, `daysLeft` rounded up.
-- Confidence = order `confMin` (and the delivered event's confidence for a delivery anchor). Below 0.7 the explain
-  payload sets `checkPolicy: true`.
-
-### R3 price drop (`pricedrop.ts`, `src/lib/prices/feed.ts`, `R3@1`): `price_drop`
-
-- Needs a price feed in the rule context; without one R3 emits nothing.
-- Skipped for `nonReturnable` policies, cancelled orders, and orders with no source email.
-- Per line item with a SKU and held qty = qty − returnedQty > 0.
-- **Window W:** `policy.priceAdjustDays` when stated, else 14 days from `placedAt`; skipped once `now > placedAt + W`.
-- **Current price:** `latestPrice(feed, merchant, sku, now)`, the latest observation at or before `now` for the same
-  merchant (case-insensitive) and exact SKU; same-instant ties take the lowest price. Must be in the order currency.
-- **Fires** when `(unitPrice − current) × heldQty ≥ max($5, 5% × unitPrice × heldQty)`. Amount = the drop, rounded to
-  cents; `dueAt = placedAt + W`.
-- Observations from the mock feed set `simulated: true` and add the evidence quote "Simulated price feed: … observed
-  …" (message id `price-feed`).
-
-## 5. Privacy boundaries
-
-| Data | Where it goes |
+| Rule | Findings |
 |---|---|
-| Raw email (headers, body, html) | Read in memory by prefilter, classify and redact. Never stored, never sent to an LLM |
-| Extraction prompt to Claude | Only `Sender domain`, `Email date`, the redacted `Subject` and the redacted body (`buildExtractionPrompt`). No From/To addresses, no html |
-| Claim rephrase prompt to Claude (optional) | The template body without the signature (so no customer name) and the list of facts it cites |
-| `textHash` | Used by the cache and `FixtureLlmClient`; never sent to the provider |
-| Stored per session | Extractions (fields, confidence, evidence quotes ≤200 chars from the redacted text), orders, findings, drafts, review queue, audit log |
-| Audit `llm_call` rows | Model, input/output token counts or "cache hit", number of redacted tokens, email id. Never email text |
-| OAuth tokens | Sealed with AES-256-GCM (`AUTH_ENCRYPTION_KEY`) in the SQLite `user` table; scope `gmail.readonly` only |
-| API key | Read from `ANTHROPIC_API_KEY` at runtime and placed only in the `x-api-key` header; error messages never include it |
+| `refundRule` (`refund.ts`) | Overdue refund after return/SLA; short refund beyond tolerance |
+| `returnRule` (`return.ts`, `policies.ts`) | Approaching return deadline, with policy/default window and lifecycle exclusions |
+| `priceDropRule` (`pricedrop.ts`) | Eligible price decrease within adjustment window; mock observations marked simulated |
 
-The matcher receives the redacted email, so evidence quotes and anything derived from them cannot carry unredacted
-PII. Gold-label extractions in demo mode are also built from the redacted email.
+Rules take an injected `now` and price feed. Monetary amounts, due dates, thresholds, rounding and owed sums come from these deterministic modules, not the LLM. `src/lib/rules/owed.ts: computeOwed` excludes uncertain/resolved/dismissed items and keeps separate currency totals; it never performs FX conversion. Approved/drafted claims remain part of the outstanding amount until their finding is resolved/dismissed.
 
-## 6. Caching
+`src/lib/review/**` and `/api/review/**` support validated edits and confirmation, with revisions for stale requests. Confirmation reruns rules while preserving existing finding statuses by id. Low-confidence orders do not contribute money until confirmed. Unreadable messages without an order are shown separately rather than fabricated as editable purchases.
 
-- Interface `ExtractionCache { get(textHash), set(textHash, extraction) }` in `src/lib/ingestion/cache.ts`.
-- Key: `textHash = sha256(redacted text)`. Identical redacted text never triggers a second LLM call; reruns and demo
-  mode are free and offline.
-- Only `ExtractionSchema`-valid results are cached. The file cache ignores entries that no longer validate and
-  re-extracts them on demand.
-- `createMemoryCache()`: the session cache held by the store, used for uploads, purged by delete-all.
-- `createFileCache(path)`: JSON `{ [textHash]: Extraction }`, loaded lazily, rewritten on every `set`.
-- `seed/llm-cache.json` (recorded real LLM output for the seed) is read-only for demo mode and is the fallback layer
-  for uploads; it is not committed yet, so demo mode currently uses gold labels.
-- A cache hit keeps the cached fields but takes the class from the current classifier.
+`src/lib/claims/draft.ts` builds templates from deterministic finding/order facts. It currently chooses the receipt customer name, then an optional profile-name argument, then “Customer”; wiring an account-profile signature is part of #94. Optional rephrasing (`rephrase.ts`) excludes the signature, Zod-validates wording, checks facts/numbers and falls back to the template on failure.
 
-## 7. In progress
+`src/lib/api/claims.ts` and `/api/claims/**` handle draft/read/edit/approve operations; `/api/findings/[id]/status` handles resolution/dismissal. Drafts and approvals survive pipeline reruns for surviving findings; changed facts produce a warning. An approval writes audit state and returns clipboard/mailto handoff information. The claim view uses the server approval state and mailto URL, hides email handoff after unsaved edits, and never sends email. “Claim sent” state represents user-approved handoff, not delivery confirmation.
 
-- **#3** Gmail OAuth is on `main`; message sync through `runPipeline` and the delete-all revoke hook are not.
-- **#35** Claims API routes (draft, edit, approve).
-- **#34** Dev playground (`npm run playground`) and `docs/manual-test-plan.md`.
-- **#22** Playwright e2e of the demo path.
-- **#18** Rewards (L3), including the `rewards_gap` finding kind.
+## 5. Identity, scoped state and deletion
+
+`src/lib/auth/config.ts`, `service.ts`, `google.ts` implement the read-only Google OAuth flow with state/PKCE. The callback verifies the mailbox through Gmail's profile endpoint. Credentials/session data are sealed with AES-256-GCM; no send/modify scope is requested.
+
+`getSession(request?)` in `src/lib/auth/session.ts` returns `{userId,gmailConnected}|null`. A valid identity can remain after Gmail credentials expire or are disconnected. Gmail operations require a usable grant; reading/editing existing account data and deleting it need only valid identity. Invalid/stale identity cookies are cleared by route helpers; config/DB errors fail closed.
+
+`src/lib/gmail/context.ts: withAccountStore` resolves the session and runs handlers inside `src/lib/store/index.ts: withStoreScope`. Stores are held on `globalThis`, selected with `AsyncLocalStorage`. Authenticated accounts are separate from the anonymous demo/upload store. Anonymous visitors share that store. `src/lib/api/server.ts` gives server page wrappers the corresponding scoped reads. There is no durable ledger database or multi-process ledger coordination.
+
+SQLite persistence is initialized by `src/lib/auth/store.ts` using Drizzle schemas in `src/db/schema/`. It persists identities, sealed tokens and auth audit, not the in-memory ledger. Auth audit actions include OAuth lifecycle and Gmail fetch records; `/api/audit` serves the separate scoped application audit.
+
+`GET /api/account` returns safe connection/mailbox/status/counts without tokens. `POST /api/auth/disconnect` clears Gmail credentials, attempts Google revocation and retains the identity and ledger. Subsequent Gmail calls require reconnecting.
+
+`POST /api/delete-all` accepts a valid identity even without tokens, attempts per-account revocation, removes the identity and credentials, purges the active store/cache/exclusions, and clears auth cookies. The response reports real purge counts and confirmed revocation status. The app audit retains a delete receipt; SQLite deletion removes subject-linked rows and inserts an `oauth.deleted` tombstone with null subject. Anonymous deletion does not revoke another account's credentials.
+
+## 6. Client/UI boundary
+
+`src/components/views/**` are props-driven views. Thin pages fetch through shared hooks (`src/hooks/data.ts`, `actions.ts`, `src/lib/api/client.ts`) or server helpers; views do not own API/store/auth access. `ShellStateProvider` shares current source/account state with the shell.
+
+`src/hooks/cache.ts` and `useCached.ts` provide stale-while-revalidate reads, deduplicate in-flight requests, and invalidate mounted/unmounted keys after mutations. Explicit errors remain visible; obsolete responses after invalidation are ignored. This browser cache is separate from the server extraction cache.
+
+Detail-page layouts check existence before their `loading.tsx` boundary can stream a successful status. Unknown orders/findings therefore return HTTP404 with the existing not-found view; valid pages compose existing skeletons while loading.
+
+Visual tokens/components belong to Alex's [design system](design-system.md). Pages supply data/actions; the shell reflects empty/demo/upload/Gmail state. Preview fixtures remain in components rather than production page wrappers.
+
+## 7. Evaluation and verification
+
+`src/lib/eval/run.ts: runEval` evaluates synthetic seed/gold/expected-finding files at the seed clock. It reports classification all/dev/holdout metrics, safety routing, optional real-output extraction accuracy and oracle/realistic-routing finding metrics. `/api/eval` returns that report; `/eval` maps real held-out classification results to `EvalView`, labels synthetic data, and discloses that default gold extraction is not measured AI quality.
+
+`src/lib/eval/gate.test.ts` fixes the holdout size and safety/precision/recall thresholds. Gold-based findings validate routing/matching/rules; the small visible synthetic holdout does not establish real-inbox performance.
+
+Vitest covers ingestion, extraction/provider failures, matching/rules, scoped API/auth/review/draft flows and view state. Playwright (`e2e/`, dedicated port3107) covers product demo, approval/reload/edit, deletion receipts, eval retry, import preview and actual HTTP404 status. Fakes/fixtures replace real Google/Gmail/Anthropic calls. `.github/workflows/ci.yml` runs checks/build and browser journeys on Node22.
