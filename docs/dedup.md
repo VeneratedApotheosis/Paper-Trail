@@ -25,9 +25,10 @@ and `mergeAccountResults`.
   shipment id or nothing. Emails sharing any strong ref (>= 4 chars with a digit, or equal primary refs) join (union-find).
 
 ## C. Scored matching (`score.ts`, `cluster.ts`)
-Weights (`DEDUP_WEIGHTS`): exact copy 100, shared ref 70, merchant 10, amount exact 25 / close 12, items shared
+Weights (`DEDUP_WEIGHTS`): exact copy 100, shared tracking number 90 (#127), shared ref 70, merchant 10, amount exact 25 / close 12 (within max($0.50, 2%)), items shared >= 80% / >= 50% / any (lifecycle 40/25/10, confirmation 30/18/8), thread (lifecycle 30, confirmation 10), refund equals a line item 15 / partial 5, date gap (confirmations <= 1 d 10, <= 3 d 6, <= 7 d 2; lifecycle <= 7 d 10, then inside the window 5), exact amount within 3 d +15 (lifecycle).
 (lifecycle 40/25/10, confirmation 30/18/8), thread (lifecycle 30, confirmation 10), date gap, exact amount within 3 d +15.
-Thresholds: `AUTO_MERGE_SCORE` 60, `POSSIBLE_DUPLICATE_SCORE` 35, lifecycle ambiguity margin 10.
+Thresholds: `AUTO_MERGE_SCORE` 60, `POSSIBLE_DUPLICATE_SCORE` 35, lifecycle ambiguity margin 10 (`AMBIGUITY_MARGIN`), recurring
+charge gap 20 days (`RECURRING_MIN_GAP_DAYS`). These numbers are pinned by `documented-constants.test.ts`.
 - Two confirmations merge only on an exact copy or a shared ref (or one lost its number: same everything within 3 days).
 - Middle band => `NormalizedOrder.possibleDuplicateOf { orderId, reason, score }` on the later order; counted as its own
   purchase; no UI yet.
@@ -53,7 +54,7 @@ All 50 emails: before P 0.667 / R 0.333 (10 TP, 5 FP, 20 FN); after P 1.000 / R 
 Per scenario before -> after recall: name variants, invoice/confirmation numbers, forwarded copy with another spelling,
 same email in two inboxes, late delivery, refund 3 weeks later, Shopify sequence, bare lifecycle email 0 -> 1;
 precision: two identical coffees, monthly subscription, refund above total 0 -> 1. Quality report fields:
-`duplicatesCollapsed`, `mergesByReason` (message_id, fingerprint, shared_ref, thread, items_amount, only_order),
+`duplicatesCollapsed`, `mergesByReason` (message_id, fingerprint, shared_ref, tracking_number, thread, items_amount, only_order),
 `possibleDuplicates`; also `PipelineStats.dedup`.
 
 ## Known limits / Phase 2
