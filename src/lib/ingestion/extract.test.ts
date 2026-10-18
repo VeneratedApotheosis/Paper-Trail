@@ -14,6 +14,7 @@ import { AnthropicLlmClient, FixtureLlmClient, type LlmClient, type LlmToolReque
 import { createMemoryCache } from "./cache";
 import { computeConfMin, extract, type ExtractionAuditEntry } from "./extract";
 import { EXTRACTION_TOOL, EXTRACTION_TOOL_NAME } from "./extract-prompt";
+import { LlmError, LlmHttpError, LlmTimeoutError, LlmUnavailableError } from "@/lib/llm";
 import { redact } from "./redact";
 
 // Synthetic fixtures only: fictional store on a .example domain, fake customer Sam Rivera.
@@ -223,14 +224,28 @@ describe("extract: cache", () => {
 });
 
 describe("extract: audit", () => {
+  it.each([
+    [new LlmHttpError(429, "private-provider"), "http_error"],
+    [new LlmHttpError(503, "private-provider"), "http_error"],
+    [new LlmTimeoutError(100), "timeout"],
+    [new LlmUnavailableError("private-provider"), "unavailable"],
+    [new LlmError("private-provider"), "network_error"],
+  ])("audits a failed attempt without provider error text (%#)", async (error, errorClass) => {
+    const { entries, audit } = auditLog();
+    const llm: LlmClient = { model: "synthetic-model", callTool: async () => { throw error; } };
+    await expect(extract(EMAIL, ORDER, { llm, audit })).rejects.toBe(error);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ model: "synthetic-model", outcome: "error", errorClass });
+    expect(JSON.stringify(entries)).not.toContain("private-provider");
+  });
   it("logs every LLM call with model and token counts but no email text", async () => {
     const invalid = { ...VALID_TOOL_INPUT, fields: { ...VALID_TOOL_INPUT.fields, currency: "dollars" } };
     const { entries, audit } = auditLog();
     await extract(EMAIL, ORDER, { llm: scriptedLlm(invalid, VALID_TOOL_INPUT), audit, now: () => FIXED_NOW });
 
     expect(entries).toEqual([
-      { at: FIXED_NOW.toISOString(), actor: "llm", action: "llm_call", model: "fake-model", inputTokens: 500, outputTokens: 120, emailId: RAW.id, cached: false },
-      { at: FIXED_NOW.toISOString(), actor: "llm", action: "llm_call", model: "fake-model", inputTokens: 500, outputTokens: 120, emailId: RAW.id, cached: false },
+      { at: FIXED_NOW.toISOString(), actor: "llm", action: "llm_call", model: "fake-model", inputTokens: 500, outputTokens: 120, emailId: RAW.id, cached: false, outcome: "success" },
+      { at: FIXED_NOW.toISOString(), actor: "llm", action: "llm_call", model: "fake-model", inputTokens: 500, outputTokens: 120, emailId: RAW.id, cached: false, outcome: "success" },
     ]);
     const serialized = JSON.stringify(entries);
     for (const text of [EMAIL.subject, "Trail Runner", "Northwind", "Sam", "[PAN_1]"]) {

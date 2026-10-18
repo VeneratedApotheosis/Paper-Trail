@@ -10,6 +10,7 @@ import {
   type RedactedEmail,
 } from "@/lib/contracts";
 import { AnthropicLlmClient, type LlmClient } from "@/lib/llm";
+import { llmErrorClass } from "@/lib/llm/audit";
 import type { ExtractionCache } from "./cache";
 import {
   EXTRACTION_SYSTEM_PROMPT,
@@ -42,6 +43,8 @@ export type ExtractionAuditEntry = {
   outputTokens: number;
   emailId: string;
   cached: boolean;
+  outcome?: "success" | "error";
+  errorClass?: string;
 };
 
 export type ExtractDeps = {
@@ -139,7 +142,7 @@ export async function extract(
   const now = deps.now ?? (() => new Date());
   const audit = deps.audit ?? (() => undefined);
   const logCall = (model: string, inputTokens: number, outputTokens: number, cached: boolean) =>
-    audit({ at: now().toISOString(), actor: "llm", action: "llm_call", model, inputTokens, outputTokens, emailId: email.id, cached });
+    audit({ at: now().toISOString(), actor: "llm", action: "llm_call", model, inputTokens, outputTokens, emailId: email.id, cached, outcome: "success" });
 
   const hit = deps.cache?.get(email.textHash);
   if (hit) {
@@ -157,6 +160,11 @@ export async function extract(
       user,
       tool: EXTRACTION_TOOL,
       textHash: email.textHash,
+    }).catch(error => {
+      audit({ at: now().toISOString(), actor: "llm", action: "llm_call", model: llm.model,
+        inputTokens: 0, outputTokens: 0, emailId: email.id, cached: false,
+        outcome: "error", errorClass: llmErrorClass(error) });
+      throw error;
     });
     logCall(response.model, response.usage.inputTokens, response.usage.outputTokens, false);
     raw = response.toolInput;

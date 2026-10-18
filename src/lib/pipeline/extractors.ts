@@ -10,7 +10,7 @@ export function redactedTokenCount(email: RedactedEmail): number {
 
 /** Converts extract()'s audit row into a store audit event: ids, model and token counts only. */
 export function llmCallAuditEvent(entry: ExtractionAuditEntry, email: RedactedEmail): PipelineAuditEvent {
-  const usage = entry.cached
+  const usage = entry.outcome === "error" ? `failed: ${entry.errorClass}` : entry.cached
     ? "cache hit, no LLM call"
     : `${entry.inputTokens} input / ${entry.outputTokens} output tokens`;
   return {

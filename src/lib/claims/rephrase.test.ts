@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   LlmTimeoutError,
+  LlmHttpError,
+  LlmError,
   LlmUnavailableError,
   type LlmClient,
   type LlmToolRequest,
@@ -61,6 +63,7 @@ describe("rephraseDraft", () => {
         inputTokens: 120,
         outputTokens: 80,
         findingId: "refund_overdue:ord-1",
+        outcome: "success",
       },
     ]);
   });
@@ -102,8 +105,10 @@ describe("rephraseDraft", () => {
   });
 
   it.each([
-    ["timeout", new LlmTimeoutError(30_000), "LlmTimeoutError"],
-    ["missing key", new LlmUnavailableError("ANTHROPIC_API_KEY is not set"), "LlmUnavailableError"],
+    ["timeout", new LlmTimeoutError(30_000), "timeout"],
+    ["missing key", new LlmUnavailableError("ANTHROPIC_API_KEY is not set"), "unavailable"],
+    ["http", new LlmHttpError(503, "synthetic-private"), "http_error"],
+    ["network", new LlmError("synthetic-private"), "network_error"],
   ])("falls back to the template on LLM error (%s)", async (_label, error, name) => {
     const draft = templateDraft();
     const llm = new FakeLlm(() => {
@@ -117,7 +122,9 @@ describe("rephraseDraft", () => {
       draft,
       reason: `LLM rephrase failed (${name}); using the template draft`,
     });
-    expect(audit).toEqual([]);
+    expect(audit).toHaveLength(1);
+    expect(audit[0]).toMatchObject({ outcome: "error", errorClass: name, inputTokens: 0, outputTokens: 0 });
+    expect(JSON.stringify(audit)).not.toContain("synthetic-private");
   });
 
   it("falls back when the tool output is not a valid body", async () => {

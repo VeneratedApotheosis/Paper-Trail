@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { LlmClient, LlmTool } from "@/lib/llm";
+import { llmErrorClass } from "@/lib/llm/audit";
 import { claimClosing, type ClaimDraft } from "./draft";
 
 /**
@@ -18,6 +19,8 @@ export type RephraseAuditEntry = {
   inputTokens: number;
   outputTokens: number;
   findingId: string;
+  outcome?: "success" | "error";
+  errorClass?: string;
 };
 
 export type RephraseDeps = {
@@ -99,10 +102,14 @@ export async function rephraseDraft(draft: ClaimDraft, deps: RephraseDeps): Prom
       inputTokens: response.usage.inputTokens,
       outputTokens: response.usage.outputTokens,
       findingId: draft.findingId,
+      outcome: "success",
     });
     toolInput = response.toolInput;
   } catch (error) {
-    const name = error instanceof Error ? error.name : "unknown error";
+    const name = llmErrorClass(error);
+    deps.audit?.({ at: (deps.now ?? (() => new Date()))().toISOString(), actor: "llm", action: "llm_call",
+      purpose: "claim_rephrase", model: deps.llm.model, inputTokens: 0, outputTokens: 0,
+      findingId: draft.findingId, outcome: "error", errorClass: name });
     return fallback(`LLM rephrase failed (${name}); using the template draft`);
   }
 

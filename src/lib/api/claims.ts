@@ -105,7 +105,7 @@ export async function maybeRephraseClaim(draft: ClaimDraftRecord, rephrase: bool
         at: entry.at,
         type: "llm_call",
         model: entry.model,
-        detail: `Claim rephrase for finding ${entry.findingId}: ${entry.inputTokens} input / ${entry.outputTokens} output tokens`,
+        detail: `Claim rephrase for finding ${entry.findingId}: ${entry.outcome === "error" ? `failed: ${entry.errorClass}` : `${entry.inputTokens} input / ${entry.outputTokens} output tokens`}`,
       }),
   });
   if (!result.rephrased) return { draft, rephrased: false, reason: result.reason };
