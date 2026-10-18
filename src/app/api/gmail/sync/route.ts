@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sameOriginAllowed } from "@/lib/http/same-origin";
 import { withAccountStore } from "@/lib/gmail/context";
 import { gmailErrorResponse, gmailRequest } from "@/lib/gmail/http";
 import { GmailError } from "@/lib/gmail/client";
@@ -19,8 +20,7 @@ export const maxDuration = 300;
 const running = new Set<string>();
 async function handlePOST(request: Request): Promise<Response> {
   const headers = { "Cache-Control": "no-store" };
-  const origin = request.headers.get("origin");
-  if ((origin && origin !== new URL(request.url).origin) || request.headers.get("sec-fetch-site") === "cross-site") {
+  if (!sameOriginAllowed(request)) {
     return Response.json({ error: "Start sync from this app." }, { status: 403, headers });
   }
   // `accountId` limits the sync to one linked account; by default every account is synced one after another (#114).

@@ -1,10 +1,10 @@
+import { sameOriginAllowed } from "@/lib/http/same-origin";
 import { jsonError } from "@/lib/api/http";
 import { QualityError } from "./feedback";
 
 /** Same-origin guard for the POST routes (the browser app is the only caller). */
 export function qualityOriginAllowed(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  return (!origin || origin === new URL(request.url).origin) && request.headers.get("sec-fetch-site") !== "cross-site";
+  return sameOriginAllowed(request);
 }
 
 export function qualityErrorResponse(error: unknown): Response {
