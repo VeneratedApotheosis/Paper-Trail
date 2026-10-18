@@ -6,6 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { OrderCard } from "@/components/OrderCard";
 import { EmptyState } from "@/components/states";
 import { Button } from "@/components/ui/Button";
+import { SearchSelect, type SearchSelectOption } from "@/components/ui/SearchSelect";
 import { deriveOrderStatus, type OrderDisplayStatus } from "@/lib/view";
 
 const ALL = "all" as const;
@@ -31,7 +32,7 @@ export interface LedgerViewProps {
 }
 
 export function LedgerView({ orders, onOpenOrder, onLoadDemo }: LedgerViewProps) {
-  const [merchant, setMerchant] = useState<string>(ALL);
+  const [merchant, setMerchant] = useState<string | null>(null);
   const [status, setStatus] = useState<string>(ALL);
 
   // Reverse-chronological: newest order first.
@@ -43,17 +44,23 @@ export function LedgerView({ orders, onOpenOrder, onLoadDemo }: LedgerViewProps)
     [orders],
   );
 
-  const merchants = useMemo(
-    () => Array.from(new Set(sorted.map((o) => o.merchant.name))).sort(),
-    [sorted],
-  );
+  // One option per store with its purchase count, A to Z.
+  const merchantOptions = useMemo<SearchSelectOption[]>(() => {
+    const counts = new Map<string, number>();
+    for (const o of sorted) counts.set(o.merchant.name, (counts.get(o.merchant.name) ?? 0) + 1);
+    return [...counts]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, count]) => ({ value: name, label: name, count }));
+  }, [sorted]);
+  // A refreshed ledger may drop the chosen store; fall back to all stores instead of an empty list.
+  const activeMerchant = merchantOptions.some((o) => o.value === merchant) ? merchant : null;
   const statuses = useMemo(() => {
     const present = new Set(sorted.map((o) => deriveOrderStatus(o)));
     return STATUS_ORDER.filter((s) => present.has(s));
   }, [sorted]);
 
   const visible = sorted.filter((o) => {
-    if (merchant !== ALL && o.merchant.name !== merchant) return false;
+    if (activeMerchant !== null && o.merchant.name !== activeMerchant) return false;
     if (status !== ALL && deriveOrderStatus(o) !== status) return false;
     return true;
   });
@@ -102,25 +109,21 @@ export function LedgerView({ orders, onOpenOrder, onLoadDemo }: LedgerViewProps)
             </FilterPill>
           ))}
         </div>
-        <div
-          role="group"
-          aria-label="Filter by merchant"
-          className="flex flex-wrap gap-2"
-        >
-          <FilterPill active={merchant === ALL} onClick={() => setMerchant(ALL)}>
-            All merchants
-          </FilterPill>
-          {merchants.map((m) => (
-            <FilterPill key={m} active={merchant === m} onClick={() => setMerchant(m)}>
-              {m}
-            </FilterPill>
-          ))}
-        </div>
+        <SearchSelect
+          label="Store"
+          options={merchantOptions}
+          value={activeMerchant}
+          onChange={setMerchant}
+          allLabel="All stores"
+          allCount={sorted.length}
+          searchPlaceholder="Search stores"
+          emptyText="No stores match"
+        />
       </div>
 
       {visible.length === 0 ? (
         <EmptyState title="No matching purchases">
-          No purchases match these filters. Try clearing the merchant or status filter.
+          No purchases match these filters. Try clearing the store or status filter.
         </EmptyState>
       ) : (
         <div className="space-y-4">
