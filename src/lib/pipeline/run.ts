@@ -368,13 +368,21 @@ export function createPipelineRun(deps: PipelineDeps, expectedEmails?: number): 
 
     const matched = matchOrdersWithReasons(matchInputs);
     const allOrders = matched.orders;
-    const includedOrders = allOrders.filter((order) => !isExcludedMerchant(order, excluded));
+    // A purchase read at $0 (no amount, or a total the reader could not find) is never trusted: it goes to Review.
+    const zeroTotalIds = new Set<string>();
+    const includedOrders = allOrders
+      .filter((order) => !isExcludedMerchant(order, excluded))
+      .map((order) => {
+        if (order.packageOnly || order.needsReview || order.total !== 0) return order;
+        zeroTotalIds.add(order.id);
+        return { ...order, needsReview: true };
+      });
     const { findings, failures } = runRulesIsolated(includedOrders, defaultRules, {
       now: deps.now,
       priceFeed: deps.priceFeed,
     });
     for (const order of includedOrders.filter((candidate) => candidate.needsReview)) {
-      const reason = orderReviewReason(order, matched.reviewReasons.get(order.id));
+      const reason = zeroTotalIds.has(order.id) ? "total read as $0, so it needs a human check" : orderReviewReason(order, matched.reviewReasons.get(order.id));
       reviewQueue.push({ emailId: order.messageIds[0], stage: "match", reason, orderId: order.id });
     }
     // An order whose rules failed has no findings; it goes to review so a human can correct and re-run it.
