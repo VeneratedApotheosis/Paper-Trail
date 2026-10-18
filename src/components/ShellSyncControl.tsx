@@ -170,7 +170,8 @@ export function ShellSyncControl({ sync }: { sync: AppShellSync }) {
   const disabled = state === "checking" || state === "running";
   const onClick = state === "ready" ? sync.onSync : state === "connect" || state === "reconnect" ? sync.onConnect : undefined;
   const surface =
-    state === "running" ? "neu-inset text-ink" : state === "connect" || state === "reconnect" ? "neu-accent" : "neu-raised-sm text-teal-deep";
+    // Only "reconnect" is an action the user must take, so only it gets the accent. Connect (demo/empty) stays quiet.
+    state === "running" ? "neu-inset text-ink" : state === "reconnect" ? "neu-accent" : "neu-raised-sm text-teal-deep";
 
   return (
     <div className="flex items-center gap-3 sm:relative">

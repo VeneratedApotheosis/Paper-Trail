@@ -57,7 +57,7 @@ const defaultNav: AppShellNavItem[] = [
   { href: "/account", label: "Account" },
 ];
 
-const DEFAULT_DEMO_LABEL = "Demo data \u2014 synthetic, not real purchases";
+const DEFAULT_DEMO_LABEL = "Demo data: synthetic";
 
 function isActive(activePath: string, href: string): boolean {
   return href === "/" ? activePath === "/" : activePath.startsWith(href);
@@ -117,7 +117,7 @@ export function AppShellView({
         ) : null}
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="group/shell flex min-w-0 flex-1 flex-col">
         {showDemoBanner ? (
           <DemoBanner
             label={demoLabel}
@@ -127,7 +127,7 @@ export function AppShellView({
         ) : null}
         {/* Masthead: wordmark + account on mobile; on desktop only the sync control (fixed height, no layout shift) */}
         <header
-          className={`relative mx-auto flex min-h-[4.25rem] w-full max-w-ledger items-center justify-between gap-3 px-5 py-3 md:justify-end md:px-10 md:pt-6 ${
+          className={`relative mx-auto flex min-h-[4.25rem] w-full max-w-ledger items-center justify-between gap-3 px-5 py-3 group-has-[[data-layout=wide]]/shell:max-w-[76rem] md:justify-end md:px-12 md:pt-6 ${
             sync ? "" : "md:hidden"
           }`}
         >
@@ -145,7 +145,7 @@ export function AppShellView({
         </header>
 
         <main
-          className={`mx-auto w-full max-w-ledger flex-1 px-5 pb-28 pt-2 md:px-10 md:pb-10 ${sync ? "md:pt-4" : "md:pt-10"}`}
+          className={`mx-auto w-full max-w-ledger flex-1 px-5 pb-28 pt-2 group-has-[[data-layout=wide]]/shell:max-w-[76rem] md:px-12 md:pb-10 ${sync ? "md:pt-4" : "md:pt-10"}`}
         >
           {children}
         </main>
