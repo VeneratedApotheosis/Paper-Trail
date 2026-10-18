@@ -1,4 +1,4 @@
-import { computeOwed } from "@/lib/rules/owed";
+import { computeOwed, orderNeedsReview } from "@/lib/rules/owed";
 import { getState } from "@/lib/store";
 import { API_LABELS, type LedgerResponse, type PipelineRunResponse } from "./types";
 
@@ -8,7 +8,8 @@ export function buildLedgerResponse(): LedgerResponse {
   return {
     mode: state.mode,
     asOf: state.asOf,
-    orders: state.orders,
+    // A $0 purchase that still needs review (no amount found) waits in Review instead of showing as a $0.00 card.
+    orders: state.orders.filter((order) => !(order.total === 0 && orderNeedsReview(order))),
     findings: state.findings,
     summary: computeOwed(state.findings, state.orders),
     reviewQueue: state.reviewQueue,

@@ -33,9 +33,10 @@ describe("pipeline with tracking emails (#127)", () => {
     expect(result.stats.classes).toMatchObject({ order: 2, shipped: 5, delivered: 1 });
     expect(result.stats.dedup?.merges.tracking_number).toBeGreaterThanOrEqual(2);
     const pkg = result.orders.find((order) => order.packageOnly);
-    expect(pkg?.needsReview).toBe(false);
+    // A tracking-only entry has no amount ($0), so it waits in Review rather than showing as a $0.00 purchase.
+    expect(pkg?.needsReview).toBe(true);
     // The package entry is not in the needs-review queue and produces no findings.
-    expect(result.reviewQueue.filter((item) => item.orderId === pkg?.id)).toEqual([]);
+    expect(result.reviewQueue.filter((item) => item.orderId === pkg?.id).map((item) => item.reason)).toEqual([expect.stringContaining("no receipt")]);
     expect(result.findings.filter((finding) => finding.orderId === pkg?.id)).toEqual([]);
   });
 

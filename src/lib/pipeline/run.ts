@@ -373,7 +373,7 @@ export function createPipelineRun(deps: PipelineDeps, expectedEmails?: number): 
     const includedOrders = allOrders
       .filter((order) => !isExcludedMerchant(order, excluded))
       .map((order) => {
-        if (order.packageOnly || order.needsReview || order.total !== 0) return order;
+        if (order.needsReview || order.total !== 0) return order;
         zeroTotalIds.add(order.id);
         return { ...order, needsReview: true };
       });
@@ -382,7 +382,7 @@ export function createPipelineRun(deps: PipelineDeps, expectedEmails?: number): 
       priceFeed: deps.priceFeed,
     });
     for (const order of includedOrders.filter((candidate) => candidate.needsReview)) {
-      const reason = zeroTotalIds.has(order.id) ? "total read as $0, so it needs a human check" : orderReviewReason(order, matched.reviewReasons.get(order.id));
+      const reason = zeroTotalIds.has(order.id) ? (includedOrders.find((o) => o.id === order.id)?.packageOnly ? "only a tracking email was found, no receipt, so the amount is unknown" : "total read as $0, so it needs a human check") : orderReviewReason(order, matched.reviewReasons.get(order.id));
       reviewQueue.push({ emailId: order.messageIds[0], stage: "match", reason, orderId: order.id });
     }
     // An order whose rules failed has no findings; it goes to review so a human can correct and re-run it.
