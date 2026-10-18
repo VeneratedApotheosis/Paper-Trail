@@ -16,7 +16,7 @@ Repo: `VeneratedApotheosis/Paper-Trail`
 | **Kenan** | `VeneratedApotheosis` | Repo owner, final say on scope. **Data + routing:** thin pages, middleware, hooks, backend. Orchestrated `kenan-pi-*` agents (section 5) |
 | **Alex** | `ptatoo` | **How it looks:** design system, styles, visual components and views (Paper) |
 | Ethan Lowe | `ethanwlowe7-cmyk` | **On the team but inactive (no time to code, 2026-10-17).** Any claim by him is stale and may be taken over immediately (comment that it's stale, then claim). Don't assign him work |
-| Chelsea | `chelsearwang` | **On the team but inactive (left the hackathon, 2026-10-17).** Any claim by her is stale and may be taken over immediately. Her area (auth, Gmail, review, DB) is now Kenan's. Don't assign her work |
+| Chelsea | `chelsearwang` | part-time via Codex (2026-10-17): she prompts occasionally; **chelsea-codex** works the issues reserved for her (assigned to `chelsearwang`: #95, #40, #96, #79, #22, #98). Claims on those are valid; anything else of hers is stale. Her former area (auth, Gmail, review, DB) stays Kenan's |
 
 ### The frontend is split by file (decided 2026-10-17)
 **Alex = how it looks. Kenan = where data comes from and where users go, plus auth, Gmail, review and DB while Chelsea is inactive.**
