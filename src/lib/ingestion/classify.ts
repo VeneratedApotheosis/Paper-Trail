@@ -74,9 +74,9 @@ const ORDER_TOTAL_OR_ITEMS = /\border total\b|\bsubtotal\b|\bgrand total\b|^[ \t
 
 /** Concrete purchase details, not promotional headings such as "Items you might like". */
 // ":" or "|": table-aware HTML-to-text (#116) renders label/value cells as "Order total | $134.45".
-const PURCHASE_TOTAL = /\b(?:order total|subtotal|grand total|total(?: paid)?|total del pedido)\s*[:|]?\s*(?:[a-z]{3}\s*)?[$€£]?\s*\d/;
+const PURCHASE_TOTAL = /\b(?:order total|subtotal|grand total|total(?: paid)?|total del pedido)\s*[:|]?\s*(?:[a-z]{1,3}\s*)?[$€£¥₩₹]?\s*\d/;
 const ITEM_QUANTITY = /\b(?:qty|quantity)\s*:?\s*\d|\bx\s*\d|\b\d+\s*x\b/;
-const ITEM_PRICE = /[$€£]\s*\d|\b\d[\d,.]*\s*(?:usd|eur|gbp|cad|mxn)\b/;
+const ITEM_PRICE = /[$€£¥₩₹]\s*\d|\b\d[\d,.]*\s*(?:usd|eur|gbp|cad|mxn|twd|ntd|jpy|krw|cny|rmb|hkd|sgd|aud|inr|元|円)(?![a-z])/;
 
 const RETURN_CLASSES: ReadonlySet<TransactionalClass> = new Set(["return_started", "return_received"]);
 
@@ -117,6 +117,22 @@ const GENERIC_NAME_WORDS = new Set([
   "hello", "from", "with", "help", "care", "updates", "mail", "online", "official", "account", "accounts",
   "billing", "security", "alert", "alerts", "shipping", "returns", "refunds", "the",
 ]);
+
+/**
+ * Commerce / point-of-sale platforms that send receipts on a shop's behalf: the display name is the shop
+ * ("korea moos") and the domain is the platform, so a name/domain mismatch is expected, not suspicious.
+ * Look-alike and urgent-verification checks still apply.
+ */
+const COMMERCE_PLATFORM_DOMAINS = [
+  "shopline.com", "shoplineapp.com", "shopify.com", "shopifyemail.com", "squareup.com", "square.com",
+  "toasttab.com", "stripe.com", "clover.com", "lightspeedhq.com", "sumup.com", "zettle.com", "izettle.com",
+  "wix.com", "wixemails.com", "squarespace.com", "bigcommerce.com", "ecwid.com", "etsy.com", "gumroad.com",
+  "paypal.com", "eventbrite.com", "loyverse.com", "odoo.com", "weebly.com", "shopee.tw", "91app.com", "cyberbiz.co",
+];
+
+function isCommercePlatform(domain: string): boolean {
+  return COMMERCE_PLATFORM_DOMAINS.some((platform) => domain === platform || domain.endsWith(`.${platform}`));
+}
 
 const SECURITY_HYPHEN_DOMAIN =
   /(?:^|[.-])(?:secure|security|verify|verification|account|accounts|login|signin|alert|alerts|support)-|-(?:secure|security|verify|verification|account|accounts|login|signin|alert|alerts|support)(?:[.-]|$)/;
@@ -203,7 +219,7 @@ function assessSuspicion(view: EmailView, foldedAll: string): Suspicion {
   if (spoofedBrand || (brands.length === 0 && /[a-z][013457][a-z]/.test(labels))) {
     score += 2;
     reasons.push(`look-alike sender domain ${domain}`);
-  } else if (brands.length > 0 && !brands.some((word) => lettersOnly.includes(word))) {
+  } else if (brands.length > 0 && !brands.some((word) => lettersOnly.includes(word)) && !isCommercePlatform(domain)) {
     score += 1;
     reasons.push(`sender domain ${domain} does not match "${senderDisplayName(view.from)}"`);
   }
@@ -325,7 +341,7 @@ function decide(view: EmailView): Verdict {
   if (transactional) return transactional;
 
   if (promo >= 1) return { cls: "marketing", confidence: 0.6, reason: "promotional language, no receipt wording" };
-  const mentionsMoney = /[$€£]\s?\d/.test(foldedAll);
+  const mentionsMoney = /[$€£¥₩₹]\s?\d/.test(foldedAll);
   return mentionsMoney
     ? { cls: "not_receipt", confidence: 0.6, reason: "mentions amounts but no receipt wording" }
     : { cls: "not_receipt", confidence: 0.85, reason: "no receipt wording" };
