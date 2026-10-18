@@ -1,38 +1,25 @@
-import Link from "next/link";
-import { AppShell } from "@/components/AppShell";
-import { EmptyState } from "@/components/states";
+import { notFound } from "next/navigation";
+import { getOrderForRequest } from "@/lib/api/server";
+import { API_LABELS } from "@/lib/api/types";
 import { OrderDetailWrapper } from "./OrderDetailWrapper";
-import { findings, getOrder } from "@/lib/mock/data";
 
+// Thin server wrapper (#61): reads the order from the request's account store and hands it to the view.
+// params.id arrives still percent-encoded (real ids contain ':'); getOrderForRequest decodes it once with safeDecode,
+// so it is passed as is to avoid double-decoding.
 export default async function OrderDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const order = getOrder(id);
+  const data = await getOrderForRequest(id);
+  if (!data) notFound();
 
-  if (!order) {
-    return (
-      <AppShell>
-        <EmptyState
-          title="Order not found"
-          actions={
-            <Link
-              href="/ledger"
-              className="neu-raised-sm rounded-sm px-4 py-2 text-sm font-bold text-ink-muted transition-shadow hover:text-ink"
-            >
-              Back to ledger
-            </Link>
-          }
-        >
-          We couldn&apos;t find an order with id <code>{id}</code>. It may have been removed.
-        </EmptyState>
-      </AppShell>
-    );
-  }
-
-  const orderFindings = findings.filter((f) => f.orderId === order.id);
-
-  return <OrderDetailWrapper order={order} findings={orderFindings} />;
+  return (
+    <OrderDetailWrapper
+      order={data.order}
+      findings={data.findings}
+      simulatedLabel={API_LABELS.simulatedPrice}
+    />
+  );
 }

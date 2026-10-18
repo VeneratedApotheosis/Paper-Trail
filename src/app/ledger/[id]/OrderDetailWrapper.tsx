@@ -10,15 +10,18 @@ import { OrderDetailView } from "@/components/views/OrderDetailView";
 export function OrderDetailWrapper({
   order,
   findings,
+  simulatedLabel,
 }: {
   order: NormalizedOrder;
   findings: Finding[];
+  simulatedLabel: string;
 }) {
   const router = useRouter();
   return (
     <OrderDetailView
       order={order}
       findings={findings}
+      simulatedLabel={simulatedLabel}
       onBack={() => router.push("/ledger")}
     />
   );
