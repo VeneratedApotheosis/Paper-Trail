@@ -107,12 +107,22 @@
     opacity: 1;
     transform: none;
   }
-  /* Press and hover feedback for buttons and cards. */
-  .press {
-    transition: transform 150ms ease-out;
+  /* Colour and state changes ease instead of snapping (tabs, chips, nav, buttons). */
+  .neu-raised-sm,
+  .neu-inset,
+  .neu-accent {
+    transition: color 150ms ease-out, background-color 150ms ease-out, opacity 150ms ease-out;
   }
-  .press:active {
-    transform: scale(0.98);
+  /* Clickable raised cards lift slightly on hover (static cards stay still). Pointer devices only. */
+  @media (hover: hover) {
+    a.neu-raised,
+    button.neu-raised {
+      transition: transform 200ms ease-out;
+    }
+    a.neu-raised:hover,
+    button.neu-raised:hover {
+      transform: translateY(-2px);
+    }
   }
 
   /* Primary actions. Deep teal so white text passes WCAG AA (4.8:1 or better). */

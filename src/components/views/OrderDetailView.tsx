@@ -1,5 +1,6 @@
-﻿"use client";
+"use client";
 
+import { CountUpMoney } from "@/components/CountUpMoney";
 import { useState } from "react";
 import type { Finding, FindingKind, NormalizedOrder, OrderEvent } from "@/lib/contracts";
 import { AppShell } from "@/components/AppShell";
@@ -98,7 +99,7 @@ export function OrderDetailView({
     </button>
   );
   const undoNotice = feedback.notice ? (
-    <div role="status" className="neu-inset mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg px-6 py-4">
+    <div role="status" className="anim-fade neu-inset mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg px-6 py-4">
       <p className="text-sm text-ink">
         {feedback.notice === "purchase"
           ? "Marked as not a purchase. It no longer counts toward what you’re owed, and future syncs skip its emails."
@@ -164,7 +165,7 @@ export function OrderDetailView({
                 <div className="xl:text-right">
                   <div className="eyebrow sr-only xl:not-sr-only">Total</div>
                   <div className="font-serif text-[2.125rem] font-semibold leading-[2.625rem] tabular-nums text-money">
-                    {formatMoney(order.total, currency)}
+                    <CountUpMoney amount={order.total} currency={currency} />
                   </div>
                   {onMarkNotPurchase && !confirming ? (
                     <Button variant="ghost" className="mt-2 xl:-mr-2" onClick={() => setConfirming(true)}>Not a purchase</Button>

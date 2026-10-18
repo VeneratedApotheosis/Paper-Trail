@@ -1,5 +1,6 @@
 "use client";
 
+import { CountUpMoney } from "@/components/CountUpMoney";
 import { useMemo, useState } from "react";
 import type { Finding, FindingStatus } from "@/lib/contracts";
 import type { OwedSummary } from "@/lib/types";
@@ -252,7 +253,7 @@ export function OwedView({
                     <h2 className="font-serif text-lg text-ink">Needs a quick check</h2>
                     <p className="mt-1 text-sm text-ink-muted">
                       {summary.excludedCount} {summary.excludedCount === 1 ? "item" : "items"} worth{" "}
-                      {formatMoney(summary.excludedTotal, summary.currency)}{" "}
+                      <CountUpMoney amount={summary.excludedTotal} currency={summary.currency} />{" "}
                       {summary.excludedCount === 1 ? "isn't" : "aren't"} counted in your total
                       until you check {summary.excludedCount === 1 ? "it" : "them"}.
                     </p>
