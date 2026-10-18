@@ -9,10 +9,11 @@ test("synthetic demo: findings, evidence, claim approval, purchases and delete",
   expect((await request.post("/api/delete-all")).ok()).toBe(true);
   await page.goto("/");
   await page.getByRole("button", { name: "Try demo data", exact: true }).click();
-  const headline = page.getByRole("heading", { level: 1, name: /You are owed/ });
-  await expect(headline).toContainText("1,774.23");
+  // #135: the owed figure is the hero amount; its accessible name carries the full total.
+  const headline = page.locator("#hero-amount");
+  await expect(headline).toHaveAttribute("aria-label", /1,774\.23/);
   await expect(page.getByText(/synthetic/i).first()).toBeVisible();
-  const before = await headline.innerText();
+  const before = await headline.getAttribute("aria-label");
   const card = page.locator("article").first();
   await card.getByRole("button", { name: "Why?", exact: true }).click();
   await expect(card.getByText("What your emails say", { exact: true })).toBeVisible();
@@ -23,7 +24,7 @@ test("synthetic demo: findings, evidence, claim approval, purchases and delete",
   await page.getByRole("button", { name: "Approve and copy", exact: true }).click();
   await expect(page.getByText("Approved and copied to clipboard", { exact: true })).toBeVisible();
   await page.goto("/");
-  await expect(headline).toHaveText(before);
+  await expect(headline).toHaveAttribute("aria-label", before ?? "");
   const approvedLedger = await (await request.get("/api/ledger")).json();
   expect(approvedLedger.summary.claimSentCount).toBe(1);
   expect(approvedLedger.findings.filter((finding: { status: string }) => finding.status === "drafted")).toHaveLength(1);
