@@ -20,6 +20,11 @@ function routeRedirect(request: NextRequest): NextResponse | null {
   if (pathname.startsWith("/api/")) return null;
   const inApp = Boolean(request.cookies.get(SESSION_COOKIE)?.value || request.cookies.get(DEMO_COOKIE)?.value);
   // /connect is retired: signed-out visitors land on /welcome; signed-in ones (demo, expired Gmail) go straight to Google.
+  if (pathname === "/connect" && inApp && (request.nextUrl.searchParams.has("_rsc") || request.headers.get("rsc") === "1")) {
+    // A client-side (RSC) fetch must not be redirected to accounts.google.com: the browser blocks it as a CORS error.
+    // A non-RSC reply makes Next fall back to a full-page navigation, which then follows the redirect to Google.
+    return new NextResponse(null, { status: 204 });
+  }
   if (pathname === "/connect") return NextResponse.redirect(new URL(inApp ? "/api/auth/google" : "/welcome", request.url));
   const isPublic = PUBLIC_PAGES.includes(pathname);
   if (!inApp && !isPublic) return NextResponse.redirect(new URL("/welcome", request.url));
