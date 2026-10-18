@@ -1,55 +1,39 @@
-import Link from "next/link";
+import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
-import { ClaimDraft } from "@/components/ClaimDraft";
 import { EmptyState } from "@/components/states";
-import { getDraftForFinding, getFinding, getOrder, SIMULATED_PRICE_LABEL } from "@/lib/mock/data";
+import { LinkButton } from "@/components/ui/Button";
+import { getClaimForRequest, getLedgerForRequest } from "@/lib/api/server";
+import { API_LABELS } from "@/lib/api/types";
+import { ClaimWrapper } from "./ClaimWrapper.client";
 
-// Claim draft sheet (#17 — UI only). `id` is a *finding* id (findings link here
-// from the hero FindingCard via /claim/${finding.id}). Data loads here on the
-// server from mock data; the editable draft + approve/copy flow lives in the
-// <ClaimDraft/> client component. Production drafting is backend (src/lib/claims,
-// team-owned): the LLM only writes wording — every number comes from the rule /
-// finding (AGENTS.md hard rule #4), and the app never sends email (hard rule #2).
-export default async function ClaimPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+// Thin server wrapper (#67): `id` is a finding id. getClaimForRequest returns the stored draft (or stores a fresh
+// template draft, like GET /api/claims/:findingId) from the request's account store. params.id arrives still
+// percent-encoded (real ids contain ':'); the helper decodes it once with safeDecode, so it is passed as is.
+// Every number in the draft comes from the finding (hard rule 4); approving never sends anything (hard rule 2).
+export default async function ClaimPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const finding = getFinding(id);
-  const order = finding ? getOrder(finding.orderId) : undefined;
+  const opened = await getClaimForRequest(id);
+  if (!opened.ok && opened.reason === "not_found") notFound();
+  const { mode } = await getLedgerForRequest();
+  const demo = mode === "demo";
 
-  if (!finding || !order) {
+  if (!opened.ok) {
+    // 422 cases: no claim template for this finding kind (e.g. rewards_gap) or a finding the template can't use.
     return (
-      <AppShell>
+      <AppShell demo={demo}>
         <EmptyState
-          title="Claim not found"
+          title={opened.reason === "unsupported_kind" ? "No claim letter for this finding" : "Couldn't draft this claim"}
           actions={
-            <Link
-              href="/"
-              className="neu-raised-sm inline-flex items-center justify-center rounded-lg px-5 py-3 text-sm font-bold text-teal-deep transition-[box-shadow,transform] active:scale-[0.99]"
-            >
+            <LinkButton href="/" variant="secondary">
               Back to owed
-            </Link>
+            </LinkButton>
           }
         >
-          We couldn&apos;t find a finding with id <code>{id}</code>. It may have been
-          resolved or removed.
+          {opened.message}
         </EmptyState>
       </AppShell>
     );
   }
 
-  const existingDraft = getDraftForFinding(finding.id);
-
-  return (
-    <AppShell>
-      <ClaimDraft
-        finding={finding}
-        order={order}
-        existingDraft={existingDraft}
-        simulatedLabel={SIMULATED_PRICE_LABEL}
-      />
-    </AppShell>
-  );
+  return <ClaimWrapper claim={opened.claim} simulatedLabel={API_LABELS.simulatedPrice} demo={demo} />;
 }
