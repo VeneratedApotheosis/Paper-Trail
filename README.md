@@ -52,7 +52,7 @@ Create your own local `.env.local` using the placeholders in `.env.example`. Kee
 | `AUTH_ENCRYPTION_KEY` | 64 hex characters for token/session sealing; generate with `openssl rand -hex 32` |
 | `ANTHROPIC_API_KEY` | Live Claude extraction for Gmail/import cache misses, and optional claim rewording |
 | `LLM_MODEL` | Optional model override; the code default is `claude-sonnet-5-5` |
-| `PAPERTRAIL_REDACT` | `on`/`off` (default `off` for the local demo): redact card numbers, phones and addresses before Claude |
+| `PAPERTRAIL_REDACT` | `on`/`off` redact card numbers, phones and addresses before Claude for privacy minded people |
 | `PROMO_FETCH_LIMIT` | Promotions-category messages fetched per sync (default 30, `0` disables, max 100) |
 | `DATABASE_URL` | SQLite file for auth identity, sealed tokens and persistent auth audit; defaults to `./papertrail.sqlite` |
 
