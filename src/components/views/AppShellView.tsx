@@ -20,19 +20,18 @@ export interface AppShellAccount {
 
 // Which data the app is showing. Drives the demo banner and keeps chrome honest
 // (AGENTS.md: synthetic data is always labelled as such).
-export type AppShellMode = "empty" | "demo" | "gmail";
+export type AppShellMode = "empty" | "demo" | "upload" | "gmail";
 
 export interface AppShellViewProps {
   children: ReactNode;
   activePath: string;
   nav?: AppShellNavItem[];
   account?: AppShellAccount;
-  mode?: AppShellMode;
+  mode: AppShellMode;
   demoLabel?: string;
+  // Shown next to the demo label when extractions came from seed labels, not an LLM.
+  precomputedExtractionLabel?: string;
   onLeaveDemo?: () => void;
-  // Deprecated: use `mode`. Kept so existing wrappers keep compiling; when `mode`
-  // is absent we derive it from this (`demo` -> "demo", otherwise "gmail").
-  demo?: boolean;
 }
 
 const defaultNav: AppShellNavItem[] = [
@@ -55,13 +54,10 @@ export function AppShellView({
   account,
   mode,
   demoLabel = DEFAULT_DEMO_LABEL,
+  precomputedExtractionLabel,
   onLeaveDemo,
-  demo,
 }: AppShellViewProps) {
-  // Prefer the explicit `mode`; fall back to the legacy `demo` boolean so older
-  // call sites keep working until ui-wiring (#75) passes a real mode.
-  const effectiveMode: AppShellMode = mode ?? (demo === false ? "gmail" : "demo");
-  const showDemoBanner = effectiveMode === "demo";
+  const showDemoBanner = mode === "demo";
 
   return (
     <div className="min-h-screen md:flex">
@@ -101,7 +97,13 @@ export function AppShellView({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {showDemoBanner ? <DemoBanner label={demoLabel} onLeaveDemo={onLeaveDemo} /> : null}
+        {showDemoBanner ? (
+          <DemoBanner
+            label={demoLabel}
+            precomputedExtractionLabel={precomputedExtractionLabel}
+            onLeaveDemo={onLeaveDemo}
+          />
+        ) : null}
         {/* Mobile masthead */}
         <header className="flex items-center justify-between px-5 py-4 md:hidden">
           <Link href="/" className="font-serif text-lg font-semibold text-ink">

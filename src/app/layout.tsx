@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Spectral, Hanken_Grotesk } from "next/font/google";
+import { ShellStateProvider } from "@/hooks/shellState";
 import "./globals.css";
 
 // Display serif for headings and the money figures (calm, bookish — Spectral).
@@ -27,7 +28,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${ui.variable}`}>
-      <body className="bg-paper font-sans text-ink antialiased">{children}</body>
+      <body className="bg-paper font-sans text-ink antialiased">
+        <ShellStateProvider>{children}</ShellStateProvider>
+      </body>
     </html>
   );
 }

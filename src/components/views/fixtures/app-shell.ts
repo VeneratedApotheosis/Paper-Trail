@@ -7,6 +7,7 @@ export const appShellViewFixture: AppShellViewProps = {
   activePath: "/ledger",
   mode: "demo",
   demoLabel: "Demo data \u2014 synthetic, not real purchases",
+  precomputedExtractionLabel: "Extracted from precomputed seed labels (no LLM call)",
   onLeaveDemo: () => {},
   nav: [
     { href: "/", label: "Owed" },
