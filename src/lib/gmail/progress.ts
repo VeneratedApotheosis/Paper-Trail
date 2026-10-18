@@ -4,8 +4,23 @@ export type GmailWorkProgress = {
   total: number | null;
   skipped: number;
 };
+type GmailSyncStage = GmailWorkProgress["stage"] | "idle" | "complete" | "failed";
+/** Progress of one linked Gmail account within a sync (#114). `idle` = waiting for its turn. */
+export type GmailAccountProgress = {
+  accountId: string;
+  mailbox: string | null;
+  stage: GmailSyncStage;
+  fetched: number;
+  total: number | null;
+};
+/**
+ * Top-level fields describe the whole sync: stage of the account being synced, `fetched`/`skipped` summed over
+ * accounts, `total` summed once every account knows its own (else null). `accounts` is present only while/after a sync of
+ * several accounts reports per account; a single-account sync keeps the plain shape.
+ */
 export type GmailSyncProgress = Omit<GmailWorkProgress, "stage"> & {
-  stage: GmailWorkProgress["stage"] | "idle" | "complete" | "failed";
+  stage: GmailSyncStage;
+  accounts?: GmailAccountProgress[];
 };
 
 const idle = (): GmailSyncProgress => ({ stage: "idle", fetched: 0, total: null, skipped: 0 });
@@ -23,7 +38,8 @@ export function createGmailProgressStore(now = Date.now) {
   return {
     read(userId: string): GmailSyncProgress {
       prune();
-      return { ...(entries.get(userId)?.value ?? idle()) };
+      const value = entries.get(userId)?.value ?? idle();
+      return { ...value, ...(value.accounts ? { accounts: value.accounts.map(account => ({ ...account })) } : {}) };
     },
     begin(userId: string) {
       prune();
@@ -38,10 +54,38 @@ export function createGmailProgressStore(now = Date.now) {
         entry.value = { ...value };
         entry.updatedAt = now();
       };
+      const work = new Map<string, { mailbox: string | null; stage: GmailSyncStage; fetched: number; total: number | null; skipped: number }>();
+      const active = ["listing", "fetching", "processing"];
+      const refresh = () => {
+        const all = [...work.entries()];
+        const current = all.find(([, item]) => active.includes(item.stage));
+        write({
+          stage: current ? current[1].stage : entry.value.stage,
+          fetched: all.reduce((sum, [, item]) => sum + item.fetched, 0),
+          skipped: all.reduce((sum, [, item]) => sum + item.skipped, 0),
+          total: all.some(([, item]) => item.total === null) ? null : all.reduce((sum, [, item]) => sum + (item.total ?? 0), 0),
+          accounts: all.map(([accountId, item]) => ({ accountId, mailbox: item.mailbox, stage: item.stage, fetched: item.fetched, total: item.total })),
+        });
+      };
       return {
         update: (value: GmailWorkProgress) => write(value),
+        // The whole run ends complete or failed; per-account state stays as reported.
         complete: () => write({ ...entry.value, stage: "complete" }),
         fail: () => write({ ...entry.value, stage: "failed" }),
+        /** Registers one account of a multi-account sync (waiting) and returns its own reporter. */
+        forAccount(accountId: string, mailbox: string | null) {
+          work.set(accountId, { mailbox, stage: "idle", fetched: 0, total: null, skipped: 0 });
+          refresh();
+          const set = (patch: Partial<NonNullable<ReturnType<typeof work.get>>>) => {
+            work.set(accountId, { ...work.get(accountId)!, ...patch });
+            refresh();
+          };
+          return {
+            update: (value: GmailWorkProgress) => set(value),
+            complete: () => set({ stage: "complete" }),
+            fail: () => set({ stage: "failed" }),
+          };
+        },
       };
     },
   };

@@ -79,6 +79,11 @@ export const NormalizedOrderSchema = z.object({
   events: z.array(OrderEventSchema),
   /** Source email ids that contributed to this order. */
   messageIds: z.array(z.string()),
+  /**
+   * Linked Gmail account ids (`RawEmail.sourceAccount`) whose inboxes contributed to this order, sorted. The same
+   * order seen in two inboxes is one order with both ids (#114). Absent for demo data and uploads.
+   */
+  sources: z.array(z.string()).optional(),
   /** Lowest extraction confidence among contributing emails. */
   confMin: z.number().min(0).max(1),
   needsReview: z.boolean(),

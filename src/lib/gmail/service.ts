@@ -15,7 +15,11 @@ export interface GmailSyncOptions extends GmailDeps {
   onProgress?: (progress: GmailWorkProgress) => void;
   /** Server-side injection for tests; never accepted from a browser request. */
   budgetMs?: number;
+  /** Linked account id stamped on every decoded email as `RawEmail.sourceAccount` (#114). */
+  sourceAccount?: string;
 }
+/** Whole-sync time budget in ms; syncing several accounts splits it between them (see syncGmailAccounts). */
+export const SYNC_BUDGET_MS = 240000;
 export interface GmailSyncResult {
   result: PipelineResult;
   fetched: number;
@@ -38,7 +42,7 @@ export async function syncGmail(options: GmailSyncOptions): Promise<GmailSyncRes
       const error = new GmailError(504, "sync_timeout");
       // Reject first so an in-flight request's abort cannot mask the timeout.
       reject(error); controller.abort(error);
-    }, options.budgetMs ?? 240000);
+    }, options.budgetMs ?? SYNC_BUDGET_MS);
   });
   try {
     // The route can never publish a late worker result once this race rejects.
@@ -103,7 +107,7 @@ async function syncWithinBudget(options: GmailSyncOptions & { signal: AbortSigna
     try {
       const decoded = decodeGmailMessage(message);
       if (decoded.id !== id) throw new Error("id mismatch");
-      return { email: decoded };
+      return { email: options.sourceAccount ? { ...decoded, sourceAccount: options.sourceAccount } : decoded };
     } catch {
       return { parseError: "unsupported_or_malformed_message" };
     }

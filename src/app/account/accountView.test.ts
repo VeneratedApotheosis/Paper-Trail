@@ -16,6 +16,7 @@ const NOW = new Date("2026-10-18T12:00:00.000Z");
 function account(overrides: Partial<AccountResponse> = {}): AccountResponse {
   return {
     gmail: { connected: true, expired: false, mailbox: "shopper@example.com" },
+    accounts: [],
     mode: "gmail",
     asOf: "2026-10-18T11:55:00.000Z",
     lastSyncAt: "2026-10-18T11:55:00.000Z",

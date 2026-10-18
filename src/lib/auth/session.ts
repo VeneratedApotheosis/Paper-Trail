@@ -1,8 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { listAccountGrants } from "./account";
 import { authConfig, SESSION_COOKIE, TRANSACTION_COOKIE } from "./config";
-import { unseal } from "./crypto";
-import { storedTokens } from "./google";
 import { sessionUser } from "./service";
 import { authStore } from "./store";
 
@@ -12,7 +11,8 @@ export type Session = { userId: string; gmailConnected: boolean };
  * Node.js only: uses SQLite and node:crypto. Never import into Edge middleware.
  * Omit request in server components; pass Request/NextRequest in route handlers.
  * Reads current account state on every call (no shared session cache).
- * gmailConnected means a locally valid refresh grant, not verified Google access.
+ * gmailConnected means at least one of the profile's Gmail accounts has a locally valid refresh grant, not verified
+ * Google access (#114: a profile can link several accounts).
  * No network calls, refreshes, redirects, writes, or credential material returned.
  * Config/DB failures propagate; callers must not silently use anonymous data.
  */
@@ -30,14 +30,8 @@ function readSession(cookie: string | undefined): Session | null {
   const row = authStore().find(userId);
   if (!row) return null;
 
-  let gmailConnected = false;
-  if (row.tokenEnc) {
-    try {
-      const tokens = storedTokens.parse(unseal(row.tokenEnc, config.key, "tokens"));
-      // An expired access token can still be refreshed by the Gmail API service.
-      gmailConnected = tokens.refreshExpiresAt === undefined || tokens.refreshExpiresAt > now;
-    } catch { /* Corrupt credentials require reconnect; identity remains valid. */ }
-  }
+  // An expired access token can still be refreshed by the Gmail API service; corrupt credentials count as not connected.
+  const gmailConnected = listAccountGrants(userId, config, authStore(), now).some(account => account.connected);
   return { userId, gmailConnected };
 }
 

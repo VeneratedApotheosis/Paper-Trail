@@ -1,8 +1,9 @@
 import type { ClaimDraft } from "@/lib/claims";
 import type { Finding, NormalizedOrder } from "@/lib/contracts";
 import type { PipelineStats, ReviewQueueItem } from "@/lib/pipeline/run";
+import type { GmailAccountPreview, GmailAccountSync, SyncAccountsResult } from "@/lib/gmail/accounts";
 import type { GmailSyncProgress } from "@/lib/gmail/progress";
-import type { GmailSyncResult, previewGmail } from "@/lib/gmail/service";
+import type { previewGmail } from "@/lib/gmail/service";
 import type { DeleteAllResult, StoreMode } from "@/lib/store";
 import type { AuditEntry, OwedSummary } from "@/lib/types";
 
@@ -151,6 +152,15 @@ export interface SessionStatus {
   reconnectUrl?: string;
 }
 
+/** One linked Gmail account in GET /api/account (#114). */
+export interface LinkedAccount {
+  id: string;
+  mailbox: string | null;
+  connected: boolean;
+  expired: boolean;
+  lastSyncAt: string | null;
+}
+
 /** GET /api/account (issue #109): connection and sync status of the current account. Never carries tokens. */
 export interface AccountResponse {
   gmail: {
@@ -161,6 +171,12 @@ export interface AccountResponse {
     /** Connected Gmail address (stored encrypted with the tokens); null when anonymous, unknown or cleared. */
     mailbox: string | null;
   };
+  /**
+   * Every Gmail account linked to this profile (#114), the profile's first mailbox first. `id` is what
+   * `NormalizedOrder.sources` carries; a disconnected account stays listed (`connected: false`, `mailbox: null`) while its
+   * purchases remain in the ledger. `lastSyncAt` is that account's last published sync. Empty for anonymous users.
+   */
+  accounts: LinkedAccount[];
   mode: StoreMode;
   asOf: string | null;
   /** When the last Gmail sync was published; null before the first sync and after delete-all. */
@@ -172,18 +188,26 @@ export interface AccountResponse {
   syncing: boolean;
 }
 
-/** POST /api/auth/disconnect: Gmail grant cleared; the signed-in identity and the synced ledger are kept. */
+/** POST /api/auth/disconnect `{ accountId? }`: Gmail grant(s) cleared; the signed-in identity and the synced ledger are kept. */
 export interface DisconnectResponse {
   disconnected: true;
   /** Google confirmed the revocation. False when no grant existed or Google was unreachable (credentials are cleared anyway). */
   revokedToken: boolean;
 }
 
-/** GET /api/gmail/preview: { query, estimatedMessages, messagesToFetch, countIsEstimate, windowDays, maxMessages }. */
-export type GmailPreviewResponse = Awaited<ReturnType<typeof previewGmail>>;
+/**
+ * GET /api/gmail/preview[?accountId=]: { query, estimatedMessages, messagesToFetch, countIsEstimate, windowDays,
+ * maxMessages } summed over the accounts that answered, plus `accounts` with each account's result (#114). Accounts that
+ * could not be read are `{ ok: false, code }` (e.g. `token_expired`); the call fails only when none could.
+ */
+export type GmailPreviewResponse = Awaited<ReturnType<typeof previewGmail>> & { accounts: GmailAccountPreview[] };
 
-/** POST /api/gmail/sync: the PipelineRunResponse plus { fetched, capped, parseErrors }. */
-export type GmailSyncResponse = PipelineRunResponse & Omit<GmailSyncResult, "result">;
+/**
+ * POST /api/gmail/sync `{ confirmed: true, accountId? }`: the PipelineRunResponse (merged ledger of every account)
+ * plus { fetched, capped, parseErrors } summed over the accounts synced and `accounts` with each account's outcome.
+ */
+export type GmailSyncResponse = PipelineRunResponse & SyncAccountsResult;
+export type { GmailAccountPreview, GmailAccountSync };
 
 /** GET /api/gmail/sync/status: transient in-process progress of the running sync (stage idle when none ran recently). */
 export type GmailSyncStatus = GmailSyncProgress;

@@ -79,9 +79,21 @@ export function getAccount(): Promise<AccountResponse> {
   return request("/api/account");
 }
 
-/** Revokes the Google grant and clears stored tokens + mailbox; the synced ledger and the sign-in are kept. */
-export function disconnectGmail(): Promise<DisconnectResponse> {
-  return request("/api/auth/disconnect", { method: "POST" });
+/**
+ * Revokes the Google grant(s) and clears stored tokens + mailbox; the synced ledger and the sign-in are kept. With
+ * `accountId` (an `accounts[].id` from `getAccount`) only that linked account is disconnected; the others stay
+ * connected. Without it every account is disconnected. Unknown ids: 404.
+ */
+export function disconnectGmail(options: { accountId?: string } = {}): Promise<DisconnectResponse> {
+  return request("/api/auth/disconnect", options.accountId === undefined ? { method: "POST" } : sendJson("POST", { accountId: options.accountId }));
+}
+
+/**
+ * Where a full-page navigation starts the OAuth flow. `link: true` adds another Gmail account to the signed-in
+ * profile instead of switching to it; the callback then returns to the app as usual.
+ */
+export function gmailConnectUrl(options: { link?: boolean } = {}): string {
+  return options.link ? "/api/auth/link" : "/api/auth/google";
 }
 
 /** What the UI branches on after a failed Gmail call: HTTP status, the route's `code`, and its message (status 0 = offline). */
@@ -94,20 +106,26 @@ export function toGmailFailure(error: unknown): GmailFailure {
 
 /**
  * GET /api/gmail/preview: the exact search and how many messages a sync would read (50 at most). Needs a live Gmail
- * grant: 401 `token_expired` otherwise. Never reads message bodies.
+ * grant: 401 `token_expired` otherwise. Never reads message bodies. By default previews every linked account (see
+ * `accounts` in the response; an expired one is reported there while the others still answer); `accountId` limits it
+ * to one (404 `account_not_found` for an unknown id).
  */
-export function getGmailPreview(): Promise<GmailPreviewResponse> {
-  return request("/api/gmail/preview");
+export function getGmailPreview(options: { accountId?: string } = {}): Promise<GmailPreviewResponse> {
+  const query = options.accountId === undefined ? "" : `?accountId=${encodeURIComponent(options.accountId)}`;
+  return request(`/api/gmail/preview${query}`);
 }
 
 /**
- * POST /api/gmail/sync `{ confirmed: true }`: runs the whole sync in one request (240 s budget; 504 `sync_timeout`
- * after that) and replaces the ledger on success. Call it only after the user confirmed the preview. Other failures:
+ * POST /api/gmail/sync `{ confirmed: true, accountId? }`: runs the whole sync in one request (240 s budget shared by
+ * the accounts, synced one after another; 504 `sync_timeout` for an account that exceeds its share) and merges the
+ * result into the ledger. Without `accountId` every linked account is synced; one that fails is reported in
+ * `accounts` (`ok: false, code`) while the others still publish, and the call fails only when none succeeded.
+ * Syncing one account keeps the other accounts' orders. Call it only after the user confirmed the preview. Other failures:
  * 401 `token_expired`, 409 `sync_already_running`, 429 `gmail_rate_limited`, 403 `gmail_access_denied`.
  * A sync changes the ledger, audit log and account: `invalidate()` afterwards (even on failure).
  */
-export function syncGmail(): Promise<GmailSyncResponse> {
-  return request("/api/gmail/sync", sendJson("POST", { confirmed: true }));
+export function syncGmail(options: { accountId?: string } = {}): Promise<GmailSyncResponse> {
+  return request("/api/gmail/sync", sendJson("POST", { confirmed: true, ...(options.accountId === undefined ? {} : { accountId: options.accountId }) }));
 }
 
 /** GET /api/gmail/sync/status: live progress of the sync running for this account (poll while one runs). */

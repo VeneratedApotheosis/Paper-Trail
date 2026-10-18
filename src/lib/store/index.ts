@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Finding, FindingStatus, NormalizedOrder } from "@/lib/contracts";
 import { createMemoryCache, type ExtractionCache } from "@/lib/ingestion";
+import { mergeAccountResults, type AccountPipelineResult } from "@/lib/pipeline/accounts";
 import {
   isExcludedMerchant,
   normalizeMerchantKey,
@@ -33,6 +34,8 @@ interface StoreData {
   drafts: Draft[];
   reviewQueue: ReviewQueueItem[];
   stats: PipelineStats | null;
+  /** Last published Gmail sync per linked account id (#114); the Gmail ledger is merged from these. */
+  accountResults: Map<string, AccountPipelineResult & { syncedAt: string }>;
   audit: AuditEntry[];
   auditSeq: number;
   excludedMerchants: Set<string>;
@@ -97,6 +100,7 @@ function emptyData(): StoreData {
     drafts: [],
     reviewQueue: [],
     stats: null,
+    accountResults: new Map(),
     audit: [],
     auditSeq: 0,
     excludedMerchants: new Set(),
@@ -170,6 +174,11 @@ export function getFindingsForOrder(orderId: string): Finding[] {
  */
 export function setPipelineResult(mode: Exclude<StoreMode, "empty">, asOf: string, result: PipelineResult): void {
   const store = data();
+  store.accountResults = new Map(); // a demo / upload ledger replaces every Gmail account's results
+  applyPipelineResult(store, mode, asOf, result);
+}
+
+function applyPipelineResult(store: StoreData, mode: Exclude<StoreMode, "empty">, asOf: string, result: PipelineResult): void {
   const previousStatus = new Map(store.findings.map((finding) => [finding.id, finding.status]));
   const previousFindings = new Map(store.findings.map(finding => [finding.id, finding]));
   store.mode = mode;
@@ -193,6 +202,24 @@ export function setPipelineResult(mode: Exclude<StoreMode, "empty">, asOf: strin
       ? draft.warnings.filter((value: unknown): value is string => typeof value === "string") : [];
     return { ...draft, warnings: [...new Set([...warnings, warning])] };
   });
+}
+
+/**
+ * Publishes one linked Gmail account's sync (#114) and rebuilds the Gmail ledger from every account's last result, so
+ * the other accounts' orders stay. The same order seen in several inboxes becomes one order with all its `sources`.
+ * Statuses and drafts carry over by finding id exactly as in setPipelineResult.
+ */
+export function setAccountPipelineResult(accountId: string, asOf: string, result: PipelineResult, syncedAt = new Date().toISOString()): void {
+  const store = data();
+  store.accountResults.set(accountId, { accountId, asOf, result, syncedAt });
+  const merged = mergeAccountResults([...store.accountResults.values()], new Date(asOf));
+  applyPipelineResult(store, "gmail", merged.asOf, merged.result);
+  store.lastSyncAt = [...store.accountResults.values()].map((entry) => entry.syncedAt).sort().at(-1) ?? syncedAt;
+}
+
+/** ISO time each linked account's last sync was published, by account id (cleared by delete-all and clearLedger). */
+export function getAccountSyncTimes(): Record<string, string> {
+  return Object.fromEntries([...data().accountResults.values()].map((entry) => [entry.accountId, entry.syncedAt]));
 }
 
 /** Records when a Gmail sync was published (call right after `setPipelineResult("gmail", ...)`). */
@@ -238,6 +265,7 @@ export function clearLedger(): void {
   store.drafts = [];
   store.reviewQueue = [];
   store.stats = null;
+  store.accountResults = new Map();
 }
 
 /** Apply a fully validated review result to one visible order, without affecting other orders. */

@@ -18,6 +18,11 @@ export const RawEmailSchema = z.object({
   text: z.string(),
   html: z.string().optional(),
   labels: z.array(z.string()).optional(),
+  /**
+   * Linked Gmail account the message was fetched from (#114: `GET /api/account` `accounts[].id`). Unset for demo data
+   * and uploads. Opaque id, never the mailbox address; the pipeline copies it onto `NormalizedOrder.sources`.
+   */
+  sourceAccount: z.string().min(1).optional(),
 });
 export type RawEmail = z.infer<typeof RawEmailSchema>;
 

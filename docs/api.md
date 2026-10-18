@@ -13,7 +13,9 @@ Raw email bodies are never stored: only orders, findings, drafts, the review que
 | `POST /api/demo` | none | `PipelineRunResponse` `{ mode: "demo", asOf, summary, stats }` | 409 if delete-all / demo reset ran while it was loading (nothing saved) |
 | `DELETE /api/demo` | none | `{ mode: "empty" }` (audit log kept) | 409 when the ledger holds non-demo data |
 | `GET /api/account` | none | `AccountResponse` (see "Account and Gmail disconnect" below) | 401 invalid / expired session cookie (cookies cleared) |
-| `POST /api/auth/disconnect` | none | `DisconnectResponse` `{ disconnected: true, revokedToken }` | 401 not signed in, 403 cross-site |
+| `POST /api/auth/disconnect` | optional `{ accountId }` | `DisconnectResponse` `{ disconnected: true, revokedToken }` | 400 bad body, 401 not signed in, 403 cross-site, 404 unknown `accountId` |
+| `GET /api/auth/google` | none | redirect to Google consent (signs in / reconnects) | 503 not configured |
+| `GET /api/auth/link` | none | same redirect, but the callback adds the mailbox to the signed-in profile (see "Multiple Gmail accounts") | 503 not configured |
 | `GET /api/ledger` | none | `LedgerResponse` `{ mode, asOf, orders, findings, summary, reviewQueue, excludedMerchants, stats, labels }` | |
 | `GET /api/orders/:id` | id URL-encoded (`encodeURIComponent`) | `{ order, findings }` | 400 empty id, 404 unknown / excluded |
 | `GET /api/findings/:id` | id URL-encoded | `{ finding, order }` | 400, 404 |
@@ -50,11 +52,14 @@ Notes:
 
 ```json
 { "gmail": { "connected": true, "expired": false, "mailbox": "shopper@example.com" },
+  "accounts": [{ "id": "…", "mailbox": "shopper@example.com", "connected": true, "expired": false, "lastSyncAt": "2026-10-18T01:02:03.000Z" }],
   "mode": "gmail", "asOf": "...", "lastSyncAt": "2026-10-18T01:02:03.000Z",
   "counts": { "orders": 45, "findings": 6, "reviewItems": 2 }, "excludedMerchants": [], "syncing": false }
 ```
 
-- Anonymous (no cookie): `gmail: { connected: false, expired: false, mailbox: null }` plus the anonymous store's mode / counts.
+- Anonymous (no cookie): `gmail: { connected: false, expired: false, mailbox: null }`, `accounts: []` plus the anonymous store's mode / counts.
+- `accounts` (#114) lists every Gmail account linked to the profile, the profile's first mailbox first, then linked ones in
+  link order; `gmail` mirrors the first connected account (else the first one) so single-account UI keeps working.
 - `gmail.connected` = a locally valid refresh grant exists. `gmail.expired` = signed in but the grant is gone (expired,
   revoked, cleared after `invalid_grant`, or disconnected): show "Connect Gmail" again. `mailbox` is shown while the
   sealed token blob is readable, otherwise `null`.
@@ -77,9 +82,57 @@ still reads and edits its own ledger. Only `GET /api/gmail/preview` and `POST /a
 answer `401 { code: "token_expired", reconnectUrl }` otherwise. Tampered / expired / deleted identities still get 401
 and their cookies cleared on every route.
 
-Client: `getAccount()`, `disconnectGmail()`. After `disconnectGmail`, a Gmail sync, or `deleteAll`, refetch the account
+Client: `getAccount()`, `disconnectGmail({ accountId? })`. After `disconnectGmail`, a Gmail sync, or `deleteAll`, refetch the account
 and the ledger (shared-cache invalidation point). UI: `useAccount()` (cache key `account`), the `/account` page and the
 header "Sync emails" button (#110, #112) read it.
+
+## Multiple Gmail accounts (issue #114)
+
+A **profile** is the session identity (the account store scope holds **one merged ledger**). Gmail mailboxes are accounts
+of that profile; each has its own sealed tokens (mailbox inside the blob), refresh/expiry, `lastSyncAt` and can be
+disconnected on its own.
+
+- **Add an account:** navigate to `/api/auth/link` (`gmailConnectUrl({ link: true })`; Google asks which account).
+  The callback links the mailbox to the profile of the current session instead of switching identity, then returns to
+  `/sync` as usual. Linking a mailbox the profile already has (also one that was disconnected) refreshes that account
+  instead of adding a copy. Without a valid session, or or when `/api/auth/google` started the flow, the callback behaves as before (the mailbox
+  signs in as its own profile).
+- **Account ids:** `accounts[].id`. The profile's own mailbox is the account whose id is the user id (no migration of
+  existing rows: `user.token_enc` stays its token); further mailboxes are rows of `linked_account`
+  (`id, user_id, identity = mailbox hash, token_enc, created_at`). Mailbox addresses live only in the sealed blob, so a
+  disconnected account stays listed (`connected: false, expired: true, mailbox: null`) and keeps its purchases.
+- **Disconnect:** `POST /api/auth/disconnect { accountId }` clears and revokes one account and leaves the others
+  connected; without a body every account is disconnected. The ledger is always kept. **Delete-all** revokes every
+  account (best effort), removes the profile with all linked accounts and the ledger.
+- **Sources:** `RawEmail.sourceAccount?` (linked account id, set by the Gmail sync) and `NormalizedOrder.sources?: string[]`
+  (sorted account ids of the inboxes that contributed; absent for demo / upload data). Order ids are merchant + order
+  ref, so the **same order seen in two inboxes is one order** with both sources, and rules do not count it twice.
+- **Merge strategy:** the store keeps the last published `PipelineResult` of **each account**
+  (`setAccountPipelineResult`). Every publish rebuilds the Gmail ledger from all of them (`mergeAccountResults`):
+  orders with the same id are merged (`mergeSameOrder`: union of events / emails / sources, amounts from the
+  confirmed copy), rules rerun only for merged orders, all other findings are kept as produced. Syncing account A
+  therefore replaces only A's contribution; B's orders stay. Finding statuses and claim drafts carry over by finding id
+  as in #77 / #79. A demo load, upload or clear replaces the whole ledger and forgets the per-account results. Limit:
+  an order without an order reference is not recognized across inboxes. Hand corrections in the review flow last
+  until the next sync of any account (as before for a re-sync).
+- **Preview / sync:** `GET /api/gmail/preview[?accountId=]` and `POST /api/gmail/sync { confirmed: true, accountId? }`
+  act on one account, or by default on **every** account, one after another. Responses keep their top-level fields
+  (summed over the accounts that worked) and add `accounts`: preview entries are
+  `{ accountId, mailbox, ok: true, estimatedMessages, messagesToFetch }`, sync entries
+  `{ accountId, mailbox, ok: true, fetched, capped }`; an account that could not be read is
+  `{ accountId, mailbox, ok: false, code }` (`token_expired`, `gmail_access_denied`, `sync_timeout`, ...) while the others
+  still publish. The call fails (with the first error, like a single-account sync) only when no account succeeded; an
+  unknown `accountId` is 404 `account_not_found`. `parseErrors` entries carry their `accountId` in a multi-account sync.
+- **Time budget:** the 240 s sync budget (`SYNC_BUDGET_MS`, below the route's `maxDuration` of 300 s) is **shared**:
+  account *i* of *n* gets an equal share of what is left, so an account that finishes early leaves its time to the
+  next. An account that exceeds its share fails with `sync_timeout` on its own. Each account has its own request
+  pacer (quota is per user, so a profile's accounts do not compete). One sync per profile at a time (409).
+- **Progress:** `GET /api/gmail/sync/status` keeps `{ stage, fetched, total, skipped }` (summed over accounts, `total`
+  is `null` until every account knows its own) and, when **several accounts** are synced, adds
+  `accounts: [{ accountId, mailbox, stage, fetched, total }]` (`idle` = waiting for its turn, `failed` for an account
+  that could not be read). A single-account sync keeps the plain shape.
+- Client: `getAccount()`, `disconnectGmail({ accountId? })`, `getGmailPreview({ accountId? })`, `syncGmail({ accountId? })`,
+  `gmailConnectUrl({ link? })`.
 
 ## Gmail routes (issues #38, #103, #112)
 
@@ -89,11 +142,11 @@ need a live Gmail grant, these do (401 `token_expired` + `reconnectUrl` otherwis
 
 | Method + path | Request | Response (200) | Errors (`code`) |
 |---|---|---|---|
-| `GET /api/gmail/preview` | none | `GmailPreviewResponse` `{ query, estimatedMessages, messagesToFetch, countIsEstimate, windowDays: 90, maxMessages: 50 }` | 401 `token_expired`, 429 `gmail_rate_limited`, 502 / 503 |
-| `POST /api/gmail/sync` | `{ "confirmed": true }`, same-origin | `GmailSyncResponse` = `PipelineRunResponse` (`mode: "gmail"`) + `{ fetched, capped, parseErrors }` | 400 not confirmed, 401 `token_expired`, 403 `gmail_access_denied` / cross-origin, 409 `sync_already_running` (or data deleted meanwhile, nothing saved), 422 `no_parseable_messages`, 429 `gmail_rate_limited`, 504 `sync_timeout`, 502 / 503 |
-| `GET /api/gmail/sync/status` | none | `GmailSyncStatus` `{ stage: "idle" \| "listing" \| "fetching" \| "processing" \| "complete" \| "failed", fetched, total: number \| null, skipped }` (in-process, kept 15 minutes) | 401 `token_expired` |
+| `GET /api/gmail/preview` | optional `?accountId=` | `GmailPreviewResponse` `{ query, estimatedMessages, messagesToFetch, countIsEstimate, windowDays: 90, maxMessages: 50, accounts }` | 401 `token_expired`, 404 `account_not_found`, 429 `gmail_rate_limited`, 502 / 503 |
+| `POST /api/gmail/sync` | `{ "confirmed": true, "accountId"? }`, same-origin | `GmailSyncResponse` = `PipelineRunResponse` (`mode: "gmail"`) + `{ fetched, capped, parseErrors, accounts }` | 400 not confirmed, 401 `token_expired`, 404 `account_not_found`, 403 `gmail_access_denied` / cross-origin, 409 `sync_already_running` (or data deleted meanwhile, nothing saved), 422 `no_parseable_messages`, 429 `gmail_rate_limited`, 504 `sync_timeout`, 502 / 503 |
+| `GET /api/gmail/sync/status` | none | `GmailSyncStatus` `{ stage: "idle" \| "listing" \| "fetching" \| "processing" \| "complete" \| "failed", fetched, total: number \| null, skipped, accounts? }` (in-process, kept 15 minutes) | 401 `token_expired` |
 
-- A sync reads at most **50** messages (`maxMessages`, last 90 days) and has a **240 s** budget: when it runs out the
+- A sync reads at most **50** messages **per account** (`maxMessages`, last 90 days) and has a **240 s** budget (shared by the accounts, see "Multiple Gmail accounts"): when it runs out the
   route answers **504 `sync_timeout`** and publishes nothing (the previous ledger is unchanged).
 - The sync is one request. While it runs, poll `/api/gmail/sync/status` (about every 1.5 s) for live counts;
   `stage` `complete` / `failed` may be left over from an earlier run, so only the in-flight stages say anything about

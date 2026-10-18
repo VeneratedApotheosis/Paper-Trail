@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authConfig, SESSION_COOKIE, SESSION_SECONDS, TRANSACTION_COOKIE } from "@/lib/auth/config";
-import { finishAuthorization } from "@/lib/auth/service";
+import { finishAuthorization, sessionUser } from "@/lib/auth/service";
 import { authStore } from "@/lib/auth/store";
 import { AuthError } from "@/lib/auth/google";
 
@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
   let response: NextResponse;
   try {
     const session = await finishAuthorization(request.nextUrl.searchParams,
-      request.cookies.get(TRANSACTION_COOKIE)?.value, config, authStore());
+      request.cookies.get(TRANSACTION_COOKIE)?.value, config, authStore(), fetch, Date.now(),
+      sessionUser(request.cookies.get(SESSION_COOKIE)?.value, config));
     response = NextResponse.redirect(new URL("/sync", config.origin));
     response.cookies.set(SESSION_COOKIE, session, { httpOnly: true, secure: config.secure,
       sameSite: "lax", path: "/", maxAge: SESSION_SECONDS });

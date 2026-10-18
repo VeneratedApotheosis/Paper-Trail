@@ -36,6 +36,7 @@ function syncResponse(overrides: Partial<GmailSyncResponse> = {}): GmailSyncResp
     fetched: 12,
     capped: false,
     parseErrors: [],
+    accounts: [],
     ...overrides,
   };
 }

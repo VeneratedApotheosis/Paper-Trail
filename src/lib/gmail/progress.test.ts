@@ -36,3 +36,25 @@ it("bounds retained entries and ignores callbacks from superseded runs", () => {
   expect(store.read("synthetic").stage).toBe("idle");
   expect(store.read("synthetic-999").stage).toBe("complete");
 });
+it("reports each account of a multi-account sync and sums them at the top level", () => {
+  const store = createGmailProgressStore();
+  const run = store.begin("synthetic");
+  const first = run.forAccount("acct-a", "a@example.test");
+  const second = run.forAccount("acct-b", null);
+  expect(store.read("synthetic")).toEqual({ stage: "listing", fetched: 0, total: null, skipped: 0, accounts: [
+    { accountId: "acct-a", mailbox: "a@example.test", stage: "idle", fetched: 0, total: null },
+    { accountId: "acct-b", mailbox: null, stage: "idle", fetched: 0, total: null },
+  ] });
+  first.update({ stage: "fetching", fetched: 1, total: 3, skipped: 1 });
+  expect(store.read("synthetic")).toMatchObject({ stage: "fetching", fetched: 1, total: null, skipped: 1 });
+  first.complete();
+  second.update({ stage: "processing", fetched: 2, total: 2, skipped: 0 });
+  const value = store.read("synthetic");
+  expect(value).toMatchObject({ stage: "processing", fetched: 3, total: 5, skipped: 1 });
+  value.accounts![0].fetched = 999; // snapshots are copies
+  expect(store.read("synthetic").accounts![0].fetched).toBe(1);
+  second.fail();
+  run.complete();
+  expect(store.read("synthetic").stage).toBe("complete");
+  expect(store.read("synthetic").accounts!.map(account => account.stage)).toEqual(["complete", "failed"]);
+});

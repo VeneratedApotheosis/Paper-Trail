@@ -510,6 +510,7 @@ function buildOrder(group: OrderGroup): { order: NormalizedOrder; reasons: strin
     ? [primary.email.id, ...sorted.filter((input) => input !== primary).map((input) => input.email.id)]
     : sorted.map((input) => input.email.id);
 
+  const sources = [...new Set(sorted.map((input) => input.email.sourceAccount).filter((source): source is string => Boolean(source)))].sort();
   const order = NormalizedOrderSchema.parse({
     id,
     merchant: { name: merchantName, domain, policy: buildPolicy(byPrecedence) },
@@ -528,6 +529,7 @@ function buildOrder(group: OrderGroup): { order: NormalizedOrder; reasons: strin
     lineItems,
     events: builtEvents.map(({ event }) => event),
     messageIds,
+    ...(sources.length > 0 ? { sources } : {}),
     confMin,
     needsReview,
   });

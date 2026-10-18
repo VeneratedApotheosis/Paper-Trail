@@ -20,6 +20,16 @@ Every Gmail attempt is audited to the SQLite audit table and the account's API a
 
 Errors are sanitized JSON with `code`: 401 (`token_expired`, reconnect at `/api/auth/google`), 403 (`gmail_access_denied` or cross-origin request), 409 (`sync_already_running`), 422 (`no_parseable_messages`), 429 (`gmail_rate_limited`), 504 (`sync_timeout`, the 240 s sync budget ran out), 502 (provider/response failures), or 503 (configuration/unavailable). A failed fetch batch does not replace the existing ledger. Abort stops fetching and prevents result publication; it is not a persistent resumable job.
 
+## Multiple Gmail accounts (#114)
+
+A profile (the session identity) can link several mailboxes; see "Multiple Gmail accounts" in `docs/api.md` for the data model and merge rules. Sync-specific behaviour:
+
+- `POST /api/gmail/sync` and `GET /api/gmail/preview` take an optional `accountId`; by default they run for every account of the profile, sequentially. Each account is its own Gmail client with its own token refresh, request pacer (burst 10, 1.4/s), 50-message cap and audit rows (`accountId` in the SQLite audit meta; the API audit stream tags the mailbox when the profile has several accounts). Every decoded email is stamped `RawEmail.sourceAccount`.
+- The 240 s budget (`SYNC_BUDGET_MS`) is shared: account *i* of *n* gets `remaining / (n - i)`, so the total stays below the route's 300 s `maxDuration` (a quick account leaves time for the next). An account over its share fails with `sync_timeout`.
+- Each account publishes as soon as it finishes (`setAccountPipelineResult`), so a later failure does not discard earlier accounts. An account that fails (expired grant, `gmail_access_denied`, rate limit, timeout, extraction down) keeps its previous results and is reported in the response `accounts` with `ok: false, code`; the request fails only when no account succeeded. Deleting the data mid-sync (generation guard) stops the whole sync with 409 and publishes nothing further.
+- The atomic-replacement rule is per account: an account's previous snapshot is replaced only by that account's complete successful sync.
+- `GET /api/gmail/sync/status` adds `accounts: [{ accountId, mailbox, stage, fetched, total }]` when several accounts are synced.
+
 ## Account isolation and lifecycle
 
 The store now supports an AsyncLocalStorage account scope keyed by the validated OAuth user ID. All ledger/data HTTP routes select the same account scope when a valid auth cookie is present. Anonymous demo/upload state remains separate. Invalid/deleted session cookies return 401 rather than falling back to another store. This keeps Gmail-derived orders, audit events, extraction caches, claims, and exclusions out of other accounts' responses.
