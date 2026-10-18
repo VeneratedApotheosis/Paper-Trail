@@ -33,3 +33,7 @@ test-results/
 # misc
 .DS_Store
 npm-debug.log*
+
+# Devpost drafts (local only)
+devpost.md
+DevpostSubmission.md
