@@ -1,28 +1,62 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AppShell } from "@/components/AppShell";
+import { ErrorState } from "@/components/states";
+import { Button } from "@/components/ui/Button";
 import { ConnectView, type ConnectErrorState } from "@/components/views/ConnectView";
+import { useLoadDemo } from "@/hooks";
 
-// Tiny client wrapper for the CONNECT page: it owns the routing/navigation the
-// props-only ConnectView is not allowed to do. The server page computes
-// `errorState` and hands it down here.
-//
-// onConnect starts the real OAuth flow (#3) — a GET redirect to a route handler,
-// so a full navigation (not next/router) is correct. onTryDemo routes into demo
-// mode; for the mock split it just pushes to /ledger (the real loadDemo call is
-// ui-wiring, #4).
+// Client boundary for /connect (#71): owns the two explicit user choices the props-only ConnectView emits.
+// - "Connect Gmail" starts the read-only OAuth flow: a GET route handler that redirects to Google, so it is a full
+//   navigation, not router.push.
+// - "Try demo data" loads the synthetic seed (POST /api/demo) only on click, then opens "/". The view stays in its
+//   loading state until the navigation lands, so the button can't be clicked twice.
 export function ConnectClient({ errorState }: { errorState: ConnectErrorState }) {
   const router = useRouter();
+  const demo = useLoadDemo();
+  const [openingHome, setOpeningHome] = useState(false);
+
+  function connectGmail() {
+    window.location.href = "/api/auth/google";
+  }
+
+  async function tryDemo() {
+    if (!(await demo.run())) return;
+    setOpeningHome(true);
+    router.push("/");
+  }
+
+  // ConnectView has no demo-error state, so a failed POST /api/demo uses the shared ErrorState (same as "/").
+  if (demo.error) {
+    return (
+      <AppShell demo={false}>
+        <ErrorState
+          title="Couldn't load the demo data"
+          what={demo.error}
+          fix="Check that the app server is running, then try again."
+          actions={
+            <>
+              <Button type="button" onClick={tryDemo} disabled={demo.pending}>
+                Try again
+              </Button>
+              <Button type="button" variant="secondary" onClick={connectGmail}>
+                Connect Gmail
+              </Button>
+            </>
+          }
+        />
+      </AppShell>
+    );
+  }
 
   return (
     <ConnectView
       errorState={errorState}
-      onConnect={() => {
-        window.location.href = "/api/auth/google";
-      }}
-      onTryDemo={() => {
-        router.push("/ledger");
-      }}
+      onConnect={connectGmail}
+      onTryDemo={tryDemo}
+      demoLoading={demo.pending || openingHome}
     />
   );
 }
