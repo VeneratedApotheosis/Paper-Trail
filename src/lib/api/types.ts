@@ -24,7 +24,7 @@ export interface ApiErrorBody {
 }
 
 /** Owed summary as served by the API (`computeOwed` in src/lib/rules/owed.ts): the claim-sent fields are always set. */
-export type LedgerSummary = Required<OwedSummary>;
+export type LedgerSummary = Required<Omit<OwedSummary, "owedByCurrency">> & Pick<OwedSummary, "owedByCurrency">;
 
 export interface LedgerResponse {
   mode: StoreMode;

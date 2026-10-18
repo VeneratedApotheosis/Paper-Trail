@@ -55,6 +55,7 @@ describe("buildLedgerResponse", () => {
 
     expect(buildLedgerResponse().summary).toEqual({
       currency: "USD",
+      owedByCurrency: { USD: 0.4 },
       owedTotal: 0.4,
       findingCount: 3,
       claimSentCount: 2,

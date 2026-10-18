@@ -62,6 +62,7 @@ describe("computeOwed", () => {
   it("returns zeros for an empty ledger", () => {
     expect(computeOwed([], [])).toEqual({
       currency: "USD",
+      owedByCurrency: {},
       owedTotal: 0,
       findingCount: 0,
       claimSentCount: 0,
@@ -81,6 +82,7 @@ describe("computeOwed", () => {
     expect(computeOwed(findings, [confirmed])).toEqual({
       currency: "USD",
       owedTotal: 65.5,
+      owedByCurrency: { USD: 65.5 },
       findingCount: 2,
       claimSentCount: 1,
       claimSentTotal: 25.5,
@@ -127,13 +129,22 @@ describe("computeOwed", () => {
     });
   });
 
-  it("labels totals with the first counted finding's currency (mixed currencies are a known follow-up)", () => {
+  it("keeps mixed currency totals separate and labels only the primary headline", () => {
     const findings = [
       makeFinding("eur-review", 5, { orderId: lowConfidence.id, currency: "EUR" }),
       makeFinding("gbp", 10, { currency: "GBP" }),
       makeFinding("usd", 1),
     ];
-    // Amounts are not converted: 10 GBP + 1 USD is reported as 11 GBP until per-currency totals exist.
-    expect(computeOwed(findings, [confirmed, lowConfidence])).toMatchObject({ currency: "GBP", owedTotal: 11 });
+    expect(computeOwed(findings, [confirmed, lowConfidence])).toMatchObject({ currency: "GBP", owedTotal: 10,
+      owedByCurrency: { GBP: 10, USD: 1 }, excludedTotal: 0 });
+  });
+  it("rounds USD/CAD/EUR independently and never combines claim-sent or review amounts", () => {
+    const findings = [makeFinding("usd1", 0.1), makeFinding("usd2", 0.2, { status: "drafted" }),
+      makeFinding("cad", 8, { currency: "CAD", status: "drafted" }),
+      makeFinding("eur1", 0.1, { currency: "EUR" }), makeFinding("eur2", 0.2, { currency: "EUR" }),
+      makeFinding("review", 99, { currency: "CAD", orderId: lowConfidence.id }),
+      makeFinding("resolved", 99, { currency: "EUR", status: "resolved" })];
+    expect(computeOwed(findings, [confirmed, lowConfidence])).toMatchObject({ currency: "USD", owedTotal: 0.3,
+      owedByCurrency: { USD: 0.3, CAD: 8, EUR: 0.3 }, claimSentTotal: 0.2, excludedTotal: 0 });
   });
 });

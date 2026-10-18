@@ -69,6 +69,7 @@ describe("demo + ledger routes", () => {
     expect(body).toMatchObject({ mode: "empty", asOf: null, orders: [], findings: [], reviewQueue: [] });
     expect(body.summary).toEqual({
       currency: "USD",
+      owedByCurrency: {},
       owedTotal: 0,
       findingCount: 0,
       claimSentCount: 0,

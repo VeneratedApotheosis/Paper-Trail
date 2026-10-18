@@ -40,6 +40,8 @@ export interface Draft {
 // (#77, computed by computeOwed in src/lib/rules/owed.ts).
 export interface OwedSummary {
   currency: string;
+  /** Eligible outstanding totals by currency; no exchange-rate conversion. */
+  owedByCurrency?: Record<string, number>;
   owedTotal: number;
   findingCount: number;
   // Drafted subset of findingCount / owedTotal. Always set by the API; optional

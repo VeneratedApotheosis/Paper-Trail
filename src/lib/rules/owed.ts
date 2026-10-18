@@ -47,15 +47,19 @@ export function computeOwed(findings: readonly Finding[], orders: readonly Norma
   }
   const claimSent = included.filter((finding) => finding.status === "drafted");
   const amount = (finding: Finding) => finding.amountAtStake;
+  const currency = included[0]?.currency ?? "USD";
+  const inPrimaryCurrency = (finding: Finding) => finding.currency === currency;
+  const currencies = [...new Set(included.map(finding => finding.currency))].sort();
+  const owedByCurrency = Object.fromEntries(currencies.map(code => [code,
+    sumMoneyBy(included.filter(finding => finding.currency === code), amount)]));
   return {
-    // Known follow-up: totals add amounts across currencies and label them with the first included finding's
-    // currency. Fine while every ledger is single-currency (the seed is USD); mixed currencies need per-currency totals.
-    currency: included[0]?.currency ?? "USD",
-    owedTotal: sumMoneyBy(included, amount),
+    currency,
+    owedByCurrency,
+    owedTotal: sumMoneyBy(included.filter(inPrimaryCurrency), amount),
     findingCount: included.length,
     claimSentCount: claimSent.length,
-    claimSentTotal: sumMoneyBy(claimSent, amount),
+    claimSentTotal: sumMoneyBy(claimSent.filter(inPrimaryCurrency), amount),
     excludedCount: excluded.length,
-    excludedTotal: sumMoneyBy(excluded, amount),
+    excludedTotal: sumMoneyBy(excluded.filter(inPrimaryCurrency), amount),
   };
 }
