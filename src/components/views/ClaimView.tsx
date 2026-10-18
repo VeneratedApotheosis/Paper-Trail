@@ -3,6 +3,8 @@
 import { useId, useState } from "react";
 import type { Finding, FindingKind, NormalizedOrder } from "@/lib/contracts";
 import type { Draft } from "@/lib/types";
+import { SourceBadge } from "@/components/SourceBadge";
+import { orderSources, type SourceAccount } from "@/components/sourceAccounts";
 import { Button } from "@/components/ui/Button";
 import { formatMoney } from "@/lib/format";
 import { merchantName } from "@/lib/view";
@@ -29,6 +31,8 @@ export interface ClaimViewProps {
   order: NormalizedOrder;
   draft: Draft;
   simulatedLabel: string;
+  /** Linked Gmail accounts (issue #115): `order.sources` ids are shown as the mailbox the purchase came from. */
+  accounts?: readonly SourceAccount[];
   onApprove: (edited: { subject: string; body: string; recipient: string }) => void;
   approved?: boolean;
   approvedAt?: string;
@@ -51,6 +55,7 @@ export function ClaimView({
   order,
   draft,
   simulatedLabel,
+  accounts = [],
   onApprove,
   approved = false, approvedAt, mailtoUrl, copyStatus = "idle", pending = false, error, warnings = [], note, recipientVerified, onSave, onSetStatus, findingStatus = finding.status,
 }: ClaimViewProps) {
@@ -58,6 +63,7 @@ export function ClaimView({
   const [body, setBody] = useState(draft.body);
   const [recipient, setRecipient] = useState(draft.recipient);
 
+  const sources = orderSources(order.sources, accounts);
   const subjectId = useId();
   const bodyId = useId();
 
@@ -80,6 +86,11 @@ export function ClaimView({
         {finding.simulated ? (
           <p className="neu-inset mt-3 inline-block rounded-md px-2.5 py-1 text-xs text-ink-muted">
             {simulatedLabel}
+          </p>
+        ) : null}
+        {sources.length > 0 ? (
+          <p className="mt-3">
+            <SourceBadge sources={sources} full />
           </p>
         ) : null}
       </header>

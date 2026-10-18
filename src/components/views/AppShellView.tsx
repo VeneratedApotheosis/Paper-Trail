@@ -5,8 +5,10 @@ import { ShellSyncControl, type AppShellSync } from "@/components/ShellSyncContr
 
 export type {
   AppShellSync,
+  AppShellSyncAccountProgress,
   AppShellSyncConfirm,
   AppShellSyncNotice,
+  AppShellSyncNoticeAccount,
   AppShellSyncProgress,
   AppShellSyncState,
 } from "@/components/ShellSyncControl";

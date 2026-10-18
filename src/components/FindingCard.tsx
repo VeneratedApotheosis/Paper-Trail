@@ -4,6 +4,8 @@ import { useId, useState } from "react";
 import type { Finding, FindingKind } from "@/lib/contracts";
 import { Button } from "@/components/ui/Button";
 import { ConfidenceChip } from "@/components/ConfidenceChip";
+import { SourceBadge } from "@/components/SourceBadge";
+import type { OrderSource } from "@/components/sourceAccounts";
 import { Chip } from "@/components/ui/Chip";
 import { explainConfidence, explainRows } from "@/components/findingExplain";
 import { countdownLabel, daysUntil, formatMoney } from "@/lib/format";
@@ -21,10 +23,13 @@ export function FindingCard({
   finding,
   merchant,
   simulatedLabel,
+  sources,
   onDraftClaim,
 }: {
   finding: Finding;
   merchant: string;
+  // Mailboxes the finding's order came from (issue #115); omitted for demo and uploaded purchases.
+  sources?: readonly OrderSource[];
   simulatedLabel: string;
   onDraftClaim: () => void;
 }) {
@@ -52,6 +57,7 @@ export function FindingCard({
           <Chip tone={overdue ? "owed" : "deadline"}>{countdownLabel(finding.dueAt)}</Chip>
         ) : null}
         {finding.simulated ? <Chip tone="neutral">{simulatedLabel}</Chip> : null}
+        <SourceBadge sources={sources} />
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-3">

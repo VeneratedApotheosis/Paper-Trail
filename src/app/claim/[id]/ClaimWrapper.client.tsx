@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ErrorState } from "@/components/states";
 import { ClaimView } from "@/components/views/ClaimView";
-import { useApproveClaim, useSaveClaim, useSetFindingStatus } from "@/hooks";
+import { useAccount, useApproveClaim, useSaveClaim, useSetFindingStatus } from "@/hooks";
 import type { ClaimResponse } from "@/lib/api/types";
 import { saveThenApproveClaim, type ApproveClaimOutcome } from "./approveClaimFlow";
 
@@ -29,6 +29,8 @@ export function ClaimWrapper({
   initialMailtoUrl?: string | null;
 }) {
   const findingId = claim.finding.id;
+  // Linked Gmail accounts: `order.sources` ids are shown as the mailbox the purchase came from (#115).
+  const account = useAccount();
   const save = useSaveClaim();
   const statusChange = useSetFindingStatus();
   const [findingStatus, setFindingStatus] = useState(claim.finding.status);
@@ -79,6 +81,7 @@ export function ClaimWrapper({
         order={claim.order}
         draft={currentDraft}
         simulatedLabel={simulatedLabel}
+        accounts={account.data?.accounts}
         onApprove={handleApprove}
         approved={approved}
         approvedAt={currentDraft.approvedAt}

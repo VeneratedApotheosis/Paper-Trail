@@ -1,12 +1,19 @@
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
+import { GmailAccountsSection, type AccountRow, type AccountRowStatus } from "@/components/GmailAccountsSection";
+import type { AppShellSync } from "@/components/ShellSyncControl";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { Chip, type ChipTone } from "@/components/ui/Chip";
+
+export type { AccountRow, AccountRowStatus };
 
 // Props-only Account screen (issue #110): which Gmail account is connected, where the current data comes from, when it
 // was last synced, what is stored, and the controls (sync, reconnect, disconnect, leave demo, excluded stores, delete
 // everything). Everything shown is a real value from the props; nothing is simulated. No fetch, no routing logic:
 // every action is a callback, plain links only for pages (/trust, /connect).
+// With linked accounts (#115, `accounts` not empty) the single Gmail card becomes a list: one row per account with its own
+// Sync, Reconnect and Disconnect, "Add another Gmail account" and "Sync all accounts". Without them (demo, signed out,
+// uploads) the single card below stays.
 
 export type AccountGmailStatus = "connected" | "expired" | "not_connected";
 
@@ -25,6 +32,12 @@ export interface AccountViewData {
 }
 
 export interface AccountViewProps extends AccountViewData {
+  /** Linked Gmail accounts (#115); empty or omitted = the single Gmail card. */
+  accounts?: AccountRow[];
+  /** With `accounts`: which account the disconnect confirm in `disconnectStep` is for. */
+  disconnectAccountId?: string | null;
+  /** Sync controls of the account list: confirm, busy state, result (same state as the header button). */
+  sync?: AppShellSync;
   /** Disconnect Gmail: idle, asking "are you sure?", or waiting for the server. */
   disconnectStep: "idle" | "confirm" | "pending";
   /** Leave demo is waiting for the server. */
@@ -34,11 +47,16 @@ export interface AccountViewProps extends AccountViewData {
   onSync: () => void;
   /** Connect Gmail (not connected) and Reconnect Gmail (expired): both start Google's read-only consent. */
   onConnect: () => void;
-  onRequestDisconnect: () => void;
+  /** With linked accounts it carries the row's account id. */
+  onRequestDisconnect: (accountId?: string) => void;
   onConfirmDisconnect: () => void;
   onCancelDisconnect: () => void;
   /** Only used in demo mode. */
   onLeaveDemo: () => void;
+  /** "Add another Gmail account": starts Google's consent for one more mailbox. */
+  onAddAccount?: () => void;
+  /** Reconnect one expired or disconnected account in the list. */
+  onReconnectAccount?: (accountId: string) => void;
 }
 
 const GMAIL_COPY: Record<AccountGmailStatus, { chip: string; tone: ChipTone; text: string }> = {
@@ -77,6 +95,9 @@ export function AccountView({
   counts,
   excludedStores,
   syncing,
+  accounts = [],
+  disconnectAccountId = null,
+  sync,
   disconnectStep,
   leaveDemoPending,
   actionError,
@@ -86,6 +107,8 @@ export function AccountView({
   onConfirmDisconnect,
   onCancelDisconnect,
   onLeaveDemo,
+  onAddAccount,
+  onReconnectAccount,
 }: AccountViewProps) {
   const copy = GMAIL_COPY[gmail.status];
   const showLeaveDemo = source.kind === "demo";
@@ -106,68 +129,82 @@ export function AccountView({
         </p>
       ) : null}
 
-      <section aria-labelledby="gmail-heading" className="neu-raised rounded-xl p-6">
-        <p className="eyebrow">Gmail</p>
-        <h2 id="gmail-heading" className="sr-only">
-          Gmail connection
-        </h2>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <Chip tone={copy.tone}>{copy.chip}</Chip>
-          {gmail.status === "connected" && gmail.mailbox ? (
-            <span className="font-sans text-base font-semibold text-ink" data-testid="mailbox">
-              {gmail.mailbox}
-            </span>
-          ) : null}
-        </div>
-        <p className="mt-3 max-w-prose font-sans text-sm text-ink-muted">{copy.text}</p>
+      {accounts.length > 0 ? (
+        <GmailAccountsSection
+          accounts={accounts}
+          disconnectStep={disconnectStep}
+          disconnectAccountId={disconnectAccountId}
+          sync={sync}
+          onAddAccount={onAddAccount ?? onConnect}
+          onReconnectAccount={onReconnectAccount ?? onConnect}
+          onRequestDisconnect={onRequestDisconnect}
+          onConfirmDisconnect={onConfirmDisconnect}
+          onCancelDisconnect={onCancelDisconnect}
+        />
+      ) : (
+        <section aria-labelledby="gmail-heading" className="neu-raised rounded-xl p-6">
+          <p className="eyebrow">Gmail</p>
+          <h2 id="gmail-heading" className="sr-only">
+            Gmail connection
+          </h2>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Chip tone={copy.tone}>{copy.chip}</Chip>
+            {gmail.status === "connected" && gmail.mailbox ? (
+              <span className="font-sans text-base font-semibold text-ink" data-testid="mailbox">
+                {gmail.mailbox}
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-3 max-w-prose font-sans text-sm text-ink-muted">{copy.text}</p>
 
-        {disconnectStep === "idle" ? (
-          <div className="mt-5 flex flex-wrap gap-3">
-            {gmail.status === "connected" ? (
-              <>
-                <Button type="button" onClick={onSync} disabled={syncing}>
-                  {syncing ? "Syncing" : "Sync emails"}
+          {disconnectStep === "idle" ? (
+            <div className="mt-5 flex flex-wrap gap-3">
+              {gmail.status === "connected" ? (
+                <>
+                  <Button type="button" onClick={onSync} disabled={syncing}>
+                    {syncing ? "Syncing" : "Sync emails"}
+                  </Button>
+                  <Button type="button" variant="secondary" onClick={() => onRequestDisconnect()}>
+                    Disconnect Gmail
+                  </Button>
+                </>
+              ) : null}
+              {gmail.status === "expired" ? (
+                <Button type="button" onClick={onConnect}>
+                  Reconnect Gmail
                 </Button>
-                <Button type="button" variant="secondary" onClick={onRequestDisconnect}>
-                  Disconnect Gmail
+              ) : null}
+              {gmail.status === "not_connected" ? (
+                <Button type="button" onClick={onConnect}>
+                  Connect Gmail
                 </Button>
-              </>
-            ) : null}
-            {gmail.status === "expired" ? (
-              <Button type="button" onClick={onConnect}>
-                Reconnect Gmail
-              </Button>
-            ) : null}
-            {gmail.status === "not_connected" ? (
-              <Button type="button" onClick={onConnect}>
-                Connect Gmail
-              </Button>
-            ) : null}
-          </div>
-        ) : (
-          <div className="neu-inset mt-5 rounded-xl p-5" role="group" aria-label="Confirm disconnecting Gmail">
-            <p className="font-sans text-sm font-semibold text-ink">Disconnect Gmail?</p>
-            <p className="mt-2 max-w-prose font-sans text-sm text-ink-muted">
-              PaperTrail stops reading your mailbox and ends its access at Google. Your purchases and findings are kept
-              here. You can connect Gmail again any time.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <Button
-                type="button"
-                variant="secondary"
-                className={destructiveText}
-                onClick={onConfirmDisconnect}
-                disabled={disconnectStep === "pending"}
-              >
-                {disconnectStep === "pending" ? "Disconnecting" : "Disconnect Gmail"}
-              </Button>
-              <Button type="button" variant="ghost" onClick={onCancelDisconnect} disabled={disconnectStep === "pending"}>
-                Keep connected
-              </Button>
+              ) : null}
             </div>
-          </div>
-        )}
-      </section>
+          ) : (
+            <div className="neu-inset mt-5 rounded-xl p-5" role="group" aria-label="Confirm disconnecting Gmail">
+              <p className="font-sans text-sm font-semibold text-ink">Disconnect Gmail?</p>
+              <p className="mt-2 max-w-prose font-sans text-sm text-ink-muted">
+                PaperTrail stops reading your mailbox and ends its access at Google. Your purchases and findings are kept
+                here. You can connect Gmail again any time.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className={destructiveText}
+                  onClick={onConfirmDisconnect}
+                  disabled={disconnectStep === "pending"}
+                >
+                  {disconnectStep === "pending" ? "Disconnecting" : "Disconnect Gmail"}
+                </Button>
+                <Button type="button" variant="ghost" onClick={onCancelDisconnect} disabled={disconnectStep === "pending"}>
+                  Keep connected
+                </Button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       <section aria-labelledby="data-heading" className="neu-raised mt-6 rounded-xl p-6">
         <p className="eyebrow">Your data</p>

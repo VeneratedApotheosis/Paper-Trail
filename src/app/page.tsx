@@ -2,10 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import type { Finding, NormalizedOrder } from "@/lib/contracts";
-import type { LedgerResponse } from "@/lib/api/types";
+import type { AccountResponse, LedgerResponse } from "@/lib/api/types";
 import { encodeIdSegment } from "@/lib/api/ids";
 import { countsTowardOwed, isOutstandingFinding } from "@/lib/rules/owed";
-import { useLedger, useLoadDemo } from "@/hooks";
+import { useAccount, useLedger, useLoadDemo } from "@/hooks";
+import { orderSources } from "@/components/sourceAccounts";
 import { AppShell } from "@/components/AppShell";
 import { OwedView, type OwedFindingItem } from "@/components/views/OwedView";
 import { ErrorState, HeroSkeleton } from "@/components/states";
@@ -15,11 +16,16 @@ import { Button } from "@/components/ui/Button";
 // Owed vs "maybe" uses the same rule as the hero total (countsTowardOwed, #77 Option A: drafted findings stay owed).
 // Empty store: no auto-load; the user explicitly loads the synthetic demo (#28 DECISION).
 
-function splitFindings(ledger: LedgerResponse): { owedItems: OwedFindingItem[]; maybeItems: OwedFindingItem[] } {
+// `accounts` (GET /api/account) turns each order's source ids into the mailbox it came from, shown on the finding card (#115).
+function splitFindings(
+  ledger: LedgerResponse,
+  accounts: AccountResponse["accounts"] = [],
+): { owedItems: OwedFindingItem[]; maybeItems: OwedFindingItem[] } {
   const ordersById = new Map<string, NormalizedOrder>(ledger.orders.map((order) => [order.id, order]));
   const toItem = (finding: Finding): OwedFindingItem => ({
     finding,
     merchant: ordersById.get(finding.orderId)?.merchant.name ?? "Unknown merchant",
+    sources: orderSources(ordersById.get(finding.orderId)?.sources, accounts),
   });
   const outstanding = ledger.findings.filter(isOutstandingFinding);
   return {
@@ -37,6 +43,7 @@ export default function Home() {
   const router = useRouter();
   const ledger = useLedger();
   const loadDemo = useLoadDemo();
+  const account = useAccount();
 
   // useLoadDemo refreshes the shared cache itself, so there is nothing to refetch here.
   async function handleLoadDemo() {
@@ -71,7 +78,7 @@ export default function Home() {
   }
 
   const data = ledger.data;
-  const { owedItems, maybeItems } = splitFindings(data);
+  const { owedItems, maybeItems } = splitFindings(data, account.data?.accounts);
 
   return (
     <OwedView

@@ -7,6 +7,7 @@ import { HeroCard } from "@/components/HeroCard";
 import { OwedIntro } from "@/components/OwedIntro";
 import { FindingCard } from "@/components/FindingCard";
 import { Button } from "@/components/ui/Button";
+import type { OrderSource } from "@/components/sourceAccounts";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/states";
 import { formatMoney } from "@/lib/format";
@@ -17,6 +18,8 @@ import { formatMoney } from "@/lib/format";
 export interface OwedFindingItem {
   finding: Finding;
   merchant: string;
+  /** Mailboxes the finding's order came from (issue #115); empty for demo and uploaded purchases. */
+  sources?: OrderSource[];
 }
 
 export interface OwedViewProps {
@@ -131,11 +134,12 @@ export function OwedView({
         {owedItems.length > 0 ? (
           <section id="findings" aria-label="Money you can get back" className="space-y-4">
             <h2 className="font-serif text-2xl text-ink">Money you can get back</h2>
-            {owedItems.map(({ finding, merchant }) => (
+            {owedItems.map(({ finding, merchant, sources }) => (
               <FindingCard
                 key={finding.id}
                 finding={finding}
                 merchant={merchant}
+                sources={sources}
                 simulatedLabel={simulatedLabel}
                 onDraftClaim={() => onOpenClaim(finding.id)}
               />

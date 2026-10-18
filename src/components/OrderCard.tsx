@@ -1,5 +1,7 @@
 import type { NormalizedOrder } from "@/lib/contracts";
 import { Chip } from "@/components/ui/Chip";
+import { SourceBadge } from "@/components/SourceBadge";
+import type { OrderSource } from "@/components/sourceAccounts";
 import { StatusChip } from "@/components/StatusChip";
 import { formatMoney, formatShortDate } from "@/lib/format";
 import { deriveOrderStatus, merchantName, orderNeedsReview } from "@/lib/view";
@@ -10,9 +12,12 @@ import { deriveOrderStatus, merchantName, orderNeedsReview } from "@/lib/view";
 // caller owns navigation (no Link/router in here).
 export function OrderCard({
   order,
+  sources,
   onOpen,
 }: {
   order: NormalizedOrder;
+  // Mailboxes the purchase came from (issue #115); omitted for demo and uploaded purchases.
+  sources?: readonly OrderSource[];
   onOpen: () => void;
 }) {
   const needsReview = orderNeedsReview(order);
@@ -30,6 +35,11 @@ export function OrderCard({
           ) : null}
           <span className="block tabular-nums">{formatShortDate(order.placedAt)}</span>
         </span>
+        {sources && sources.length > 0 ? (
+          <span className="mt-1.5 flex">
+            <SourceBadge sources={sources} />
+          </span>
+        ) : null}
       </span>
       <span className="flex shrink-0 flex-wrap items-center justify-end gap-2">
         <StatusChip status={deriveOrderStatus(order)} />

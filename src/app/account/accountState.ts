@@ -1,5 +1,7 @@
-import type { AccountGmailStatus, AccountSourceKind, AccountViewData } from "@/components/views/AccountView";
-import type { AccountResponse } from "@/lib/api/types";
+import { accountLabels } from "@/components/sourceAccounts";
+import type { AccountGmailStatus, AccountRow, AccountRowStatus, AccountSourceKind, AccountViewData } from "@/components/views/AccountView";
+import type { AppShellSync } from "@/components/views/AppShellView";
+import type { AccountResponse, LinkedAccount } from "@/lib/api/types";
 import { absoluteTimeLabel, relativeTimeLabel } from "@/hooks/timeLabels";
 
 // Pure GET /api/account -> AccountView props mapping (issue #110). Every value shown comes from the response; the page
@@ -32,6 +34,58 @@ export function sourceOf(account: Pick<AccountResponse, "mode" | "gmail" | "coun
     return { kind: "empty", ...SOURCES.empty };
   }
   return { kind: account.mode, ...SOURCES[account.mode] };
+}
+
+/**
+ * connected: readable now. A known address without a grant: Google ended access (expired). No address and no grant: the
+ * account was disconnected. Both need a reconnect; the purchases of either are kept.
+ */
+export function accountRowStatus(account: Pick<LinkedAccount, "connected" | "mailbox">): AccountRowStatus {
+  if (account.connected) return "connected";
+  return account.mailbox !== null ? "expired" : "disconnected";
+}
+
+/** What a syncing row says: this account's own line while several sync, else the whole sync's counts. */
+function rowSyncDetail(accountId: string, progress: AppShellSync["progress"]): string {
+  const line = progress?.accounts?.find((entry) => entry.accountId === accountId);
+  if (line) {
+    if (line.detail === "waiting") return "Waiting for its turn";
+    if (line.detail === "done") return "Done";
+    return `Syncing, ${line.detail}`;
+  }
+  if (progress?.stage === "fetching" && progress.total !== null) return `Reading ${progress.fetched} of ${progress.total}`;
+  return "Syncing";
+}
+
+/**
+ * One row per linked account (GET /api/account `accounts`). While a sync runs, the accounts it covers are marked: the
+ * target account for a sync of one, every connected account for a sync of all (with progress per account when the
+ * status carries it).
+ */
+export function buildAccountRows(
+  accounts: readonly LinkedAccount[],
+  sync: Pick<AppShellSync, "state" | "progress" | "targetAccountId"> | null,
+  now: Date,
+): AccountRow[] {
+  const labels = accountLabels(accounts);
+  const running = sync?.state === "running";
+  const target = sync?.targetAccountId ?? null;
+  const perAccount = sync?.progress?.accounts;
+  return accounts.map((account) => {
+    const covered = running && account.connected && (target === null || target === account.id);
+    const listed = perAccount === undefined || perAccount.some((entry) => entry.accountId === account.id);
+    const syncing = covered && listed;
+    return {
+      id: account.id,
+      label: labels.get(account.id)!,
+      status: accountRowStatus(account),
+      lastSync: account.lastSyncAt
+        ? { relative: relativeTimeLabel(account.lastSyncAt, now), absolute: absoluteTimeLabel(account.lastSyncAt) }
+        : null,
+      syncing,
+      syncDetail: syncing ? rowSyncDetail(account.id, sync?.progress) : null,
+    };
+  });
 }
 
 export function buildAccountViewData(account: AccountResponse, syncRunningHere: boolean, now: Date): AccountViewData {

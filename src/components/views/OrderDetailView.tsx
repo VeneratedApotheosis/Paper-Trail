@@ -3,6 +3,8 @@
 import type { Finding, FindingKind, NormalizedOrder, OrderEvent } from "@/lib/contracts";
 import { AppShell } from "@/components/AppShell";
 import { ConfidenceChip } from "@/components/ConfidenceChip";
+import { SourceBadge } from "@/components/SourceBadge";
+import { orderSources, type SourceAccount } from "@/components/sourceAccounts";
 import { Chip } from "@/components/ui/Chip";
 import { StatusChip } from "@/components/StatusChip";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -18,6 +20,8 @@ export interface OrderDetailViewProps {
   // Optional + defaulted so the existing page wrapper keeps compiling until
   // ui-wiring passes the real label.
   simulatedLabel?: string;
+  // Linked Gmail accounts (issue #115): `order.sources` ids are shown as the mailbox they came from.
+  accounts?: readonly SourceAccount[];
   onBack: () => void;
 }
 
@@ -47,9 +51,11 @@ export function OrderDetailView({
   order,
   findings,
   simulatedLabel = "Simulated price feed",
+  accounts = [],
   onBack,
 }: OrderDetailViewProps) {
   const needsReview = orderNeedsReview(order);
+  const sources = orderSources(order.sources, accounts);
   const { currency } = order;
   const events = [...order.events].sort(
     (a, b) => new Date(a.at).getTime() - new Date(b.at).getTime(),
@@ -72,6 +78,7 @@ export function OrderDetailView({
             <div className="flex flex-wrap items-center gap-2">
               <StatusChip status={deriveOrderStatus(order)} />
               {needsReview ? <Chip tone="review">Needs a quick check</Chip> : null}
+              <SourceBadge sources={sources} full />
             </div>
             <h1 className="mt-3 font-serif text-3xl text-ink">{merchantName(order)}</h1>
             <p className="mt-1 text-sm text-ink-faint">

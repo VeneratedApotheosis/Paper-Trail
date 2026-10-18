@@ -6,6 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { OrderCard } from "@/components/OrderCard";
 import { EmptyState } from "@/components/states";
 import { Button } from "@/components/ui/Button";
+import { accountFilterOptions, filterOrdersByAccount, orderSources, type SourceAccount } from "@/components/sourceAccounts";
 import { SearchSelect, type SearchSelectOption } from "@/components/ui/SearchSelect";
 import { deriveOrderStatus, type OrderDisplayStatus } from "@/lib/view";
 
@@ -27,12 +28,16 @@ const STATUS_ORDER: OrderDisplayStatus[] = [
 // data + navigation. No fetch, no @/lib/api, no routing in here.
 export interface LedgerViewProps {
   orders: NormalizedOrder[];
+  // Linked Gmail accounts (issue #115): purchases show the mailbox they came from, and with two or more accounts an
+  // Account filter appears. Omit for demo and uploaded data.
+  accounts?: SourceAccount[];
   onOpenOrder: (id: string) => void;
   onLoadDemo?: () => void;
 }
 
-export function LedgerView({ orders, onOpenOrder, onLoadDemo }: LedgerViewProps) {
+export function LedgerView({ orders, accounts, onOpenOrder, onLoadDemo }: LedgerViewProps) {
   const [merchant, setMerchant] = useState<string | null>(null);
+  const [account, setAccount] = useState<string | null>(null);
   const [status, setStatus] = useState<string>(ALL);
 
   // Reverse-chronological: newest order first.
@@ -54,14 +59,20 @@ export function LedgerView({ orders, onOpenOrder, onLoadDemo }: LedgerViewProps)
   }, [sorted]);
   // A refreshed ledger may drop the chosen store; fall back to all stores instead of an empty list.
   const activeMerchant = merchantOptions.some((o) => o.value === merchant) ? merchant : null;
+  const linkedAccounts = useMemo(() => accounts ?? [], [accounts]);
+  // Only with two or more accounts; a refreshed account list may drop the chosen one.
+  const accountOptions = useMemo(() => accountFilterOptions(sorted, linkedAccounts), [sorted, linkedAccounts]);
+  const activeAccount = accountOptions.some((o) => o.value === account) ? account : null;
   const statuses = useMemo(() => {
     const present = new Set(sorted.map((o) => deriveOrderStatus(o)));
     return STATUS_ORDER.filter((s) => present.has(s));
   }, [sorted]);
 
+  const fromAccount = useMemo(() => new Set(filterOrdersByAccount(sorted, activeAccount).map((o) => o.id)), [sorted, activeAccount]);
   const visible = sorted.filter((o) => {
     if (activeMerchant !== null && o.merchant.name !== activeMerchant) return false;
     if (status !== ALL && deriveOrderStatus(o) !== status) return false;
+    if (!fromAccount.has(o.id)) return false;
     return true;
   });
 
@@ -109,21 +120,35 @@ export function LedgerView({ orders, onOpenOrder, onLoadDemo }: LedgerViewProps)
             </FilterPill>
           ))}
         </div>
-        <SearchSelect
-          label="Store"
-          options={merchantOptions}
-          value={activeMerchant}
-          onChange={setMerchant}
-          allLabel="All stores"
-          allCount={sorted.length}
-          searchPlaceholder="Search stores"
-          emptyText="No stores match"
-        />
+        <div className="flex flex-wrap gap-x-5 gap-y-3">
+          <SearchSelect
+            label="Store"
+            options={merchantOptions}
+            value={activeMerchant}
+            onChange={setMerchant}
+            allLabel="All stores"
+            allCount={sorted.length}
+            searchPlaceholder="Search stores"
+            emptyText="No stores match"
+          />
+          {accountOptions.length > 0 ? (
+            <SearchSelect
+              label="Account"
+              options={accountOptions}
+              value={activeAccount}
+              onChange={setAccount}
+              allLabel="All accounts"
+              allCount={sorted.length}
+              searchPlaceholder="Search accounts"
+              emptyText="No accounts match"
+            />
+          ) : null}
+        </div>
       </div>
 
       {visible.length === 0 ? (
         <EmptyState title="No matching purchases">
-          No purchases match these filters. Try clearing the store or status filter.
+          No purchases match these filters. Try clearing the store, account or status filter.
         </EmptyState>
       ) : (
         <div className="space-y-4">
@@ -131,6 +156,7 @@ export function LedgerView({ orders, onOpenOrder, onLoadDemo }: LedgerViewProps)
             <OrderCard
               key={order.id}
               order={order}
+              sources={orderSources(order.sources, linkedAccounts)}
               onOpen={() => onOpenOrder(order.id)}
             />
           ))}

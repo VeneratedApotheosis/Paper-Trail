@@ -9,24 +9,45 @@ import { Button } from "@/components/ui/Button";
 /** ready: Gmail connected and idle. running: a sync is in flight. connect / reconnect: Gmail is not usable. checking: account not loaded yet. */
 export type AppShellSyncState = "checking" | "ready" | "running" | "connect" | "reconnect";
 
-/** Live counts of a running sync (GET /api/gmail/sync/status). `total` is null until listing finishes. */
+/** One account's line while several accounts sync (#115): `detail` is plain words such as "12 of 50" or "waiting". */
+export interface AppShellSyncAccountProgress {
+  accountId: string;
+  label: string;
+  detail: string;
+}
+
+/**
+ * Live counts of a running sync (GET /api/gmail/sync/status). `total` is null until listing finishes. `accounts` is set
+ * only while two or more accounts sync, one line each.
+ */
 export interface AppShellSyncProgress {
   stage: "listing" | "fetching" | "processing";
   fetched: number;
   total: number | null;
+  accounts?: AppShellSyncAccountProgress[];
 }
 
-/** Inline confirm shown before a sync starts, from GET /api/gmail/preview. */
+/** Inline confirm shown before a sync starts, from GET /api/gmail/preview. `accountCount` is set for two or more accounts. */
 export type AppShellSyncConfirm =
   | { status: "loading" }
-  | { status: "ready"; messageCount: number; windowDays: number };
+  | { status: "ready"; messageCount: number; windowDays: number; accountCount?: number };
 
-/** Outcome of the last attempt. `reconnect` adds a Reconnect Gmail action. */
+/** How one account ended in a finished sync (#115). `reconnect`: it needs Google's read-only consent again. */
+export interface AppShellSyncNoticeAccount {
+  accountId: string;
+  label: string;
+  ok: boolean;
+  text: string;
+  reconnect?: boolean;
+}
+
+/** Outcome of the last attempt. `reconnect` adds a Reconnect Gmail action; `accounts` lists each account's result. */
 export interface AppShellSyncNotice {
   tone: "success" | "error";
   text: string;
   detail?: string;
   reconnect?: boolean;
+  accounts?: AppShellSyncNoticeAccount[];
 }
 
 export interface AppShellSync {
@@ -41,6 +62,10 @@ export interface AppShellSync {
   onSync: () => void;
   /** Click in the "connect" and "reconnect" states. */
   onConnect: () => void;
+  /** The account the confirm, the running sync or the last attempt is for; null or omitted = every connected account (#115). */
+  targetAccountId?: string | null;
+  /** Starts the confirm for one account (`accountId`) or every connected one (null). Omitted in single-account previews. */
+  onSyncAccount?: (accountId: string | null) => void;
   /** "Start sync" in the confirm. */
   onStartSync: () => void;
   onCancelSync: () => void;
@@ -64,9 +89,80 @@ export function syncButtonLabel(state: AppShellSyncState, progress?: AppShellSyn
   }
 }
 
-export function syncConfirmText(confirm: { messageCount: number; windowDays: number }): string {
-  return `Read up to ${confirm.messageCount} emails from the last ${confirm.windowDays} days. Receipts are redacted and sent to Claude for analysis. Nothing is sent or changed in your mailbox.`;
+export function syncConfirmText(confirm: { messageCount: number; windowDays: number; accountCount?: number }): string {
+  const across = confirm.accountCount !== undefined && confirm.accountCount > 1 ? ` across ${confirm.accountCount} Gmail accounts` : "";
+  return `Read up to ${confirm.messageCount} emails from the last ${confirm.windowDays} days${across}. Receipts are redacted and sent to Claude for analysis. Nothing is sent or changed in your mailbox.`;
 }
+
+/** The confirm wording and its actions; the header popover and the Account page both show it. */
+export function SyncConfirmContent({ confirm, sync }: { confirm: AppShellSyncConfirm; sync: Pick<AppShellSync, "onStartSync" | "onCancelSync"> }) {
+  return (
+    <>
+      {confirm.status === "loading" ? (
+        <p className="text-sm text-ink-muted">Checking your mailbox</p>
+      ) : (
+        <p className="text-sm text-ink">{syncConfirmText(confirm)}</p>
+      )}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {confirm.status === "ready" ? (
+          <Button type="button" className="px-4 py-2" onClick={sync.onStartSync}>
+            Start sync
+          </Button>
+        ) : null}
+        <Button type="button" variant="ghost" className="px-4 py-2" onClick={sync.onCancelSync}>
+          Cancel
+        </Button>
+      </div>
+    </>
+  );
+}
+
+/** One line per account while several sync: mailbox on the left, its state on the right ("12 of 50", "waiting"). */
+export function SyncAccountLines({ lines }: { lines: AppShellSyncAccountProgress[] }) {
+  return (
+    <ul className="space-y-1.5" data-testid="sync-account-lines">
+      {lines.map((line) => (
+        <li key={line.accountId} className="flex items-baseline justify-between gap-3 text-sm">
+          <span className="min-w-0 truncate font-semibold text-ink">{line.label}</span>
+          <span className="shrink-0 tabular-nums text-ink-muted">{line.detail}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The result of a sync: headline, detail and, for several accounts, how each one went. */
+export function SyncNoticeContent({ notice, sync }: { notice: AppShellSyncNotice; sync: Pick<AppShellSync, "onConnect" | "onDismissNotice"> }) {
+  return (
+    <>
+      <p className="text-sm font-bold text-ink">{notice.text}</p>
+      {notice.detail ? <p className="mt-1 text-sm text-ink-muted">{notice.detail}</p> : null}
+      {notice.accounts ? (
+        <ul className="mt-3 space-y-2" data-testid="sync-notice-accounts">
+          {notice.accounts.map((account) => (
+            <li key={account.accountId} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm">
+              <span className="min-w-0 truncate font-semibold text-ink">{account.label}</span>
+              <span className={account.ok ? "text-ink-muted" : "font-semibold text-ink"}>{account.text}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {notice.reconnect ? (
+          <Button type="button" className="px-4 py-2" onClick={sync.onConnect}>
+            Reconnect Gmail
+          </Button>
+        ) : null}
+        <Button type="button" variant="ghost" className="px-4 py-2" onClick={sync.onDismissNotice}>
+          Dismiss
+        </Button>
+      </div>
+    </>
+  );
+}
+
+const popover =
+  "neu-raised absolute inset-x-5 top-full z-50 mt-1 rounded-lg p-5 text-left sm:inset-x-auto sm:right-0 sm:mt-3 sm:w-[22rem]";
 
 export function ShellSyncControl({ sync }: { sync: AppShellSync }) {
   const { state, progress, lastSyncLabel, confirm, notice } = sync;
@@ -103,43 +199,22 @@ export function ShellSyncControl({ sync }: { sync: AppShellSync }) {
         <div
           role="dialog"
           aria-label="Confirm Gmail sync"
-          className="neu-raised absolute inset-x-5 top-full z-50 mt-1 rounded-lg p-5 text-left sm:inset-x-auto sm:right-0 sm:mt-3 sm:w-[22rem]"
+          className={popover}
         >
-          {confirm.status === "loading" ? (
-            <p className="text-sm text-ink-muted">Checking your mailbox</p>
-          ) : (
-            <p className="text-sm text-ink">{syncConfirmText(confirm)}</p>
-          )}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {confirm.status === "ready" ? (
-              <Button type="button" className="px-4 py-2" onClick={sync.onStartSync}>
-                Start sync
-              </Button>
-            ) : null}
-            <Button type="button" variant="ghost" className="px-4 py-2" onClick={sync.onCancelSync}>
-              Cancel
-            </Button>
-          </div>
+          <SyncConfirmContent confirm={confirm} sync={sync} />
+        </div>
+      ) : null}
+
+      {!confirm && state === "running" && progress?.accounts ? (
+        <div role="status" aria-label="Sync progress per account" className={popover}>
+          <p className="mb-3 text-sm font-bold text-ink">Syncing {progress.accounts.length} accounts</p>
+          <SyncAccountLines lines={progress.accounts} />
         </div>
       ) : null}
 
       {!confirm && notice ? (
-        <div
-          role={notice.tone === "error" ? "alert" : "status"}
-          className="neu-raised absolute inset-x-5 top-full z-50 mt-1 rounded-lg p-5 text-left sm:inset-x-auto sm:right-0 sm:mt-3 sm:w-[22rem]"
-        >
-          <p className="text-sm font-bold text-ink">{notice.text}</p>
-          {notice.detail ? <p className="mt-1 text-sm text-ink-muted">{notice.detail}</p> : null}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {notice.reconnect ? (
-              <Button type="button" className="px-4 py-2" onClick={sync.onConnect}>
-                Reconnect Gmail
-              </Button>
-            ) : null}
-            <Button type="button" variant="ghost" className="px-4 py-2" onClick={sync.onDismissNotice}>
-              Dismiss
-            </Button>
-          </div>
+        <div role={notice.tone === "error" ? "alert" : "status"} className={popover}>
+          <SyncNoticeContent notice={notice} sync={sync} />
         </div>
       ) : null}
     </div>
