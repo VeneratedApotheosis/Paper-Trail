@@ -49,14 +49,17 @@ function parseNumericInput(raw: string): number | null {
 export function ReviewCard({
   order,
   onEdit,
-  onConfirm, pending = false, saveState,
+  onConfirm, pending = false, saveState, onNotPurchase,
 }: {
   order: NormalizedOrder;
   pending?: boolean;
   saveState?: "unsaved" | "saving" | "saved";
   onEdit: (orderId: string, edit: OrderFieldEdit) => void;
   onConfirm: (orderId: string) => void;
+  // "Not a purchase" (#134): the action is hidden when omitted; the card asks to confirm before calling it.
+  onNotPurchase?: (orderId: string) => void;
 }) {
+  const [confirmingNotPurchase, setConfirmingNotPurchase] = useState(false);
   // View state: read-only by default, Edit unlocks the input wells.
   const [isEditing, setIsEditing] = useState(false);
   // Whether the user has touched any field, so we can show unsaved changes.
@@ -239,10 +242,34 @@ export function ReviewCard({
         <Button disabled={pending} variant="secondary" onClick={() => setIsEditing((v) => !v)}>
           {isEditing ? "Done" : "Edit"}
         </Button>
+        {onNotPurchase && !confirmingNotPurchase ? (
+          <Button disabled={pending} variant="ghost" onClick={() => setConfirmingNotPurchase(true)}>Not a purchase</Button>
+        ) : null}
         <span className="text-sm text-ink-faint">
           {saveState === "saving" ? "Saving changes…" : saveState === "saved" ? "Changes saved to the audit trail" : edited || saveState === "unsaved" ? "Unsaved changes. Confirm to save and check this purchase." : "Not counted in what you're owed until you confirm"}
         </span>
       </footer>
+
+      {onNotPurchase && confirmingNotPurchase ? (
+        <div role="group" aria-label="Confirm not a purchase" className="neu-inset mt-4 rounded-lg px-5 py-4">
+          <p className="text-sm text-ink">
+            Mark this as not a purchase? It leaves your purchases, and future syncs skip its{" "}
+            {order.messageIds.length === 1 ? "email" : `${order.messageIds.length} emails`}. You can undo this right after.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Button
+              disabled={pending}
+              onClick={() => {
+                setConfirmingNotPurchase(false);
+                onNotPurchase(order.id);
+              }}
+            >
+              Yes, not a purchase
+            </Button>
+            <Button variant="secondary" disabled={pending} onClick={() => setConfirmingNotPurchase(false)}>Cancel</Button>
+          </div>
+        </div>
+      ) : null}
     </article>
   );
 }

@@ -30,6 +30,7 @@ const PHISHING_REASON = /phishing|suspicious/i;
 function skipReason(observation: PipelineEmailObservation): SkipReason {
   if (observation.outcome === "prefiltered") return "prefilter";
   const { classification } = observation;
+  if (observation.classOverridden && classification?.class === "not_receipt") return "marked_not_purchase";
   if (classification?.class === "marketing") return PHISHING_REASON.test(classification.reason ?? "") ? "phishing" : "marketing";
   return "not_receipt";
 }

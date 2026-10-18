@@ -9,6 +9,7 @@ import type { RealEvalReport } from "@/lib/eval/real";
 import type { ExperimentRequest, ExperimentResult } from "@/lib/quality/experiment";
 import type { PromotionsResponse } from "@/lib/promotions/state";
 import type { NotReceiptFeedbackResult, PromotionFeedbackResult, ReceiptFeedbackResult } from "@/lib/quality/feedback";
+import type { NotAboutOrderResult, NotPurchaseResult, RestoreOrderResult } from "@/lib/quality/purchase-feedback";
 import type { QualityResponse } from "@/lib/quality/state";
 import type { SkippedEmail, SyncQualityReport } from "@/lib/quality/types";
 import type { DeleteAllResult, StoreMode } from "@/lib/store";
@@ -249,6 +250,13 @@ export type MarkPromotionResponse = PromotionFeedbackResult;
 
 /** GET /api/promotions: offers read from marketing emails (#131); never part of the owed total. */
 export type { PromotionsResponse };
+
+/** POST /api/orders/:id/not-purchase (#134): the order left the ledger; `summary` is the recomputed owed total. */
+export type MarkNotPurchaseResponse = NotPurchaseResult & { summary: LedgerSummary };
+/** POST /api/orders/:id/emails/:emailId/not-about-order. */
+export type MarkNotAboutOrderResponse = NotAboutOrderResult & { summary: LedgerSummary };
+/** POST /api/orders/:id/restore: undo of either. */
+export type RestoreOrderResponse = RestoreOrderResult & { summary: LedgerSummary };
 
 /** GET /api/quality/eval: scores against the saved labels (cache only, never calls a model). */
 export type QualityEvalResponse = RealEvalReport & { model: string };

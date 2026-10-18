@@ -31,7 +31,7 @@ export interface QualitySkippedRow {
   /** Redacted subject. */
   subject: string;
   date: string;
-  reason: "prefilter" | "marketing" | "not_receipt" | "phishing";
+  reason: "prefilter" | "marketing" | "not_receipt" | "phishing" | "marked_not_purchase";
 }
 
 export interface QualityFieldRow {
@@ -108,6 +108,7 @@ const REASONS: Record<QualitySkippedRow["reason"], string> = {
   prefilter: "Didn't look like a receipt",
   marketing: "Marketing",
   not_receipt: "Not a receipt",
+  marked_not_purchase: "Marked not a purchase",
   phishing: "Look-alike sender",
 };
 const SOURCES: Record<QualityRunRow["source"], string> = { gmail: "Gmail", upload: "Upload", demo: "Demo" };

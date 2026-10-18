@@ -23,9 +23,11 @@ export interface ReviewViewProps {
   // Field edits bubble as the typed OrderFieldEdit ReviewCard emits (numeric
   // fields stay numbers) so the edit flow is type-safe end to end.
   onEditField: (orderId: string, edit: OrderFieldEdit) => void;
+  // "Not a purchase" (#134) on a card; omit to hide the action.
+  onNotPurchase?: (orderId: string) => void;
 }
 
-export function ReviewView({ items, onConfirm, onEditField, pendingOrderId, saveStates = {}, notice, unreadableItems = [], onLoadDemo }: ReviewViewProps) {
+export function ReviewView({ items, onConfirm, onEditField, pendingOrderId, saveStates = {}, notice, unreadableItems = [], onLoadDemo, onNotPurchase }: ReviewViewProps) {
   return (
     <>
       <div className="mb-6">
@@ -57,6 +59,7 @@ export function ReviewView({ items, onConfirm, onEditField, pendingOrderId, save
                 saveState={pendingOrderId === order.id ? "saving" : saveStates[order.id]}
                 onEdit={onEditField}
                 onConfirm={onConfirm}
+                onNotPurchase={onNotPurchase}
               />
             ))}
           </div>

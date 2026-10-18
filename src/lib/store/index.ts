@@ -267,14 +267,30 @@ export function setAccountPipelineResult(accountId: string, asOf: string, result
 export function updateLedgerResult(accountId: string | undefined, update: (result: PipelineResult) => PipelineResult): void {
   const store = data();
   if (store.mode === "empty" || !store.asOf) throw new Error("No ledger to update");
-  const current: PipelineResult = {
+  applyPipelineResult(store, store.mode, store.asOf, update(ledgerAsResult(store)), false);
+  const part = accountId === undefined ? undefined : store.accountResults.get(accountId);
+  if (part) store.accountResults.set(part.accountId, { ...part, result: update(part.result) });
+}
+
+/**
+ * Like updateLedgerResult, for a change that concerns every inbox (#134: an order seen in several linked accounts):
+ * applies `update` to the published ledger (`accountId` undefined) and then to each stored Gmail account result.
+ */
+export function updateLedgerEverywhere(update: (result: PipelineResult, accountId: string | undefined) => PipelineResult): void {
+  const store = data();
+  if (store.mode === "empty" || !store.asOf) throw new Error("No ledger to update");
+  applyPipelineResult(store, store.mode, store.asOf, update(ledgerAsResult(store), undefined), false);
+  for (const part of [...store.accountResults.values()]) {
+    store.accountResults.set(part.accountId, { ...part, result: update(part.result, part.accountId) });
+  }
+}
+
+function ledgerAsResult(store: StoreData): PipelineResult {
+  return {
     orders: store.orders, findings: store.findings, reviewQueue: store.reviewQueue,
     stats: store.stats ?? { emails: 0, prefilteredOut: 0, classes: {}, extracted: 0, skipped: 0,
       extractionOrigins: { llm: 0, cache: 0, gold: 0 }, orders: 0, excludedOrders: 0, findings: 0, needsReview: 0 },
   };
-  applyPipelineResult(store, store.mode, store.asOf, update(current), false);
-  const part = accountId === undefined ? undefined : store.accountResults.get(accountId);
-  if (part) store.accountResults.set(part.accountId, { ...part, result: update(part.result) });
 }
 
 /** Quality data of the current store scope (#117); see src/lib/quality. */

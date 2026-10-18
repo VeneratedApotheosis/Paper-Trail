@@ -19,6 +19,8 @@ import type {
   GmailSyncResponse,
   GmailSyncStatus,
   LedgerResponse,
+  MarkNotAboutOrderResponse,
+  MarkNotPurchaseResponse,
   MarkNotReceiptResponse,
   MarkPromotionResponse,
   MarkReceiptResponse,
@@ -30,6 +32,7 @@ import type {
   QualityEvalResponse,
   QualityReportsResponse,
   ResetDemoResponse,
+  RestoreOrderResponse,
   SessionStatus,
   SkippedEmailsResponse,
   UploadResponse,
@@ -260,6 +263,28 @@ export function markSkippedAsPromotion(emailId: string): Promise<MarkPromotionRe
  */
 export function getPromotions(options: { includeExpired?: boolean } = {}): Promise<PromotionsResponse> {
   return request(`/api/promotions${options.includeExpired ? "?include=expired" : ""}`);
+}
+
+/**
+ * POST /api/orders/:id/not-purchase: "Not a purchase" for a false positive. Every email of the order is saved as "not a
+ * receipt" (kept across syncs of any account and restarts), the order and its findings leave the ledger and the response
+ * carries the recomputed owed `summary`. `invalidate()` afterwards. Undo with `restoreOrder`.
+ */
+export function markNotPurchase(orderId: string): Promise<MarkNotPurchaseResponse> {
+  return request(`/api/orders/${encodeIdSegment(orderId)}/not-purchase`, { method: "POST" });
+}
+
+/**
+ * POST /api/orders/:id/emails/:emailId/not-about-order: one email of the order is not about this purchase; only its
+ * share leaves the order. 409 for the confirmation email that supplied the amounts (mark the purchase instead).
+ */
+export function markEmailNotAboutOrder(orderId: string, emailId: string): Promise<MarkNotAboutOrderResponse> {
+  return request(`/api/orders/${encodeIdSegment(orderId)}/emails/${encodeIdSegment(emailId)}/not-about-order`, { method: "POST" });
+}
+
+/** POST /api/orders/:id/restore: undoes `markNotPurchase` / `markEmailNotAboutOrder` while the server still holds the order (404 after a restart). */
+export function restoreOrder(orderId: string): Promise<RestoreOrderResponse> {
+  return request(`/api/orders/${encodeIdSegment(orderId)}/restore`, { method: "POST" });
 }
 
 /** GET /api/quality/eval: gate precision/recall and field accuracy on the saved labels (cache only, no model calls). */

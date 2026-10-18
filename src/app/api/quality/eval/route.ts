@@ -1,7 +1,7 @@
 import { withAccountStore } from "@/lib/gmail/context";
 import { runRealEval } from "@/lib/eval/real";
 import { currentModelName } from "@/lib/quality/experiment";
-import { existingLabelStore } from "@/lib/quality/labels";
+import { scorableLabels } from "@/lib/quality/labels";
 import { currentStoreScope, getExtractionCache } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  */
 async function handleGET(_request: Request): Promise<Response> {
   void _request;
-  const labels = existingLabelStore()?.list(currentStoreScope()) ?? [];
+  const labels = scorableLabels(currentStoreScope());
   const report = await runRealEval(labels, { cache: getExtractionCache() });
   return Response.json({ ...report, model: currentModelName() }, { headers: { "Cache-Control": "no-store" } });
 }

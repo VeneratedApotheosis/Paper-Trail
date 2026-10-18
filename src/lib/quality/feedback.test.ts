@@ -74,7 +74,7 @@ describe("this is a receipt", () => {
     await markNotReceipt("o1", { now: NOW });
     const { result } = await publishUpload(emails(), fakeLlm());
     expect(result.orders.map((candidate) => candidate.messageIds[0])).toEqual(["news-1"]);
-    expect(getSkippedEmails().map((entry) => [entry.emailId, entry.reason])).toEqual([["o1", "not_receipt"], ["promo-1", "marketing"]]);
+    expect(getSkippedEmails().map((entry) => [entry.emailId, entry.reason])).toEqual([["o1", "marked_not_purchase"], ["promo-1", "marketing"]]);
   });
 
   it("does not save anything when delete-all ran during the extraction", async () => {
@@ -99,7 +99,7 @@ describe("not a receipt", () => {
     expect(state.findings).toEqual([]);
     expect(state.stats).toMatchObject({ orders: 0, extracted: 0, skipped: 2 });
     expect(labels.get(scope, "o1")).toMatchObject({ class: "not_receipt", source: "feedback", fields: null });
-    expect(getSkippedEmails().find((entry) => entry.emailId === "o1")).toMatchObject({ reason: "not_receipt", classConfidence: 1 });
+    expect(getSkippedEmails().find((entry) => entry.emailId === "o1")).toMatchObject({ reason: "marked_not_purchase", classConfidence: 1 });
     await expect(markNotReceipt("o1")).rejects.toMatchObject({ status: 409 });
   });
 

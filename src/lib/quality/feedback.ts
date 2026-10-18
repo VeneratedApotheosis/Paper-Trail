@@ -67,7 +67,7 @@ export interface NotReceiptFeedbackResult {
 
 const isReceiptClass = (value: EmailClass | undefined): value is EmailClass => value !== undefined && !SKIPPED_EXTRACTION_CLASSES.has(value);
 
-function labelOf(stored: StoredEmailText, cls: EmailClass, source: QualityLabel["source"], fields: QualityLabel["fields"], at: Date): QualityLabel {
+export function labelOf(stored: StoredEmailText, cls: EmailClass, source: QualityLabel["source"], fields: QualityLabel["fields"], at: Date): QualityLabel {
   return {
     emailId: stored.emailId, ...(stored.accountId ? { accountId: stored.accountId } : {}), source, class: cls, fields,
     redactedText: stored.text, textHash: stored.textHash, subject: stored.subject,
@@ -75,7 +75,7 @@ function labelOf(stored: StoredEmailText, cls: EmailClass, source: QualityLabel[
   };
 }
 
-function ledgerClock(options: FeedbackOptions): { now: Date; priceFeed?: typeof seedPriceFeed } {
+export function ledgerClock(options: FeedbackOptions): { now: Date; priceFeed?: typeof seedPriceFeed } {
   const state = getState();
   // Demo data keeps its fixed as-of and simulated feed; live data never gets seed prices (same as Review).
   return state.mode === "demo" && state.asOf ? { now: new Date(state.asOf), priceFeed: seedPriceFeed } : { now: options.now ?? new Date() };
@@ -214,7 +214,7 @@ export async function markNotReceipt(emailId: string, options: FeedbackOptions =
   updateLedgerResult(stored.accountId, (current) => removeEmailFromResult(current, emailId, previous).result);
   const skipped: SkippedEmail = {
     emailId, ...(stored.accountId ? { accountId: stored.accountId } : {}), from: { name: stored.fromName, domain: stored.fromDomain },
-    subject: stored.subject, date: stored.date, reason: "not_receipt", classConfidence: 1,
+    subject: stored.subject, date: stored.date, reason: "marked_not_purchase", classConfidence: 1,
   };
   data.skipped = [...data.skipped, skipped];
   stored.outcome = "skipped";

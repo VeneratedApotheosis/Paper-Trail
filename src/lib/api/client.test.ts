@@ -12,7 +12,10 @@ import {
   getSessionStatus,
   markSkippedAsPromotion,
   markSkippedAsReceipt,
+  markEmailNotAboutOrder,
+  markNotPurchase,
   regenerateClaim,
+  restoreOrder,
   safeDecode,
   saveClaim,
   setFindingStatus,
@@ -148,5 +151,25 @@ describe("promotions and skipped-email feedback (#131)", () => {
     ]);
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ class: "shipped" });
     expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+  });
+});
+
+describe("not a purchase client (#134)", () => {
+  it("posts the three order feedback routes with single-encoded ids", async () => {
+    await markNotPurchase(encodeURIComponent(ORDER_ID));
+    await restoreOrder(ORDER_ID);
+    await markEmailNotAboutOrder(ORDER_ID, "<msg:1@edge.example>");
+    const order = encodeURIComponent(ORDER_ID);
+    expect(requestedPaths()).toEqual([
+      `/api/orders/${order}/not-purchase`,
+      `/api/orders/${order}/restore`,
+      `/api/orders/${order}/emails/${encodeURIComponent("<msg:1@edge.example>")}/not-about-order`,
+    ]);
+    expect(fetchMock.mock.calls.every(([, init]) => (init as RequestInit).method === "POST")).toBe(true);
+  });
+
+  it("throws the route's message on a refusal", async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ error: "Order not found" }, { status: 404 }));
+    await expect(markNotPurchase("x")).rejects.toMatchObject({ status: 404, message: "Order not found" });
   });
 });

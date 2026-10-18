@@ -4,7 +4,7 @@ import { withAccountStore } from "@/lib/gmail/context";
 import { PROMPT_VARIANT_IDS, runExperiment, type PromptVariantId } from "@/lib/quality/experiment";
 import { QualityError } from "@/lib/quality/feedback";
 import { qualityErrorResponse, qualityOriginAllowed } from "@/lib/quality/http";
-import { existingLabelStore } from "@/lib/quality/labels";
+import { scorableLabels } from "@/lib/quality/labels";
 import { beginStoreWork, currentStoreScope, getExtractionCache } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -34,7 +34,7 @@ async function handlePOST(request: Request): Promise<Response> {
   if (running.has(scope)) return jsonError(409, "An experiment is already running.");
   running.add(scope);
   try {
-    const labels = existingLabelStore()?.list(scope) ?? [];
+    const labels = scorableLabels(scope);
     const work = beginStoreWork();
     const at = new Date();
     work.appendAudit({ at: at.toISOString(), type: "approval",

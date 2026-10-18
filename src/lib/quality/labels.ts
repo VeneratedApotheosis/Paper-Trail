@@ -18,6 +18,8 @@ export interface LabelStore {
   list(scope: string): QualityLabel[];
   /** Class the user set by hand per email, from "feedback" labels (these override the classifier on the next sync). */
   classOverrides(scope: string): Map<string, EmailClass>;
+  /** Deletes the labels of the given emails (Undo of "Not a purchase"); returns how many rows went. */
+  remove(scope: string, emailIds: readonly string[]): number;
   /** Deletes every label of the scope; returns how many rows went. */
   deleteScope(scope: string): number;
   close(): void;
@@ -41,6 +43,9 @@ export function createLabelStore(filename: string): LabelStore {
   const one = sqlite.prepare("SELECT * FROM quality_label WHERE scope = ? AND email_id = ?");
   const all = sqlite.prepare("SELECT * FROM quality_label WHERE scope = ? ORDER BY at DESC, rowid DESC");
   const remove = sqlite.prepare("DELETE FROM quality_label WHERE scope = ?");
+  const removeOne = sqlite.prepare("DELETE FROM quality_label WHERE scope = ? AND email_id = ?");
+  const removeMany = sqlite.transaction((scope: string, emailIds: readonly string[]) =>
+    emailIds.reduce((count, emailId) => count + removeOne.run(scope, emailId).changes, 0));
 
   function toLabel(row: Row): QualityLabel | undefined {
     const cls = EmailClassSchema.safeParse(row.class);
@@ -74,6 +79,7 @@ export function createLabelStore(filename: string): LabelStore {
       }
       return overrides;
     },
+    remove: (scope, emailIds) => removeMany(scope, emailIds),
     deleteScope: (scope) => remove.run(scope).changes,
     close: () => sqlite.close(),
   };
@@ -107,6 +113,14 @@ export function existingLabelStore(): LabelStore | undefined {
 export function classOverridesFor(scope: string): (emailId: string) => EmailClass | undefined {
   const overrides = existingLabelStore()?.classOverrides(scope) ?? new Map<string, EmailClass>();
   return (emailId) => overrides.get(emailId);
+}
+
+/**
+ * Labels the real eval and experiments can score: those with the redacted email text. "Not a purchase" on an order
+ * whose email text was not kept still saves its class override (so syncs honor it) but has no text to score.
+ */
+export function scorableLabels(scope: string): QualityLabel[] {
+  return existingLabelStore()?.list(scope).filter((label) => label.redactedText.trim() !== "") ?? [];
 }
 
 /** Delete-all: removes the scope's labels. Returns the number deleted. */

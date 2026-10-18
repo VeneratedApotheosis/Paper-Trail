@@ -343,7 +343,7 @@ demo), `Cache-Control: no-store`, and built from counts, safe metadata and **red
 skippedNonReceipt, extracted, lowConfidence, extractionFailures, matchedOrders, findings, llmCalls, inputTokens,
 outputTokens, bodySource: { plain, html } }`. `llmCalls` counts requests that left the machine (cache hits, gold labels and a missing API key are not calls; a failed request is);
 `bodySource` counts decoded Gmail messages and `.eml` uploads (zero for the demo and `.mbox` uploads).
-`SkippedEmail`: `{ emailId, accountId?, from: { name, domain }, subject (redacted), date, reason: prefilter|marketing|not_receipt|phishing, classConfidence }`.
+`SkippedEmail`: `{ emailId, accountId?, from: { name, domain }, subject (redacted), date, reason: prefilter|marketing|not_receipt|phishing|marked_not_purchase, classConfidence }`.
 
 **Labels** live in the `quality_label` table of the same SQLite file as the Gmail accounts (`DATABASE_URL`, default
 `./papertrail.sqlite`, gitignored), keyed by store scope and email id (latest correction wins): `{ emailId, accountId?,
@@ -393,6 +393,31 @@ rules' reading stays; a provider error keeps it too; a missing `ANTHROPIC_API_KE
 **Duplicates.** Same store (domain, else name) and, within 5 days, a shared promo code or the same headline collapse into one offer (`emailIds` lists them all).
 
 Typed client: `getPromotions`, `markSkippedAsPromotion`. Hook: `usePromotions(includeExpired)` (cache key `promotions`, polls every 3 s while `enriching`).
+
+## Not a purchase (issue #134)
+
+For false positives: something the ledger counts as a purchase that is not one. Same store scope, same-origin POSTs, same
+labels as the quality feedback above. Code: `src/lib/quality/purchase-feedback.ts`, `purchase-contribution.ts`; routes under
+`src/app/api/orders/[id]/**`.
+
+| Route | Purpose |
+|---|---|
+| `POST /api/orders/:id/not-purchase` | Every email of the order is saved as a `not_receipt` label (a class override), the order, its findings, drafts and review items leave the ledger **and every linked Gmail account's stored result**, owed is recomputed, one audit row is written, and the emails are listed in the skipped list with reason `marked_not_purchase`. Returns `{ orderId, merchant, emailIds, removedFindings, summary }`. 404 unknown order, 409 no ledger |
+| `POST /api/orders/:id/emails/:emailId/not-about-order` | One email of an order built from several emails is not about it: only that email's events leave the order (rules run again, a return quantity only that email explained goes back to 0) and it is saved as `not_receipt`. Returns `{ orderId, emailId, removedOrder, findings, summary }`. An email that is the order's only one removes the whole order (`removedOrder: true`); 409 for the confirmation email that supplied the amounts and items (mark the whole purchase instead); 404 for an email that is not part of the order |
+| `POST /api/orders/:id/restore` | Undo of either: the order returns as it was before the first mark (rules run again, finding statuses and claim drafts kept), the labels are removed or put back as they were, the skipped rows go. Returns `{ orderId, merchant, emailIds, findings, summary }`. 404 when the server no longer holds what was removed |
+
+**Persistence.** The override is the label (SQLite `quality_label`, keyed by store scope and email id), applied by the
+pipeline's `classOverride` on every later Gmail sync of any account, upload and demo load, so it survives restarts and
+holds when dedup moves an email to another order (it never looks at order ids). Delete-all removes the labels. The undo
+snapshot is in memory only: it is gone after a restart, an upload or delete-all (the emails stay skipped; on the Quality
+page "This is a receipt" brings one back, which needs Claude unless the extraction is cached). Emails of the order whose
+redacted text was not kept (more than 400 saved texts) get a class-only label with no text; the real eval and experiments
+skip such labels. A later email about the same order that was not marked still becomes an order of its own.
+
+Typed client: `markNotPurchase`, `markEmailNotAboutOrder`, `restoreOrder`; hooks `useMarkNotPurchase`,
+`useMarkEmailNotAboutOrder`, `useRestoreOrder` (refresh every cached read). UI: "Not a purchase" on order detail
+(`OrderDetailView`, with a confirm step and an Undo notice), "Not about this purchase" on its timeline rows, "Not a
+purchase" on Review cards.
 
 ## Dispute draft stub (`#20`)
 

@@ -1,6 +1,7 @@
-import type { EmailClass, ExtractedFields } from "@/lib/contracts";
-import type { PipelineEmailOutcome } from "@/lib/pipeline/run";
+import type { EmailClass, ExtractedFields, Finding, NormalizedOrder } from "@/lib/contracts";
+import type { PipelineEmailOutcome, ReviewQueueItem } from "@/lib/pipeline/run";
 import type { MergeReason } from "@/lib/orders/dedup/score";
+import type { Draft } from "@/lib/types";
 
 /**
  * Quality tracking (#117). Everything here is derived data: counts, safe metadata (sender name + domain, subject) and
@@ -49,7 +50,8 @@ export interface SyncQualityReport {
   bodySource: { plain: number; html: number };
 }
 
-export type SkipReason = "prefilter" | "marketing" | "not_receipt" | "phishing";
+/** `marked_not_purchase`: the user said so ("Not a purchase" / "Not a receipt"); the classifier never sees these. */
+export type SkipReason = "prefilter" | "marketing" | "not_receipt" | "phishing" | "marked_not_purchase";
 
 /** Safe metadata about an email that produced no order. No body, no addresses beyond the sender domain. */
 export interface SkippedEmail {
@@ -79,6 +81,36 @@ export interface StoredEmailText {
   outcome: PipelineEmailOutcome;
 }
 
+/** One result (the ledger, or one Gmail account's stored sync) as it was before the purchase was marked. */
+export interface MarkedPurchaseSnapshot {
+  /** Gmail account whose stored result this is; absent for the published ledger. */
+  accountId?: string;
+  order: NormalizedOrder;
+  findings: Finding[];
+  reviewQueue: ReviewQueueItem[];
+}
+
+/**
+ * What "Not a purchase" took out of the ledger, kept in memory so Undo (`POST /api/orders/:id/restore`) can put it
+ * back. Derived data only. Gone after a restart, an upload or delete-all (the labels outlive a restart; the
+ * skipped list's "This is a receipt" is the way back then).
+ */
+export interface MarkedPurchase {
+  orderId: string;
+  /** Merchant name, for audit rows and messages. */
+  merchant: string;
+  markedAt: string;
+  /** Emails whose "not a receipt" label is active because of this mark. */
+  emailIds: string[];
+  /** State before the first mark of this order (ledger first, then each Gmail account that held it). */
+  snapshots: MarkedPurchaseSnapshot[];
+  drafts: Draft[];
+  /** Labels the mark replaced (one label per email); restored on Undo, otherwise the label is deleted. */
+  previousLabels: QualityLabel[];
+  /** How each email was classified and counted before, to put its saved text and the counters back. */
+  previousEmails: Array<{ emailId: string; outcome: PipelineEmailOutcome; classification: StoredEmailText["classification"] }>;
+}
+
 /** Per store scope (anonymous demo or one signed-in profile); replaced wholesale by delete-all. */
 export interface QualityData {
   /** Oldest first, capped. */
@@ -87,10 +119,12 @@ export interface QualityData {
   texts: Map<string, StoredEmailText>;
   /** Monotonic counter behind SyncQualityReport.id. */
   reportSeq: number;
+  /** Purchases marked "Not a purchase" and not yet restored, by order id (#134). */
+  marked: Map<string, MarkedPurchase>;
 }
 
 export function emptyQualityData(): QualityData {
-  return { history: [], skipped: [], texts: new Map(), reportSeq: 0 };
+  return { history: [], skipped: [], texts: new Map(), reportSeq: 0, marked: new Map() };
 }
 
 export type LabelSource = "review" | "feedback";

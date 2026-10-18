@@ -20,7 +20,12 @@ export function recordSyncQuality(collected: CollectedSync): SyncQualityReport {
   const data = getQualityData();
   const { accountId, source } = collected.report;
   const replaces = (entry: { accountId?: string }) => source !== "gmail" || entry.accountId === accountId;
-  data.skipped = [...data.skipped.filter((entry) => !replaces(entry)), ...collected.skipped].slice(-MAX_SKIPPED_EMAILS);
+  // An email listed as skipped by a "Not a purchase" mark (#134) is listed once, by the run that now sees it.
+  const incoming = new Set(collected.skipped.map((entry) => entry.emailId));
+  data.skipped = [...data.skipped.filter((entry) => !replaces(entry) && !incoming.has(entry.emailId)), ...collected.skipped].slice(-MAX_SKIPPED_EMAILS);
+  // An upload replaced the ledger with different data, so a purchase marked in the old one cannot be restored into it.
+  // (The demo is the same every time, and a Gmail account's sync still sees the same emails: those keep their Undo.)
+  if (source === "upload") data.marked?.clear();
   for (const [emailId, text] of data.texts) if (replaces(text)) data.texts.delete(emailId);
   const room = Math.max(0, MAX_STORED_TEXTS - data.texts.size);
   const kept = collected.texts.map((text, index) => ({ text, index }))

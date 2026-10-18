@@ -5,7 +5,7 @@
 // the shared read cache (cache.ts, issue #108) and waits for the refetch, so every page and the app shell already show
 // the new data when `pending` ends; the page does not need to call `refetch()` itself.
 import { useCallback, useState } from "react";
-import { approveClaim, loadDemo, saveClaim, setFindingStatus } from "@/lib/api/client";
+import { approveClaim, loadDemo, markEmailNotAboutOrder, markNotPurchase, restoreOrder, saveClaim, setFindingStatus } from "@/lib/api/client";
 import { invalidate, LEDGER_DATA_KEYS } from "./cache";
 import { errorMessage } from "./useAsync";
 
@@ -65,4 +65,22 @@ export function useSaveClaim() {
 /** POST /api/claims/:findingId/approve: records approval, returns mailtoUrl + clipboardText. Never sends email. */
 export function useApproveClaim() {
   return useAction(approveClaim, LEDGER_DATA_KEYS);
+}
+
+/**
+ * POST /api/orders/:id/not-purchase: the purchase leaves the ledger. Refreshes every cached read (ledger and owed, orders,
+ * findings, audit, account counts); the Quality page reads fresh when it opens.
+ */
+export function useMarkNotPurchase() {
+  return useAction(markNotPurchase);
+}
+
+/** POST /api/orders/:id/emails/:emailId/not-about-order: one email stops counting toward the purchase. */
+export function useMarkEmailNotAboutOrder() {
+  return useAction(markEmailNotAboutOrder);
+}
+
+/** POST /api/orders/:id/restore: undo of "Not a purchase". */
+export function useRestoreOrder() {
+  return useAction(restoreOrder);
 }

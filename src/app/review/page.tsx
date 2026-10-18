@@ -6,7 +6,7 @@ import type { OrderFieldEdit } from "@/components/ReviewCard";
 import { EmptyState, ErrorState, OrderDetailSkeleton } from "@/components/states";
 import { Button } from "@/components/ui/Button";
 import { ReviewView } from "@/components/views/ReviewView";
-import { invalidate, useLedger } from "@/hooks";
+import { invalidate, useLedger, useMarkNotPurchase, useRestoreOrder } from "@/hooks";
 import type { NormalizedOrder } from "@/lib/contracts";
 import { formatMoney } from "@/lib/format";
 import { countsTowardOwed, orderNeedsReview } from "@/lib/rules/owed";
@@ -22,14 +22,35 @@ type Notice =
   | { kind: "confirmed"; merchant: string; owedFindings: number; owedTotal: string }
   | { kind: "invalid_edit"; message: string }
   | { kind: "stale"; merchant: string; message: string }
-  | { kind: "failed"; merchant: string; message: string; savedEdits: number };
+  | { kind: "failed"; merchant: string; message: string; savedEdits: number }
+  | { kind: "not_purchase"; orderId: string; merchant: string; owedTotal: string }
+  | { kind: "restored"; merchant: string }
+  | { kind: "not_purchase_failed"; message: string };
 
 function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
-function NoticeState({ notice }: { notice: Notice }) {
+function NoticeState({ notice, onUndo, undoDisabled }: { notice: Notice; onUndo: (orderId: string) => void; undoDisabled: boolean }) {
   switch (notice.kind) {
+    case "not_purchase":
+      return (
+        <EmptyState
+          title={`Marked ${notice.merchant} as not a purchase`}
+          actions={<Button type="button" variant="secondary" disabled={undoDisabled} onClick={() => onUndo(notice.orderId)}>Undo</Button>}
+        >
+          It left your purchases and no longer counts toward what you&apos;re owed ({notice.owedTotal} in total). Future syncs skip
+          its emails. The change is logged to your audit trail.
+        </EmptyState>
+      );
+    case "restored":
+      return (
+        <EmptyState title={`${notice.merchant} is back`}>
+          It counts as a purchase again. If it needs a quick check it shows up below.
+        </EmptyState>
+      );
+    case "not_purchase_failed":
+      return <ErrorState title="Couldn't mark it as not a purchase" what={notice.message} fix="Nothing was changed." />;
     case "confirmed":
       return (
         <EmptyState title={`Confirmed ${notice.merchant}`}>
@@ -72,6 +93,9 @@ export default function ReviewPage() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const inFlight = useRef(false);
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
+  const markNotPurchase = useMarkNotPurchase();
+  const restoreOrder = useRestoreOrder();
+  const [lastAction, setLastAction] = useState<"mark" | "restore" | null>(null);
 
   const showsDemo = ledger.data?.mode === "demo";
 
@@ -109,6 +133,40 @@ export default function ReviewPage() {
     const stored = storedById.get(orderId);
     if (!stored) return;
     setPendingEdits((prev) => ({ ...prev, [orderId]: bufferEdit(stored, prev[orderId] ?? [], edit) }));
+  }
+
+  async function handleNotPurchase(orderId: string) {
+    const stored = storedById.get(orderId);
+    if (!stored || inFlight.current) return;
+    inFlight.current = true;
+    setPendingOrderId(orderId);
+    setNotice(null);
+    setLastAction("mark");
+    try {
+      const response = await markNotPurchase.run(orderId);
+      if (!response) return;
+      setPendingEdits((prev) => {
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
+      });
+      setNotice({ kind: "not_purchase", orderId, merchant: response.merchant, owedTotal: formatMoney(response.summary.owedTotal, response.summary.currency) });
+    } finally {
+      inFlight.current = false;
+      setPendingOrderId(null);
+    }
+  }
+
+  async function handleUndoNotPurchase(orderId: string) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setLastAction("restore");
+    try {
+      const response = await restoreOrder.run(orderId);
+      if (response) setNotice({ kind: "restored", merchant: response.merchant });
+    } finally {
+      inFlight.current = false;
+    }
   }
 
   async function handleConfirm(orderId: string) {
@@ -157,12 +215,16 @@ export default function ReviewPage() {
     }
   }
 
+  const actionError = lastAction === "mark" ? markNotPurchase.error : lastAction === "restore" ? restoreOrder.error : null;
+  const shownNotice: Notice | null = notice ?? (actionError ? { kind: "not_purchase_failed", message: actionError } : null);
+
   return (
     <AppShell demo={showsDemo}>
       <ReviewView items={shownOrders} onConfirm={handleConfirm} onEditField={handleEditField}
         pendingOrderId={pendingOrderId}
         saveStates={Object.fromEntries(Object.entries(pendingEdits).filter(([, edits]) => edits.length).map(([id]) => [id, "unsaved" as const]))}
-        notice={notice ? <NoticeState notice={notice} /> : null} unreadableItems={unreadable} />
+        onNotPurchase={handleNotPurchase}
+        notice={shownNotice ? <NoticeState notice={shownNotice} onUndo={handleUndoNotPurchase} undoDisabled={restoreOrder.pending} /> : null} unreadableItems={unreadable} />
     </AppShell>
   );
 }

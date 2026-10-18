@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import type { Finding, FindingKind, NormalizedOrder, OrderEvent } from "@/lib/contracts";
 import { AppShell } from "@/components/AppShell";
 import { ConfidenceChip } from "@/components/ConfidenceChip";
 import { SourceBadge } from "@/components/SourceBadge";
 import { orderSources, type SourceAccount } from "@/components/sourceAccounts";
+import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { StatusChip } from "@/components/StatusChip";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -23,6 +25,19 @@ export interface OrderDetailViewProps {
   // Linked Gmail accounts (issue #115): `order.sources` ids are shown as the mailbox they came from.
   accounts?: readonly SourceAccount[];
   onBack: () => void;
+  // "Not a purchase" (#134). Each action is hidden when its callback is omitted. The view asks for a confirmation before
+  // calling onMarkNotPurchase; the page wrapper owns the request and reports its state in `feedback`.
+  onMarkNotPurchase?: () => void;
+  // One timeline email is not about this purchase (shown only for orders built from several emails).
+  onMarkEmailNotAboutOrder?: (emailId: string) => void;
+  // Undo for the notice shown after either action.
+  onRestore?: () => void;
+  feedback?: {
+    pending: boolean;
+    error: string | null;
+    // What was just done: the whole purchase was marked (the order is gone, only the notice is shown) or one email.
+    notice: "purchase" | "email" | null;
+  };
 }
 
 // Human labels for each event type (contracts: OrderEventTypeSchema).
@@ -53,7 +68,12 @@ export function OrderDetailView({
   simulatedLabel = "Simulated price feed",
   accounts = [],
   onBack,
+  onMarkNotPurchase,
+  onMarkEmailNotAboutOrder,
+  onRestore,
+  feedback = { pending: false, error: null, notice: null },
 }: OrderDetailViewProps) {
+  const [confirming, setConfirming] = useState(false);
   const needsReview = orderNeedsReview(order);
   const sources = orderSources(order.sources, accounts);
   const { currency } = order;
@@ -61,15 +81,45 @@ export function OrderDetailView({
     (a, b) => new Date(a.at).getTime() - new Date(b.at).getTime(),
   );
 
+  const backButton = (
+    <button
+      type="button"
+      onClick={onBack}
+      className="inline-flex min-h-[44px] items-center text-sm font-medium text-ink-muted hover:text-ink"
+    >
+      ← Purchases
+    </button>
+  );
+  const undoNotice = feedback.notice ? (
+    <div role="status" className="neu-inset mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg px-6 py-4">
+      <p className="text-sm text-ink">
+        {feedback.notice === "purchase"
+          ? "Marked as not a purchase. It no longer counts toward what you’re owed, and future syncs skip its emails."
+          : "That email no longer counts toward this purchase."}
+      </p>
+      {onRestore ? (
+        <Button variant="secondary" disabled={feedback.pending} onClick={onRestore}>Undo</Button>
+      ) : null}
+    </div>
+  ) : null;
+  const feedbackError = feedback.error ? <p role="alert" className="mt-3 text-sm text-ink">{feedback.error}</p> : null;
+
+  // The order is gone from the ledger: only the notice (with Undo) is left to show.
+  if (feedback.notice === "purchase") {
+    return (
+      <AppShell>
+        {backButton}
+        {undoNotice}
+        {feedbackError}
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell>
-      <button
-        type="button"
-        onClick={onBack}
-        className="inline-flex min-h-[44px] items-center text-sm font-medium text-ink-muted hover:text-ink"
-      >
-        ← Purchases
-      </button>
+      {backButton}
+      {undoNotice}
+      {feedbackError}
 
       {/* Summary card */}
       <section className="neu-raised mt-4 rounded-lg px-6 py-6">
@@ -97,8 +147,32 @@ export function OrderDetailView({
             <div className="mt-1 font-serif text-2xl tabular-nums text-money">
               {formatMoney(order.total, currency)}
             </div>
+            {onMarkNotPurchase && !confirming ? (
+              <Button variant="ghost" className="mt-3" onClick={() => setConfirming(true)}>Not a purchase</Button>
+            ) : null}
           </div>
         </header>
+
+        {onMarkNotPurchase && confirming ? (
+          <div role="group" aria-label="Confirm not a purchase" className="neu-inset mt-5 rounded-lg px-5 py-4">
+            <p className="text-sm text-ink">
+              Mark this as not a purchase? It stops counting toward what you’re owed, and future syncs skip its{" "}
+              {order.messageIds.length === 1 ? "email" : `${order.messageIds.length} emails`}. You can undo this right after.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <Button
+                disabled={feedback.pending}
+                onClick={() => {
+                  setConfirming(false);
+                  onMarkNotPurchase();
+                }}
+              >
+                Yes, not a purchase
+              </Button>
+              <Button variant="secondary" disabled={feedback.pending} onClick={() => setConfirming(false)}>Cancel</Button>
+            </div>
+          </div>
+        ) : null}
 
         {/* Total breakdown */}
         <dl className="mt-6 max-w-sm space-y-1 text-sm">
@@ -218,6 +292,16 @@ export function OrderDetailView({
                   <blockquote className="neu-inset mt-3 rounded-sm px-4 py-3 text-sm italic text-ink-muted">
                     “{event.evidence}”
                   </blockquote>
+                ) : null}
+                {onMarkEmailNotAboutOrder && order.messageIds.length > 1 ? (
+                  <button
+                    type="button"
+                    disabled={feedback.pending}
+                    onClick={() => onMarkEmailNotAboutOrder(event.messageId)}
+                    className="mt-1 inline-flex min-h-[44px] items-center text-sm font-medium text-ink-muted hover:text-ink disabled:opacity-50"
+                  >
+                    Not about this purchase
+                  </button>
                 ) : null}
               </div>
             </li>
