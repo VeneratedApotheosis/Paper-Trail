@@ -60,7 +60,22 @@ export async function syncGmail(options: GmailSyncOptions): Promise<GmailSyncRes
   if (listed.ids.length > 0 && emails.length === 0) throw new GmailError(422, "no_parseable_messages");
   options.signal?.throwIfAborted();
   report("processing");
-  const result = await runPipeline(emails, { ...options.pipeline, applyPrefilter: true, sourceLabel: "gmail" });
+  // The shared pipeline queues extractor exceptions and continues. A Gmail
+  // replacement snapshot must instead be atomic when its provider is down:
+  // threshold = one exception. Do not make further provider calls after that.
+  let extractionFailed = false;
+  const result = await runPipeline(emails, { ...options.pipeline, applyPrefilter: true, sourceLabel: "gmail",
+    extractor: async (...args) => {
+      if (extractionFailed) throw new GmailError(503, "extraction_unavailable");
+      try { return await options.pipeline.extractor(...args); }
+      catch {
+        extractionFailed = true;
+        // Neither the provider payload nor arbitrary exception text is exposed.
+        throw new GmailError(503, "extraction_unavailable");
+      }
+    },
+  });
+  if (extractionFailed) throw new GmailError(503, "extraction_unavailable");
   for (const error of parseErrors) result.reviewQueue.push({ emailId: error.id, stage: "extract", reason: error.reason });
   result.stats.needsReview = result.reviewQueue.length;
   return { result, fetched: listed.ids.length, capped: listed.capped, parseErrors };

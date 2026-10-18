@@ -91,3 +91,15 @@ it("runs an empty inbox through the pipeline without LLM calls", async () => {
   expect(extractor).not.toHaveBeenCalled();
   expect(onProgress).toHaveBeenLastCalledWith({ stage: "processing", fetched: 0, total: 0, skipped: 0 });
 });
+
+it("fails an atomic Gmail snapshot on extractor exceptions and stops further provider calls", async () => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async url => {
+    const path = new URL(String(url)).pathname;
+    return path.endsWith("/messages") ? Response.json({ messages: [{ id: "m1" }, { id: "m2" }] })
+      : Response.json(fixture(path.endsWith("m1") ? "m1" : "m2"));
+  });
+  const extractor = vi.fn().mockRejectedValue(new Error("synthetic provider outage"));
+  await expect(syncGmail({ accessToken: async () => "synthetic", fetcher, audit: vi.fn(), pace: async () => {},
+    pipeline: { now, extractor } })).rejects.toMatchObject({ status: 503, code: "extraction_unavailable" });
+  expect(extractor).toHaveBeenCalledTimes(1);
+});

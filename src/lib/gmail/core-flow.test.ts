@@ -61,6 +61,7 @@ afterEach(() => { db.close(); resetStore(); vi.useRealTimers(); vi.unstubAllGlob
 
 it("connects OAuth, previews and syncs through real handlers, preserves a failed sync, then deletes and disconnects", async () => {
   let gmailDenied = false;
+  let llmUnavailable = false;
   let mailbox = "shopper@example.test";
   const llmInputs: string[] = [];
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
@@ -74,11 +75,17 @@ it("connects OAuth, previews and syncs through real handlers, preserves a failed
       if (url.pathname.endsWith("/profile")) return Response.json({ emailAddress: mailbox });
       if (gmailDenied) return new Response(null, { status: 401 });
       if (url.pathname.endsWith("/messages")) return Response.json({ resultSizeEstimate: 2,
-        messages: [{ id: "synthetic-order" }, { id: "synthetic-return" }] });
+        messages: [{ id: llmUnavailable ? "synthetic-new" : "synthetic-order" }, { id: "synthetic-return" }] });
       const id = url.pathname.split("/").at(-1)!;
+      if (id === "synthetic-new") {
+        const changed = message(id);
+        changed.payload.body.data = Buffer.from("Thank you for your order #SY-1002. Order total: $50.00.").toString("base64url");
+        return Response.json(changed);
+      }
       if (["synthetic-order", "synthetic-return"].includes(id)) return Response.json(message(id));
     }
     if (url.hostname === "api.anthropic.com") {
+      if (llmUnavailable) return Response.json({ error: { type: "overloaded_error" } }, { status: 503 });
       const body = String(init?.body); llmInputs.push(body);
       const prompt = (JSON.parse(body) as { messages: Array<{ content: string }> }).messages[0].content;
       return Response.json({ model: "synthetic-model", usage: { input_tokens: 100, output_tokens: 100 },
@@ -130,6 +137,13 @@ it("connects OAuth, previews and syncs through real handlers, preserves a failed
   const otherCookie = otherCallback.cookies.get(SESSION_COOKIE)!.value;
   expect((await (await ledger(req("ledger", otherCookie))).json()).orders).toEqual([]);
   expect(await (await progress(req("gmail/sync/status", cookie))).json()).toMatchObject({ stage: "complete", fetched: 2, total: 2 });
+  llmUnavailable = true;
+  const outage = await sync(req("gmail/sync", cookie, { confirmed: true }));
+  expect(outage.status).toBe(503);
+  expect(await outage.json()).toMatchObject({ code: "extraction_unavailable" });
+  expect((await (await ledger(req("ledger", cookie))).json()).findings).toEqual(connectedLedger.findings);
+  expect((await (await ledger(req("ledger", cookie))).json()).orders).toEqual(connectedLedger.orders);
+  llmUnavailable = false;
   gmailDenied = true;
   expect((await sync(req("gmail/sync", cookie, { confirmed: true }))).status).toBe(401);
   expect((await (await ledger(req("ledger", cookie))).json()).orders).toEqual(connectedLedger.orders);
