@@ -42,6 +42,10 @@ export function createAuthStore(filename = process.env.DATABASE_URL ?? "./papert
         tx.update(users).set({ tokenEnc: null }).where(eq(users.id, id)).run();
         tx.delete(audit).where(eq(audit.subjectId, id)).run();
         tx.delete(users).where(eq(users.id, id)).run();
+        // Retain proof of deletion without retaining a link to the deleted
+        // identity. The tombstone and purge commit atomically in SQLite.
+        tx.insert(audit).values({ id: randomUUID(), at: new Date(), actor: "system",
+          action: "oauth.deleted", subjectId: null, metaJson: "{}" }).run();
       });
     },
     audit(action: string, subjectId: string | null, meta: Record<string, unknown> = {}) {
