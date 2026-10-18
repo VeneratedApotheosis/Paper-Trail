@@ -1,4 +1,5 @@
 import { withAccountStore } from "@/lib/gmail/context";
+import { liveLlmRateLimited } from "@/lib/api/rate-limit";
 import { z } from "zod";
 import {
   applyClaimEdits,
@@ -79,6 +80,8 @@ async function handlePOST(request: Request, context: ClaimParams): Promise<Respo
   const claim = getClaimContext(findingId);
   if (!claim) return jsonError(404, "Finding not found");
   const { rephrase = false, ...options } = parsed.data;
+  const limited = rephrase ? liveLlmRateLimited() : null;
+  if (limited) return limited;
   const generated = generateClaimDraft(claim, options);
   if (!generated.ok) return generated.response;
   const outcome = await maybeRephraseClaim(generated.draft, rephrase);

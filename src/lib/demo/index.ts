@@ -10,5 +10,5 @@ export {
 export type { SeedDemoOptions, SeedDemoResult, SeedExtractorOptions } from "./seed";
 export { EmailParseError, htmlToText, parseEml, parseEmlDetailed, parseMbox, parseMboxDetailed } from "./eml";
 export type { MboxParseResult } from "./eml";
-export { MAX_UPLOAD_BYTES, runUploadPipeline } from "./upload";
+export { MAX_UPLOAD_BYTES, MAX_UPLOAD_EMAILS, runUploadPipeline } from "./upload";
 export type { UploadPipelineOptions } from "./upload";

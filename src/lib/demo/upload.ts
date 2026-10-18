@@ -7,6 +7,8 @@ import { loadSeedLlmCache } from "./seed";
 
 /** Max total upload size accepted by POST /api/upload. */
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+/** Most emails one upload may contain (#91), the same order of magnitude as a Gmail sync. */
+export const MAX_UPLOAD_EMAILS = 300;
 
 /** Reads from `primary` then `fallback`; writes go to `primary` only (the committed seed cache is never modified). */
 function layeredCache(primary: ExtractionCache, fallback: ExtractionCache | null): ExtractionCache {
