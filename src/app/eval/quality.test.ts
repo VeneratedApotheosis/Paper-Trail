@@ -18,6 +18,15 @@ describe("qualityViewProps", () => {
     expect(props.experimentWarning).toMatch(/calls Claude/);
   });
 
+  it("passes the shipping-update and promotion callbacks through", () => {
+    const onMarkShipping = async () => null;
+    const onMarkPromotion = async () => "nope";
+    const props = qualityViewProps({ ...input(null), onMarkShipping, onMarkPromotion });
+    expect(props.onMarkShipping).toBe(onMarkShipping);
+    expect(props.onMarkPromotion).toBe(onMarkPromotion);
+    expect(qualityViewProps(input(null)).onMarkShipping).toBeUndefined();
+  });
+
   it("maps the label eval and puts the live model first in the picker", async () => {
     const report = await runRealEval([], { cache: { get: () => undefined, set: () => undefined } });
     const props = qualityViewProps(input({ ...report, model: "claude-sonnet-5-5" }));

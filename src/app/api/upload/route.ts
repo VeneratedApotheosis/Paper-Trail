@@ -6,6 +6,7 @@ import type { UploadResponse } from "@/lib/api/types";
 import { MAX_UPLOAD_BYTES, parseEmlDetailed, parseMboxDetailed, runUploadPipeline } from "@/lib/demo";
 import { createSyncCollector } from "@/lib/quality/collector";
 import { classOverridesFor } from "@/lib/quality/labels";
+import { recordSyncPromotions } from "@/lib/promotions/state";
 import { recordSyncQuality } from "@/lib/quality/state";
 import { beginStoreWork, currentStoreScope, getExcludedMerchants, getExtractionCache, setPipelineResult } from "@/lib/store";
 
@@ -71,7 +72,9 @@ async function handlePOST(request: Request): Promise<Response> {
   });
   if (!work.isCurrent()) return jsonError(409, DELETED_DURING_UPLOAD);
   setPipelineResult("upload", now.toISOString(), result);
-  recordSyncQuality(collector.finish(result, { fetched: emails.length + parseErrors.length, bodySource }));
+  const collected = collector.finish(result, { fetched: emails.length + parseErrors.length, bodySource });
+  recordSyncQuality(collected);
+  void recordSyncPromotions(collected).enrichment; // Claude reads promotion details in the background (PROMO_LLM_LIMIT)
   const body: UploadResponse = { ...buildPipelineRunResponse(), files: fileSummaries, parseErrors };
   return Response.json(body);
 }

@@ -19,15 +19,16 @@ function render(sync?: (typeof appShellSyncFixtures)[keyof typeof appShellSyncFi
 }
 
 describe("AppShellView navigation", () => {
-  it("lists Owed to you, Purchases, Review, Trust and Account", () => {
+  it("lists Owed to you, Purchases, Promotions, Review, Trust and Account", () => {
     // nav undefined = the shell's own default items
     const html = renderToStaticMarkup(
       createElement(AppShellView, { ...appShellViewFixture, nav: undefined, activePath: "/account" }),
     );
     const labels = [...html.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/g)].map((m) => `${m[1]}:${m[2]}`);
-    expect(labels.slice(1, 6)).toEqual([
+    expect(labels.slice(1, 7)).toEqual([
       "/:Owed to you",
       "/ledger:Purchases",
+      "/promotions:Promotions",
       "/review:Review",
       "/trust:Trust",
       "/account:Account",

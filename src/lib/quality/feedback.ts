@@ -1,8 +1,9 @@
-import { REVIEW_CONFIDENCE_THRESHOLD, type EmailClass, type ExtractedFields, type NormalizedOrder } from "@/lib/contracts";
+import { REVIEW_CONFIDENCE_THRESHOLD, type EmailClass, type ExtractedFields, type NormalizedOrder, type Promotion } from "@/lib/contracts";
 import { SKIPPED_EXTRACTION_CLASSES, extract, prepareForLlm, type RedactionMode } from "@/lib/ingestion";
 import { LlmError, LlmUnavailableError, type LlmClient } from "@/lib/llm";
 import { seedPriceFeed } from "@/lib/demo/seed";
 import { llmCallAuditEvent } from "@/lib/pipeline/extractors";
+import { addPromotionFromEmail, forgetPromotion } from "@/lib/promotions/state";
 import type { ReviewEdit } from "@/lib/review/schema";
 import {
   appendAudit, beginStoreWork, currentStoreScope, getExcludedMerchants, getExtractionCache, getQualityData, getState,
@@ -46,6 +47,13 @@ export interface ReceiptFeedbackResult {
   orderId: string | null;
   /** The extracted order was not added because its merchant is excluded. */
   excludedMerchant: boolean;
+  labeled: true;
+}
+
+export interface PromotionFeedbackResult {
+  emailId: string;
+  /** The promotion now listed for this email (read by rules; Claude's cached reading is applied when there is one). */
+  promotion: Promotion;
   labeled: true;
 }
 
@@ -130,6 +138,7 @@ export async function markSkippedAsReceipt(emailId: string, options: ReceiptFeed
   }
   if (!work.isCurrent()) throw new QualityError(409, "Your data was deleted while this was running; nothing was saved.");
   saveLabel();
+  forgetPromotion(emailId);
 
   const removeFromSkipped = () => { data.skipped = data.skipped.filter((candidate) => candidate.emailId !== emailId); };
   const previous = { outcome: stored.outcome, class: stored.classification?.class };
@@ -159,6 +168,26 @@ export async function markSkippedAsReceipt(emailId: string, options: ReceiptFeed
     emailId, class: receiptClass, extracted: true, needsReview: result.extraction.confMin < REVIEW_CONFIDENCE_THRESHOLD || Boolean(added?.orderId && getState().orders.find((order) => order.id === added?.orderId)?.needsReview),
     orderId: added?.orderId ?? null, excludedMerchant: added?.excluded ?? false, labeled: true,
   };
+}
+
+/**
+ * "This is a promotion": for a skipped email that is a marketing offer (the classifier or the prefilter missed it, or it
+ * has no code or end date). Lists it on the Promotions page (rules reading; no Claude call), records a class label
+ * ("marketing", which also makes the next sync treat the email as a promotion) and an audit row, and removes it from the
+ * skipped list.
+ */
+export function markSkippedAsPromotion(emailId: string, options: FeedbackOptions = {}): PromotionFeedbackResult {
+  const data = getQualityData();
+  if (!data.skipped.some((candidate) => candidate.emailId === emailId)) throw new QualityError(404, "That email is not in the skipped list.");
+  const stored = requireText(emailId);
+  const at = options.now ?? new Date();
+  (options.labels ?? labelStore()).upsert(currentStoreScope(), labelOf(stored, "marketing", "feedback", null, at));
+  appendAudit({ at: at.toISOString(), type: "approval", detail: `Marked email ${emailId} as a promotion; saved as a quality label` });
+  stored.classification = { class: "marketing", confidence: 1, reason: "set by the user" };
+  stored.outcome = "skipped";
+  const promotion = addPromotionFromEmail(stored);
+  data.skipped = data.skipped.filter((candidate) => candidate.emailId !== emailId);
+  return { emailId, promotion, labeled: true };
 }
 
 /**

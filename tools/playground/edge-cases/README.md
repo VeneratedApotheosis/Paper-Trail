@@ -54,6 +54,9 @@ Known classifier bugs are marked `it.fails` in the test (see `KNOWN_FAILURES` th
 | `27-extremely-long-body.eml` | ~90 KB body with a phone number at the very end | order, the trailing phone is still redacted |
 | `28-newsletter.eml` | Non-receipt newsletter | marketing or not_receipt, dropped by the prefilter |
 | `29-order-number-not-phone.eml` | Order number shaped like digits (`112-4455-6677`) next to a real phone | order, only the phone is redacted |
+| `33-promo-ends-tonight.eml` | Pickup offer that ends tonight ("$10 off your $40 order") | marketing, kept by the prefilter ("order" in the subject); Promotions page: `$10 off a $40 pickup order`, in store, ends 23:59 on 17 Oct |
+| `34-promo-code-fall20.eml` | 20% off with code FALL20, free shipping over $75, ends Oct 20 | marketing, dropped by the prefilter; Promotions page: code FALL20 (copyable), ends 20 Oct |
+| `35-promo-chinese-code.eml` | Traditional Chinese promo: 折扣碼 AUTUMN88, 8折, 10月20日截止, 免運 | not a receipt, dropped by the prefilter; Promotions page: code AUTUMN88, 20% off, ends 20 Oct |
 
 | `30-international-phones.eml` | International and contextual bare phones; reference preserved | phone + name redacted |
 | `31-international-postal.eml` | German/French streets and Canadian postal line | address + name redacted |

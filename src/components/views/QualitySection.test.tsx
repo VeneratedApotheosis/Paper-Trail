@@ -32,7 +32,7 @@ describe("QualitySection", () => {
     expect(text).toContain("88%");
     expect(text).toContain("calls Claude");
     expect(container.querySelector("svg[role=img]")).not.toBeNull();
-    expect(container.querySelectorAll("button")).toHaveLength(3); // 2 receipt buttons + run
+    expect(container.querySelectorAll("button")).toHaveLength(7); // 3 buttons per skipped row + run
   });
 
   it("calls back with the email id and shows a failure message next to that row", async () => {
@@ -41,6 +41,27 @@ describe("QualitySection", () => {
     await act(async () => button(container, "This is a receipt").click());
     expect(onMarkReceipt).toHaveBeenCalledWith("m-101");
     expect(container.querySelector("[role=alert]")?.textContent).toBe("Claude is not configured.");
+  });
+
+  it("offers receipt, shipping-update and promotion buttons per skipped row, each calling its own callback", async () => {
+    const onMarkReceipt = vi.fn(async () => null);
+    const onMarkShipping = vi.fn(async () => null);
+    const onMarkPromotion = vi.fn(async () => "Could not list it.");
+    const container = await render({ ...qualitySectionFixture, onMarkReceipt, onMarkShipping, onMarkPromotion });
+    const first = container.querySelector("[aria-label='Skipped emails'] tbody tr")!;
+    expect([...first.querySelectorAll("button")].map((candidate) => candidate.textContent)).toEqual(["This is a receipt", "This is a shipping update", "This is a promotion"]);
+    await act(async () => button(first as HTMLElement, "shipping update").click());
+    expect(onMarkShipping).toHaveBeenCalledWith("m-101");
+    await act(async () => button(first as HTMLElement, "a promotion").click());
+    expect(onMarkPromotion).toHaveBeenCalledWith("m-101");
+    expect(onMarkReceipt).not.toHaveBeenCalled();
+    expect(first.querySelector("[role=alert]")?.textContent).toBe("Could not list it.");
+  });
+
+  it("hides the shipping-update and promotion buttons when their callbacks are not given", async () => {
+    const container = await render({ ...qualitySectionFixture, onMarkShipping: undefined, onMarkPromotion: undefined });
+    expect([...container.querySelectorAll("tbody button")].map((candidate) => candidate.textContent)).toEqual(["This is a receipt", "This is a receipt"]);
+    expect(container.querySelectorAll("button")).toHaveLength(3);
   });
 
   it("runs the experiment with the chosen model and prompt, and renders both settings side by side", async () => {

@@ -7,7 +7,8 @@ import type { GmailSyncProgress } from "@/lib/gmail/progress";
 import type { previewGmail } from "@/lib/gmail/service";
 import type { RealEvalReport } from "@/lib/eval/real";
 import type { ExperimentRequest, ExperimentResult } from "@/lib/quality/experiment";
-import type { NotReceiptFeedbackResult, ReceiptFeedbackResult } from "@/lib/quality/feedback";
+import type { PromotionsResponse } from "@/lib/promotions/state";
+import type { NotReceiptFeedbackResult, PromotionFeedbackResult, ReceiptFeedbackResult } from "@/lib/quality/feedback";
 import type { QualityResponse } from "@/lib/quality/state";
 import type { SkippedEmail, SyncQualityReport } from "@/lib/quality/types";
 import type { DeleteAllResult, StoreMode } from "@/lib/store";
@@ -242,6 +243,12 @@ export interface SkippedEmailsResponse {
 /** POST /api/quality/skipped/:emailId/receipt: the outcome plus the recomputed owed summary. */
 export type MarkReceiptResponse = ReceiptFeedbackResult & { summary: LedgerSummary };
 export type MarkNotReceiptResponse = NotReceiptFeedbackResult & { summary: LedgerSummary };
+
+/** POST /api/quality/skipped/:emailId/promotion: the promotion now listed for the email. */
+export type MarkPromotionResponse = PromotionFeedbackResult;
+
+/** GET /api/promotions: offers read from marketing emails (#131); never part of the owed total. */
+export type { PromotionsResponse };
 
 /** GET /api/quality/eval: scores against the saved labels (cache only, never calls a model). */
 export type QualityEvalResponse = RealEvalReport & { model: string };

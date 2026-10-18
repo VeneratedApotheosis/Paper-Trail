@@ -328,6 +328,7 @@ demo), `Cache-Control: no-store`, and built from counts, safe metadata and **red
 | `GET /api/quality/skipped` | `{ skipped: SkippedEmail[], total }`: emails that produced no order |
 | `POST /api/quality/skipped/:emailId/receipt` `{ class? }` | "This is a receipt": extracts the email (receipt path forced; cache first, else Claude), merges it through the normal matcher + rules, saves a label, writes an audit row, removes it from the list. Returns `{ emailId, class, extracted, needsReview, orderId, excludedMerchant, labeled, summary }`. No Claude key / provider down: 503 with `details.labeled: true` (label saved, email stays listed) |
 | `POST /api/quality/skipped/:emailId/not-receipt` | For a false positive (an extracted email): removes its order when it was the order's only email, saves a label, lists the email as skipped. An order that also holds other emails is kept (`keptSharedOrders`): fix it in Review |
+| `POST /api/quality/skipped/:emailId/promotion` | "This is a promotion" (#131): lists the email on the Promotions page (rules reading, no Claude call), saves a `marketing` class label (the next sync treats it as a promotion), writes an audit row, removes it from the list. Returns `{ emailId, promotion, labeled }`. 404 when the email is not in the skipped list. "This is a shipping update" is `POST …/receipt { class: "shipped" }` |
 | `GET /api/quality/eval` | Scores the saved labels: receipt-gate precision/recall (prefilter + classifier on the stored redacted text) and per-field extraction accuracy. **Cache only, never calls a model**: labels without a cached extraction are listed as `unscored` |
 | `POST /api/quality/experiment` `{ model?, promptVariant? }` | Runs the labeled set (at most 50 labels with corrected fields, newest first) through `model` / `promptVariant` (`default`, `conservative`, `itemized`) and the current setting, returns both side by side (accuracy, per-field, calls, tokens, estimated USD cost). **Calls Claude** (once per label per side, counted with the same rule as `llmCalls`; the current side is answered from the live cache where possible). Does not change `LLM_MODEL`, the live cache or the ledger. Audited. 400 without labels, 503 without a key, 409 while one is running |
 
@@ -350,6 +351,39 @@ Redacted texts of the latest run are kept in memory only (max 400 emails, skippe
 no re-fetch; delete-all and a demo reset clear them. Typed client: `getQualityReports`, `getSkippedEmails`,
 `markSkippedAsReceipt`, `markNotReceipt`, `getQualityEval`, `runQualityExperiment`. UI: the "Quality" section of `/eval`
 (`QualitySection`, data via `useQuality`).
+
+## Promotions (issue #131)
+
+Marketing emails are no longer just "skipped": the ones that carry an offer become promotions with the store, the offer, its
+end and copyable promo codes. Display only: never part of the owed total, never produced by the rules engine. Code:
+`src/lib/promotions/**`, contract `src/lib/contracts/promotions.ts`, UI `/promotions` (`PromotionsView`, data via `usePromotions`).
+
+| Route | Purpose |
+|---|---|
+| `GET /api/promotions[?include=expired]` | `{ promotions: Promotion[], total, asOf, expiredHidden, enriching }`: soonest end first, no end last (newest email first within a tie); expired offers are left out unless `include=expired` (then they follow the active ones, latest end first). `asOf` is the clock expiry was judged against (the demo's fixed as-of in demo mode, else now). `enriching` is true while Claude is still reading details: fetch again shortly. Per store scope, `Cache-Control: no-store`; delete-all and a demo reset clear it |
+
+`Promotion`: `{ id, emailIds, accountId?, store, storeDomain, receivedAt, headline, discount: { kind: percent|amount|free_shipping|bogo|other, value, currency, minSpend } | null, codes, expiresAt, channel: online|in_store|both|null, source: rules|llm, confidence }`.
+`id` is the earliest email's id (stable when a repeat arrives later); `receivedAt`, details and `accountId` come from the newest email.
+
+**Which emails.** After every published run (Gmail per account, upload, demo) the runs' redacted texts (the #117 observer data, no pipeline change)
+are scanned: skipped emails the classifier called marketing, plus prefiltered or not-a-receipt mail with a discount and a code or end
+date (Chinese promos, mail the prefilter dropped). Receipts, shipping updates, extraction failures and phishing look-alikes are never
+promotions (a receipt with a promo footer stays a receipt). Marketing without any offer (no discount, code or end date) is not listed unless the user
+says "this is a promotion". A Gmail run replaces that account's promotions; an upload or demo run replaces all.
+The Gmail search query is unchanged, so promotions only come from marketing mail the receipt search already returned (subjects/senders that look transactional); uploads and the demo see everything they are given.
+
+**Rules first (free).** `src/lib/promotions/rules.ts`: codes (`code: X`, `use code X`, `promo code`, 折扣碼/優惠碼), percent / amount off (`8折` = 20% off), min spend,
+free shipping, buy-one-get-one, expiry phrases (ends tonight / today / tomorrow / Sunday / Oct 20 / 10/20 / in 48 hours / 今晚截止 / 10月20日截止) and channel words (in store / pickup / online).
+Expiry assumption: a phrase without a time ends at **23:59 local time** (the server's zone, which is the user's because the app runs locally); "tonight" and "today" are the email's local calendar day; a date without a year is the next such date unless it is more than 30 days in the past.
+
+**Claude for details (bounded).** Only the newest `PROMO_LLM_LIMIT` (default 20; `0` = rules only) promotions of a sync that no cached answer covers are sent to Claude, three at a time,
+in the background after the run is published (the demo never calls Claude). Own prompt and tool (`record_promotion`), Zod-validated, retried once with the validation error, then the
+rules' reading stays; a provider error keeps it too; a missing `ANTHROPIC_API_KEY` ends the pass quietly. Claude never invents codes: a code must appear verbatim in the email text or it is dropped
+(an amount not in the text is dropped too). Answers are cached per scope by text hash, so re-syncing the same email costs nothing. Every request writes an `llm_call` audit row (model, tokens; never text).
+
+**Duplicates.** Same store (domain, else name) and, within 5 days, a shared promo code or the same headline collapse into one offer (`emailIds` lists them all).
+
+Typed client: `getPromotions`, `markSkippedAsPromotion`. Hook: `usePromotions(includeExpired)` (cache key `promotions`, polls every 3 s while `enriching`).
 
 ## Dispute draft stub (`#20`)
 

@@ -6,6 +6,7 @@ import { deleteScopeLabels } from "@/lib/quality/labels";
 import { deleteScopeOverrides, listOverrides, recordOverride, removeFindingOverride, resetOverrideStores } from "@/lib/review/override-store";
 import { applyOverrides } from "@/lib/review/overrides";
 import { emptyQualityData, type QualityData } from "@/lib/quality/types";
+import { emptyPromotionData, type PromotionData } from "@/lib/promotions/types";
 import { mergeAccountResults, type AccountPipelineResult } from "@/lib/pipeline/accounts";
 import {
   isExcludedMerchant,
@@ -47,6 +48,8 @@ interface StoreData {
   revokeOAuth: RevokeOAuthHook | null;
   /** Quality reports, skipped-email list and redacted texts (#117); cleared by delete-all and clearLedger. */
   quality: QualityData;
+  /** Promotions read from marketing emails (#131); cleared by delete-all and clearLedger. */
+  promotions: PromotionData;
   /** Bumped by deleteAll and clearLedger so in-flight work (upload, demo load) can tell its data was deleted. */
   generation: number;
 }
@@ -113,6 +116,7 @@ function emptyData(): StoreData {
     extractionCache: createMemoryCache(),
     revokeOAuth: null,
     quality: emptyQualityData(),
+    promotions: emptyPromotionData(),
     generation: 0,
   };
 }
@@ -278,6 +282,11 @@ export function getQualityData(): QualityData {
   return data().quality;
 }
 
+/** Promotion data of the current store scope (#131); see src/lib/promotions. */
+export function getPromotionData(): PromotionData {
+  return data().promotions;
+}
+
 /** Key of the current store scope: the signed-in profile id, or "anonymous" for the demo. Keys the local label store. */
 export function currentStoreScope(): string {
   return context.getStore() ?? "anonymous";
@@ -333,6 +342,7 @@ export function clearLedger(): void {
   store.stats = null;
   store.accountResults = new Map();
   store.quality = emptyQualityData();
+  store.promotions = emptyPromotionData();
 }
 
 /** Apply a fully validated review result to one visible order, without affecting other orders. */
@@ -457,3 +467,4 @@ export async function deleteAll(
   });
   return { deleted: true, ok: true, at, revokedToken, purged };
 }
+

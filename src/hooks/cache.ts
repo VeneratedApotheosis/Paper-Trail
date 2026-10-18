@@ -30,6 +30,8 @@ export const CACHE_KEYS = {
   /** GET /api/account: Gmail connection, mailbox, last sync time, counts (issue #110). */
   account: "account",
   audit: "audit",
+  /** GET /api/promotions (#131); `promotions:expired` is the same list with expired offers. */
+  promotions: "promotions",
   order: (id: string) => `order:${id}`,
   finding: (id: string) => `finding:${id}`,
   claim: (id: string) => `claim:${id}`,

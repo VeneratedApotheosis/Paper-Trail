@@ -12,6 +12,7 @@ export const appShellViewFixture: AppShellViewProps = {
   nav: [
     { href: "/", label: "Owed to you" },
     { href: "/ledger", label: "Purchases" },
+    { href: "/promotions", label: "Promotions" },
     { href: "/review", label: "Review" },
     { href: "/trust", label: "Trust" },
     { href: "/account", label: "Account" },

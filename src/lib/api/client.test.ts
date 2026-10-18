@@ -8,7 +8,10 @@ import {
   getGmailPreview,
   getGmailSyncStatus,
   getOrder,
+  getPromotions,
   getSessionStatus,
+  markSkippedAsPromotion,
+  markSkippedAsReceipt,
   regenerateClaim,
   safeDecode,
   saveClaim,
@@ -127,5 +130,23 @@ describe("Gmail client", () => {
       code: null,
       error: null,
     });
+  });
+});
+describe("promotions and skipped-email feedback (#131)", () => {
+  it("reads the promotions, with expired ones only on request", async () => {
+    await getPromotions();
+    await getPromotions({ includeExpired: true });
+    expect(requestedPaths()).toEqual(["/api/promotions", "/api/promotions?include=expired"]);
+  });
+
+  it("posts 'this is a promotion' and 'this is a shipping update' to the right routes", async () => {
+    await markSkippedAsPromotion("<m1@mail.example>");
+    await markSkippedAsReceipt("<m1@mail.example>", { class: "shipped" });
+    expect(requestedPaths()).toEqual([
+      `/api/quality/skipped/${encodeURIComponent("<m1@mail.example>")}/promotion`,
+      `/api/quality/skipped/${encodeURIComponent("<m1@mail.example>")}/receipt`,
+    ]);
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ class: "shipped" });
+    expect(fetchMock.mock.calls[0][1].method).toBe("POST");
   });
 });

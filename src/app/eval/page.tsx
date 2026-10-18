@@ -26,12 +26,14 @@ export default function EvalPage() {
       fix="Check that the app server is running, then try again."
       actions={<Button type="button" onClick={report.refetch}>Try again</Button>} /></AppShell>;
   }
-  const { data, markReceipt, experiment } = quality;
+  const { data, markReceipt, markShipping, markPromotion, experiment } = quality;
   return <EvalView metrics={evalViewMetrics(report.data)} quality={qualityViewProps({
     loading: data.loading, error: data.error, reports: data.data?.reports ?? null, skipped: data.data?.skipped ?? null,
     evaluation: data.data?.evaluation ?? null,
     experiment,
     onMarkReceipt: markReceipt,
+    onMarkShipping: markShipping,
+    onMarkPromotion: markPromotion,
     onRunExperiment: (model, promptVariant) => experiment.run(model, promptVariant as PromptVariantId),
   })} />;
 }

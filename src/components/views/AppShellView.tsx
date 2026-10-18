@@ -52,6 +52,7 @@ export interface AppShellViewProps {
 const defaultNav: AppShellNavItem[] = [
   { href: "/", label: "Owed to you" },
   { href: "/ledger", label: "Purchases" },
+  { href: "/promotions", label: "Promotions" },
   { href: "/review", label: "Review" },
   { href: "/trust", label: "Trust" },
   { href: "/account", label: "Account" },
@@ -162,7 +163,7 @@ export function AppShellView({
                 onMouseEnter={() => onNavIntent?.(item.href)}
                 onFocus={() => onNavIntent?.(item.href)}
                 onTouchStart={() => onNavIntent?.(item.href)}
-                className={`flex min-h-[44px] items-center justify-center rounded-sm px-2.5 text-xs font-bold transition-shadow ${
+                className={`flex min-h-[44px] items-center justify-center rounded-sm px-1.5 text-xs font-bold transition-shadow ${
                   active ? "neu-inset text-teal-deep" : "text-ink-muted"
                 }`}
               >

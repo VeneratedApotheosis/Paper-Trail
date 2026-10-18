@@ -31,5 +31,7 @@ export const qualitySectionFixture: QualitySectionProps = {
   experimentWarning: "Running an experiment calls Claude once per labeled email for each setting compared.",
   experiment: { pending: false, error: null, result: null },
   onMarkReceipt: async () => null,
+  onMarkShipping: async () => null,
+  onMarkPromotion: async () => null,
   onRunExperiment: () => undefined,
 };

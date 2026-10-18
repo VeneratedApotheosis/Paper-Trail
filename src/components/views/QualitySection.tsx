@@ -94,6 +94,10 @@ export interface QualitySectionProps {
   experiment: { pending: boolean; error: string | null; result: QualityExperimentResult | null };
   /** Resolves to an error message, or null when the email was re-run. */
   onMarkReceipt: (emailId: string) => Promise<string | null>;
+  /** "This is a shipping update": same result as onMarkReceipt. The button is hidden when omitted. */
+  onMarkShipping?: (emailId: string) => Promise<string | null>;
+  /** "This is a promotion" (lists it on the Promotions page): same result as onMarkReceipt. The button is hidden when omitted. */
+  onMarkPromotion?: (emailId: string) => Promise<string | null>;
   onRunExperiment: (model: string, promptVariant: string) => void;
 }
 
@@ -129,12 +133,18 @@ function Sparkline({ values }: { values: number[] }) {
   );
 }
 
-function SkippedList({ skipped, onMarkReceipt }: Pick<QualitySectionProps, "skipped" | "onMarkReceipt">) {
+function SkippedList({ skipped, onMarkReceipt, onMarkShipping, onMarkPromotion }: Pick<QualitySectionProps, "skipped" | "onMarkReceipt" | "onMarkShipping" | "onMarkPromotion">) {
+  // Which button is running, as `${emailId}:${kind}`; all buttons wait while one runs.
   const [busy, setBusy] = useState<string | null>(null);
   const [messages, setMessages] = useState<Record<string, string>>({});
-  async function mark(emailId: string) {
-    setBusy(emailId);
-    const message = await onMarkReceipt(emailId);
+  const actions = [
+    { kind: "receipt", label: "This is a receipt", busyLabel: "Reading…", run: onMarkReceipt },
+    { kind: "shipping", label: "This is a shipping update", busyLabel: "Reading…", run: onMarkShipping },
+    { kind: "promotion", label: "This is a promotion", busyLabel: "Saving…", run: onMarkPromotion },
+  ].flatMap((action) => (action.run ? [{ ...action, run: action.run }] : []));
+  async function mark(emailId: string, kind: string, run: (emailId: string) => Promise<string | null>) {
+    setBusy(`${emailId}:${kind}`);
+    const message = await run(emailId);
     setBusy(null);
     if (message) setMessages((current) => ({ ...current, [emailId]: message }));
   }
@@ -163,10 +173,14 @@ function SkippedList({ skipped, onMarkReceipt }: Pick<QualitySectionProps, "skip
               </td>
               <td className="py-3 pr-4"><span className="neu-raised-sm rounded-full px-2 py-0.5 text-xs text-ink-muted">{REASONS[row.reason]}</span></td>
               <td className="py-3 text-right">
-                <Button type="button" variant="secondary" className="px-3 py-2" disabled={busy !== null} onClick={() => mark(row.emailId)}>
-                  {busy === row.emailId ? "Reading…" : "This is a receipt"}
-                </Button>
-                {messages[row.emailId] ? <p role="alert" className="mt-2 max-w-xs text-xs text-ink-muted">{messages[row.emailId]}</p> : null}
+                <div className="flex flex-col items-end gap-2">
+                  {actions.map((action) => (
+                    <Button key={action.kind} type="button" variant="secondary" className="whitespace-nowrap px-3 py-2 text-xs" disabled={busy !== null} onClick={() => mark(row.emailId, action.kind, action.run)}>
+                      {busy === `${row.emailId}:${action.kind}` ? action.busyLabel : action.label}
+                    </Button>
+                  ))}
+                </div>
+                {messages[row.emailId] ? <p role="alert" className="mt-2 ml-auto max-w-xs text-xs text-ink-muted">{messages[row.emailId]}</p> : null}
               </td>
             </tr>
           ))}
@@ -311,8 +325,8 @@ export function QualitySection(props: QualitySectionProps) {
 
       <div className="neu-inset rounded-lg p-6" aria-label="Skipped emails">
         <p className="eyebrow">Skipped emails · {skipped.length}</p>
-        <p className="mt-2 max-w-prose text-sm text-ink-muted">These did not become orders. If one is really a receipt, say so: it is read again and added, and the correction is remembered.</p>
-        <SkippedList skipped={skipped} onMarkReceipt={props.onMarkReceipt} />
+        <p className="mt-2 max-w-prose text-sm text-ink-muted">These did not become orders. If one is really a receipt, a shipping update or a promotion, say so: it is read again and filed there, and the correction is remembered.</p>
+        <SkippedList skipped={skipped} onMarkReceipt={props.onMarkReceipt} onMarkShipping={props.onMarkShipping} onMarkPromotion={props.onMarkPromotion} />
       </div>
 
       <div className="neu-inset rounded-lg p-6" aria-label="Accuracy on your labels">

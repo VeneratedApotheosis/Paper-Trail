@@ -13,6 +13,8 @@ export interface QualityViewInput {
   evaluation: QualityEvalResponse | null;
   experiment: { pending: boolean; error: string | null; result: ExperimentResult | null };
   onMarkReceipt: QualitySectionProps["onMarkReceipt"];
+  onMarkShipping?: QualitySectionProps["onMarkShipping"];
+  onMarkPromotion?: QualitySectionProps["onMarkPromotion"];
   onRunExperiment: QualitySectionProps["onRunExperiment"];
 }
 
@@ -72,6 +74,8 @@ export function qualityViewProps(input: QualityViewInput): QualitySectionProps {
         : null,
     },
     onMarkReceipt: input.onMarkReceipt,
+    onMarkShipping: input.onMarkShipping,
+    onMarkPromotion: input.onMarkPromotion,
     onRunExperiment: input.onRunExperiment,
   };
 }

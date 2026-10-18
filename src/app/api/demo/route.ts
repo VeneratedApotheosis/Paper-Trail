@@ -5,6 +5,7 @@ import type { PipelineRunResponse, ResetDemoResponse } from "@/lib/api/types";
 import { loadSeedDemo } from "@/lib/demo";
 import { createSyncCollector } from "@/lib/quality/collector";
 import { classOverridesFor } from "@/lib/quality/labels";
+import { recordSyncPromotions } from "@/lib/promotions/state";
 import { recordSyncQuality } from "@/lib/quality/state";
 import { appendAudit, beginStoreWork, clearLedger, currentStoreScope, getExcludedMerchants, getState, setPipelineResult } from "@/lib/store";
 
@@ -25,7 +26,9 @@ async function handlePOST(_request: Request): Promise<Response> {
     return jsonError(409, "Your data was deleted while the demo was loading; nothing was saved. Load the demo again to continue.");
   }
   setPipelineResult("demo", result.asOf, result);
-  recordSyncQuality(collector.finish(result));
+  const collected = collector.finish(result);
+  recordSyncQuality(collected);
+  recordSyncPromotions(collected, { useClaude: false }); // the demo is offline: rules only
   const body: PipelineRunResponse = buildPipelineRunResponse();
   return Response.json(body);
 }

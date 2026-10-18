@@ -1,0 +1,15 @@
+From: "Northwind Outfitters" <deals@northwind.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Fall into savings: 20% off everything
+Date: Fri, 16 Oct 2026 09:00:00 +0000
+Message-ID: <34-promo-code-fall20@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=marketing; keep=false; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+Take 20% off everything online. Use code FALL20 at checkout.
+
+Free shipping on orders over $75. Sale ends Oct 20.
+
+Northwind Outfitters (synthetic). Unsubscribe any time.

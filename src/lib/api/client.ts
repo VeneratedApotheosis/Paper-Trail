@@ -20,11 +20,13 @@ import type {
   GmailSyncStatus,
   LedgerResponse,
   MarkNotReceiptResponse,
+  MarkPromotionResponse,
   MarkReceiptResponse,
   MerchantExcludeResponse,
   OrderResponse,
   PipelineRunResponse,
   PrefilterResponse,
+  PromotionsResponse,
   QualityEvalResponse,
   QualityReportsResponse,
   ResetDemoResponse,
@@ -242,6 +244,22 @@ export function markSkippedAsReceipt(emailId: string, options: { class?: EmailCl
 /** POST /api/quality/skipped/:emailId/not-receipt: removes a false positive from the ledger and saves a label. */
 export function markNotReceipt(emailId: string): Promise<MarkNotReceiptResponse> {
   return request(`/api/quality/skipped/${encodeIdSegment(emailId)}/not-receipt`, { method: "POST" });
+}
+
+/**
+ * POST /api/quality/skipped/:emailId/promotion: "this is a promotion". Lists the email on the Promotions page (read by rules,
+ * no Claude call) and saves a label. `invalidate()` afterwards. A shipping update is `markSkippedAsReceipt(id, { class: "shipped" })`.
+ */
+export function markSkippedAsPromotion(emailId: string): Promise<MarkPromotionResponse> {
+  return request(`/api/quality/skipped/${encodeIdSegment(emailId)}/promotion`, { method: "POST" });
+}
+
+/**
+ * GET /api/promotions: offers read from marketing emails (#131), soonest expiry first, no-expiry last. Expired offers are
+ * left out (`expiredHidden` counts them) unless `includeExpired`. `enriching` is true while Claude is still reading details.
+ */
+export function getPromotions(options: { includeExpired?: boolean } = {}): Promise<PromotionsResponse> {
+  return request(`/api/promotions${options.includeExpired ? "?include=expired" : ""}`);
 }
 
 /** GET /api/quality/eval: gate precision/recall and field accuracy on the saved labels (cache only, no model calls). */

@@ -6,6 +6,7 @@ import { syncGmailAccounts } from "@/lib/gmail/accounts";
 import { createLlmExtractor } from "@/lib/pipeline/extractors";
 import { createSyncCollector, type SyncCollector } from "@/lib/quality/collector";
 import { classOverridesFor } from "@/lib/quality/labels";
+import { recordSyncPromotions } from "@/lib/promotions/state";
 import { recordSyncQuality } from "@/lib/quality/state";
 import { beginStoreWork, currentStoreScope, getExcludedMerchants, getExtractionCache, setAccountPipelineResult } from "@/lib/store";
 import { buildPipelineRunResponse } from "@/lib/api/ledger";
@@ -57,7 +58,11 @@ async function handlePOST(request: Request): Promise<Response> {
         if (!work.isCurrent()) return false;
         setAccountPipelineResult(accountId, now.toISOString(), result, new Date().toISOString());
         const collector = collectors.get(accountId);
-        if (collector) recordSyncQuality(collector.finish(result, { fetched: accountSync.fetched, bodySource: accountSync.bodySources }));
+        if (collector) {
+          const collected = collector.finish(result, { fetched: accountSync.fetched, bodySource: accountSync.bodySources });
+          recordSyncQuality(collected);
+          void recordSyncPromotions(collected).enrichment; // Claude reads promotion details in the background (PROMO_LLM_LIMIT)
+        }
         return true;
       },
     });
