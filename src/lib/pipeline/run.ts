@@ -186,6 +186,12 @@ export async function runPipeline(emails: readonly RawEmail[], deps: PipelineDep
         reason: `low extraction confidence ${extraction.confMin.toFixed(2)}`,
       });
     }
+    // The matcher derives timestamps from the email date; an unparseable one would throw and abort the whole run
+    // (real inboxes / uploads can carry odd Date headers). Route that email to review instead (hard rule 5).
+    if (Number.isNaN(Date.parse(redacted.date))) {
+      reviewQueue.push({ emailId: raw.id, stage: "match", reason: "email has no readable date, so it can't be matched to an order" });
+      continue;
+    }
     // The matcher sees the redacted email, so nothing derived from it can carry unredacted PII.
     matchInputs.push({ email: redacted, extraction });
   }

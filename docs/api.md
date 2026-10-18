@@ -10,13 +10,13 @@ Raw email bodies are never stored: only orders, findings, drafts, the review que
 
 | Method + path | Request | Response (200) | Errors |
 |---|---|---|---|
-| `POST /api/demo` | none | `PipelineRunResponse` `{ mode: "demo", asOf, summary, stats }` | |
+| `POST /api/demo` | none | `PipelineRunResponse` `{ mode: "demo", asOf, summary, stats }` | 409 if delete-all / demo reset ran while it was loading (nothing saved) |
 | `DELETE /api/demo` | none | `{ mode: "empty" }` (audit log kept) | 409 when the ledger holds non-demo data |
 | `GET /api/ledger` | none | `LedgerResponse` `{ mode, asOf, orders, findings, summary, reviewQueue, excludedMerchants, stats, labels }` | |
 | `GET /api/orders/:id` | id URL-encoded (`encodeURIComponent`) | `{ order, findings }` | 400 empty id, 404 unknown / excluded |
 | `GET /api/findings/:id` | id URL-encoded | `{ finding, order }` | 400, 404 |
 | `POST /api/findings/:id/status` | `{ status: "resolved" \| "dismissed" \| "open" }` | `FindingStatusResponse` `{ finding, summary }` (summary recomputed) | 400 empty id / invalid JSON / body, 404 unknown / excluded / deleted |
-| `POST /api/upload` | `multipart/form-data`, one or more `.eml` / `.mbox` files (any field name), 5 MB total | `UploadResponse` = `PipelineRunResponse` (`mode: "upload"`) + `{ files: [{ name, emails }], parseErrors: [{ file, index, reason }] }` | 400 no files / wrong type / nothing parseable, 413 too large |
+| `POST /api/upload` | `multipart/form-data`, one or more `.eml` / `.mbox` files (any field name), 5 MB total | `UploadResponse` = `PipelineRunResponse` (`mode: "upload"`) + `{ files: [{ name, emails }], parseErrors: [{ file, index, reason }] }` | 400 no files / wrong type / nothing parseable, 413 too large, 409 if delete-all ran while it was processing (nothing saved) |
 | `GET /api/prefilter` | none | `{ query, description, windowDays }` (exact Gmail search + plain-language text) | |
 | `GET /api/audit` | none | `{ entries: AuditEntry[] }`, newest first | |
 | `POST /api/delete-all` | none | `{ deleted: true, ok: true, at, revokedToken, purged: { orders, findings, drafts, reviewItems, audit } }` | |
@@ -30,7 +30,7 @@ Notes:
   (demo mode without a committed `seed/llm-cache.json`); show it with the demo banner.
 - `summary` is `computeOwed(findings, orders)` from `src/lib/rules/owed.ts`, the single source of truth for the owed
   total (`computeOwedSummary` / `findingCountsTowardOwed` in `src/lib/view.ts` delegate to it). See "Owed summary" below.
-- `reviewQueue` items are `{ emailId, stage: "classify" | "extract" | "match", reason, orderId? }`: uncertain
+- `reviewQueue` items are `{ emailId, stage: "classify" | "extract" | "match" | "rules", reason, orderId? }` (`match`: e.g. odd/negative totals or an unreadable email date; `rules`: a rule failed for that one order, which gets no findings while every other order still does): uncertain
   classifications that were not extracted, failed / invalid / low-confidence extractions, and orders that need review.
 - Excluded merchants are hidden from every response (ledger, orders, findings, review queue) until re-included.
 - Delete-all purges orders, findings, drafts, review queue, extraction cache, exclusions and the audit log, keeping
@@ -80,7 +80,7 @@ Claim drafts are still cleared by a re-run (a drafted finding keeps its status; 
 
 ## Pipeline
 
-`runPipeline` (`src/lib/pipeline/run.ts`) is shared by demo, upload and (later) Gmail sync:
+`runPipeline` (`src/lib/pipeline/run.ts`) is shared by demo, upload and Gmail sync:
 `isReceiptLike` (demo/upload only) → `classify` (raw email, for phishing detection) → `redact` → extractor on the
 redacted email (marketing / not_receipt are never extracted) → `matchOrders` → `runRules(defaultRules)`.
 Demo mode (`loadSeedDemo` in `src/lib/demo`) runs `seed/inbox.json` with `now = asOf` and the simulated seed

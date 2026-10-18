@@ -4,7 +4,7 @@ import { gmailErrorResponse, gmailRequest } from "@/lib/gmail/http";
 import { GmailError } from "@/lib/gmail/client";
 import { syncGmail } from "@/lib/gmail/service";
 import { createLlmExtractor } from "@/lib/pipeline/extractors";
-import { appendAudit, getExcludedMerchants, getExtractionCache, setPipelineResult } from "@/lib/store";
+import { beginStoreWork, getExcludedMerchants, getExtractionCache, setPipelineResult } from "@/lib/store";
 import { buildPipelineRunResponse } from "@/lib/api/ledger";
 import { gmailProgress } from "@/lib/gmail/progress";
 
@@ -31,12 +31,22 @@ async function handlePOST(request: Request): Promise<Response> {
     acquired = true;
     progress = gmailProgress.begin(userId);
     const now = new Date();
+    // Same guard as upload/demo (#93): capture the store before the long await, write in-flight audit rows to that
+    // store only, and don't publish results if delete-all (or a demo reset) ran meanwhile.
+    const work = beginStoreWork();
     const { result, ...info } = await syncGmail({ ...authenticated.deps, onProgress: progress.update, pipeline: {
-      now, audit: appendAudit, excludedMerchants: getExcludedMerchants(),
-      extractor: createLlmExtractor({ cache: getExtractionCache(), audit: appendAudit }),
+      now, audit: work.appendAudit, excludedMerchants: getExcludedMerchants(),
+      extractor: createLlmExtractor({ cache: getExtractionCache(), audit: work.appendAudit }),
     } });
     request.signal.throwIfAborted();
     if (!authenticated.active()) throw new GmailError(401, "token_expired");
+    if (!work.isCurrent()) {
+      progress.fail();
+      return Response.json(
+        { error: "Your data was deleted while Gmail was syncing; nothing was saved. Start the sync again if you want it." },
+        { status: 409, headers },
+      );
+    }
     setPipelineResult("gmail", now.toISOString(), result);
     progress.complete();
     return Response.json({ ...buildPipelineRunResponse(), ...info }, { headers });

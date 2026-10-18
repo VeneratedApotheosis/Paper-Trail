@@ -10,7 +10,7 @@ import { authConfig, SESSION_COOKIE } from "@/lib/auth/config";
 import { createAuthStore, type AuthStore } from "@/lib/auth/store";
 import { seal } from "@/lib/auth/crypto";
 import { loadSeedDemo } from "@/lib/demo/seed";
-import { appendAudit, getState, resetStore, withStoreScope } from "@/lib/store";
+import { appendAudit, clearLedger, getState, resetStore, withStoreScope } from "@/lib/store";
 import type { GmailSyncResult } from "./service";
 import * as service from "./service";
 import { GmailError } from "./client";
@@ -110,6 +110,20 @@ it("does not publish results after deletion invalidates the session", async () =
   expect((await sync(req("gmail/sync", cookie, { confirmed: true }))).status).toBe(401);
   expect(withStoreScope(id, getState).orders).toEqual([]);
   expect((await status(req("gmail/sync/status", cookie))).status).toBe(401);
+});
+
+it("does not publish results when the ledger was cleared during the sync (generation guard, #93)", async () => {
+  const { id, cookie } = account("one@example.test");
+  const seed = await loadSeedDemo({ cachePath: "missing-llm-cache.json" });
+  vi.spyOn(service, "syncGmail").mockImplementation(async () => {
+    withStoreScope(id, clearLedger); // same generation bump as delete-all / demo reset
+    return { result: seed, fetched: 45, capped: false, parseErrors: [] };
+  });
+  const response = await sync(req("gmail/sync", cookie, { confirmed: true }));
+  expect(response.status).toBe(409);
+  expect((await response.json()).error).toMatch(/deleted while Gmail was syncing/);
+  expect(withStoreScope(id, getState).orders).toEqual([]);
+  expect(await (await status(req("gmail/sync/status", cookie))).json()).toMatchObject({ stage: "failed" });
 });
 
 it("polls actual progress locally and isolates other accounts, never returning message data", async () => {

@@ -125,6 +125,19 @@ describe("runPipeline review queue", () => {
     ]);
   });
 
+  it("routes an email with an unreadable date to review instead of aborting the run", async () => {
+    const goodExtraction = (id: string): Extraction => ({ ...lowConfidenceExtraction(id), confidence: { merchant: 0.95, orderRef: 0.95, date: 0.95, currency: 0.95, totals: 0.95 }, confMin: 0.95 });
+    const extractor: PipelineExtractor = async (redacted) => ({ ok: true, extraction: goodExtraction(redacted.id) });
+    const badDate = { ...email, id: "upload-bad-date", date: "not a date" } as RawEmail;
+    const result = await runPipeline([email, badDate], { ...base, extractor });
+    expect(result.orders).toHaveLength(1);
+    expect(result.reviewQueue).toContainEqual({
+      emailId: "upload-bad-date",
+      stage: "match",
+      reason: "email has no readable date, so it can't be matched to an order",
+    });
+  });
+
   it("routes needs-review extraction results to the review queue", async () => {
     const extractor: PipelineExtractor = async () => ({ ok: false, needsReview: true, reason: "invalid after retry" });
     const result = await runPipeline([email], { ...base, extractor });
