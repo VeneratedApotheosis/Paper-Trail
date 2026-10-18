@@ -171,7 +171,7 @@ export function SearchSelect({
         <svg
           aria-hidden
           viewBox="0 0 12 12"
-          className={`h-3 w-3 shrink-0 text-ink-muted transition-transform ${open ? "rotate-180" : ""}`}
+          className={`h-3 w-3 shrink-0 text-ink-muted transition-transform duration-200 ease-out ${open ? "rotate-180" : ""}`}
           fill="none"
           stroke="currentColor"
           strokeWidth="1.8"
@@ -183,7 +183,7 @@ export function SearchSelect({
       </button>
 
       {open ? (
-        <div className="neu-raised absolute left-0 top-full z-20 mt-2 w-full rounded-lg bg-paper p-3 sm:w-80">
+        <div className="anim-sheet neu-raised absolute left-0 top-full z-20 mt-2 w-full rounded-lg bg-paper p-3 sm:w-80">
           <input
             ref={inputRef}
             type="text"

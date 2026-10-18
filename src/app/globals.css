@@ -70,6 +70,61 @@
       inset -4px -4px 10px var(--shadow-light);
   }
 
+  /* Motion: one shared set. Opacity and transform only, 150-350ms, ease-out. Reduced motion zeroes it below.
+     fill-mode "backwards" so no transform lingers after the animation (it would clip shadows and trap fixed children). */
+  .anim-fade {
+    animation: pt-fade 250ms ease-out backwards;
+  }
+  .anim-fade-up {
+    animation: pt-fade-up 300ms ease-out backwards;
+  }
+  .anim-sheet {
+    animation: pt-sheet 200ms ease-out backwards;
+  }
+  /* Children rise in one after another (50ms apart, max 8 so long lists never feel slow). */
+  .anim-stagger > * {
+    animation: pt-fade-up 300ms ease-out backwards;
+  }
+  .anim-stagger > *:nth-child(2) { animation-delay: 50ms; }
+  .anim-stagger > *:nth-child(3) { animation-delay: 100ms; }
+  .anim-stagger > *:nth-child(4) { animation-delay: 150ms; }
+  .anim-stagger > *:nth-child(5) { animation-delay: 200ms; }
+  .anim-stagger > *:nth-child(6) { animation-delay: 250ms; }
+  .anim-stagger > *:nth-child(7) { animation-delay: 300ms; }
+  .anim-stagger > *:nth-child(n + 8) { animation-delay: 350ms; }
+  /* Bars grow from the left on first render. */
+  .anim-grow {
+    transform-origin: left center;
+    animation: pt-grow 600ms ease-out backwards;
+  }
+  /* Landing sections: visible by default; the .reveal-ready class (added by script) hides them until in view. */
+  .reveal-ready .reveal {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 400ms ease-out, transform 400ms ease-out;
+  }
+  .reveal-ready .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+  /* Colour and state changes ease instead of snapping (tabs, chips, nav, buttons). */
+  .neu-raised-sm,
+  .neu-inset,
+  .neu-accent {
+    transition: color 150ms ease-out, background-color 150ms ease-out, opacity 150ms ease-out;
+  }
+  /* Clickable raised cards lift slightly on hover (static cards stay still). Pointer devices only. */
+  @media (hover: hover) {
+    a.neu-raised,
+    button.neu-raised {
+      transition: transform 200ms ease-out;
+    }
+    a.neu-raised:hover,
+    button.neu-raised:hover {
+      transform: translateY(-2px);
+    }
+  }
+
   /* Primary actions. Deep teal so white text passes WCAG AA (4.8:1 or better). */
   .neu-accent {
     background: linear-gradient(135deg, var(--teal-action-start), var(--teal-action-end));
@@ -87,4 +142,17 @@
     font-weight: 700;
     color: var(--ink-muted);
   }
+}
+
+@keyframes pt-fade {
+  from { opacity: 0; }
+}
+@keyframes pt-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+}
+@keyframes pt-sheet {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+}
+@keyframes pt-grow {
+  from { transform: scaleX(0); }
 }

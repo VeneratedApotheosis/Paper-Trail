@@ -148,7 +148,7 @@ export function AppShellView({
         </header>
 
         <main
-          className={`mx-auto w-full max-w-ledger flex-1 px-5 pb-28 pt-2 group-has-[[data-layout=wide]]/shell:max-w-[76rem] md:px-12 md:pb-10 ${sync ? "md:pt-4" : "md:pt-10"}`}
+          className={`anim-fade-up mx-auto w-full max-w-ledger flex-1 px-5 pb-28 pt-2 group-has-[[data-layout=wide]]/shell:max-w-[76rem] md:px-12 md:pb-10 ${sync ? "md:pt-4" : "md:pt-10"}`}
         >
           {children}
         </main>
@@ -229,7 +229,7 @@ function MobileNav({
           <ul
             id="more-nav-sheet"
             hidden={!open}
-            className="neu-raised absolute bottom-full right-0 mb-3 w-56 space-y-1 rounded-lg bg-paper p-2"
+            className="anim-sheet neu-raised absolute bottom-full right-0 mb-3 w-56 space-y-1 rounded-lg bg-paper p-2"
           >
             {more.map((item) => {
               const active = isActive(activePath, item.href);

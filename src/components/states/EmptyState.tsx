@@ -13,7 +13,7 @@ export function EmptyState({
   actions?: ReactNode;
 }) {
   return (
-    <div className="neu-raised mx-auto max-w-ledger rounded-xl px-8 py-14 text-center">
+    <div className="anim-fade-up neu-raised mx-auto max-w-ledger rounded-xl px-8 py-14 text-center">
       <h2 className="font-serif text-2xl text-ink">{title}</h2>
       {children ? (
         <p className="mx-auto mt-3 max-w-md text-base text-ink-muted">{children}</p>

@@ -185,7 +185,7 @@ export function LedgerView({ orders, accounts, onOpenOrder, onLoadDemo }: Ledger
                         {m.items.length} {m.items.length === 1 ? "purchase" : "purchases"}
                       </span>
                     </div>
-                    <div className="space-y-4">
+                    <div className="anim-stagger space-y-4">
                       {m.items.map((order) => (
                         <OrderCard
                           key={order.id}

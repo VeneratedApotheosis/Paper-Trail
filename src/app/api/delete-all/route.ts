@@ -1,3 +1,4 @@
+import { sameOriginAllowed } from "@/lib/http/same-origin";
 import { withAccountStore } from "@/lib/gmail/context";
 import { NextRequest, NextResponse } from "next/server";
 import type { DeleteAllResponse } from "@/lib/api/types";
@@ -14,8 +15,7 @@ export const dynamic = "force-dynamic";
 async function handlePOST(request: Request): Promise<Response> {
   const req = new NextRequest(request);
   const headers = { "Cache-Control": "no-store" };
-  const origin = req.headers.get("origin");
-  if ((origin && origin !== req.nextUrl.origin) || req.headers.get("sec-fetch-site") === "cross-site") {
+  if (!sameOriginAllowed(req)) {
     return NextResponse.json({ error: "Delete everything must be requested from this app." }, { status: 403, headers });
   }
   const cookie = req.cookies.get(SESSION_COOKIE)?.value;

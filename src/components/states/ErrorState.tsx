@@ -13,7 +13,7 @@ export function ErrorState({
   actions?: ReactNode;
 }) {
   return (
-    <div role="alert" className="neu-raised mx-auto max-w-ledger rounded-xl px-8 py-12 text-center">
+    <div role="alert" className="anim-fade neu-raised mx-auto max-w-ledger rounded-xl px-8 py-12 text-center">
       <h2 className="font-serif text-2xl text-ink">{title}</h2>
       {what ? <p className="mx-auto mt-3 max-w-md text-base text-ink">{what}</p> : null}
       {fix ? <p className="mx-auto mt-2 max-w-md text-sm text-ink-muted">{fix}</p> : null}

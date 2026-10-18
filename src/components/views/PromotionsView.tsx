@@ -181,7 +181,7 @@ export function PromotionsView({
 
 function CardList({ promotions, now, accounts, onCopyCode, label }: { promotions: Promotion[]; now: Date; accounts: SourceAccount[]; onCopyCode: CopyCode; label: string }) {
   return (
-    <ul aria-label={label} className="space-y-4 xl:space-y-5">
+    <ul aria-label={label} className="anim-stagger space-y-4 xl:space-y-5">
       {promotions.map((promotion) => (
         <li key={promotion.id}>
           <PromotionCard promotion={promotion} now={now} accounts={accounts} onCopyCode={onCopyCode} />

@@ -148,7 +148,7 @@ export function AccountView({
         </header>
 
         {actionError ? (
-          <p role="alert" className="neu-inset mb-6 rounded-lg px-5 py-4 text-sm text-ink">
+          <p role="alert" className="anim-fade neu-inset mb-6 rounded-lg px-5 py-4 text-sm text-ink">
             {actionError}
           </p>
         ) : null}
