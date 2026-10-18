@@ -20,7 +20,7 @@ import type { AuditEntry, OwedSummary } from "@/lib/types";
 export type { PipelineStats, ReviewQueueItem, StoreMode };
 
 export const API_LABELS = {
-  demo: "Demo data — synthetic",
+  demo: "Demo data: synthetic",
   simulatedPrice: "Simulated price feed",
   precomputedExtraction: "Extracted from precomputed seed labels (no LLM call)",
 } as const;

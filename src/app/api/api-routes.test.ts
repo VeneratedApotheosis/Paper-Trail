@@ -77,7 +77,7 @@ describe("demo + ledger routes", () => {
       excludedCount: 0,
       excludedTotal: 0,
     });
-    expect(body.labels).toEqual({ demo: "Demo data — synthetic", simulatedPrice: "Simulated price feed", precomputedExtraction: null });
+    expect(body.labels).toEqual({ demo: "Demo data: synthetic", simulatedPrice: "Simulated price feed", precomputedExtraction: null });
   });
 
   it("POST /api/demo loads the seed through the pipeline and GET /api/ledger serves it", async () => {

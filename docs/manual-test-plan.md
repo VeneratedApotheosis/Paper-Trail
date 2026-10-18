@@ -47,7 +47,7 @@ Report as a bug if, anywhere:
 
 | # | Steps | Expected | Bug if |
 |---|---|---|---|
-| L1 | Click **Load demo** | mode `demo`; notice "Demo data — synthetic"; when no `seed/llm-cache.json` exists, a notice "Precomputed extractions (seed gold labels, no LLM)"; pipeline stats line; orders table filled | no synthetic notice; empty ledger; error |
+| L1 | Click **Load demo** | mode `demo`; notice "Demo data: synthetic"; when no `seed/llm-cache.json` exists, a notice "Precomputed extractions (seed gold labels, no LLM)"; pipeline stats line; orders table filled | no synthetic notice; empty ledger; error |
 | L2 | Read the summary | "You're owed" total, findings counted, excluded (needs review) count + amount; green ✓ "owed total = open findings on confirmed orders" | ✗ check shows; a needs-review order's finding counted in the total |
 | L3 | Scan the orders table | merchant, ref, placed date, total + currency, status = latest event (`ordered` if none), needs-review badge, confMin | status not matching the latest event; CAD order shown as USD |
 | L4 | Open **Why?** on each finding | summary, rule version, dates list, source quote, confidence, evidence quotes (message id + quote ≤200 chars), raw explain JSON | missing evidence; amount differs from explain values; confidence < 0.7 not flagged |

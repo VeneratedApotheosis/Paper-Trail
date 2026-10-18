@@ -5,7 +5,7 @@ import type { Finding, MerchantPolicy, NormalizedOrder } from "@/lib/contracts";
 import type { AuditEntry, Draft, OwedSummary } from "@/lib/types";
 import { computeOwedSummary } from "@/lib/view";
 
-export const DEMO_LABEL = "Demo data — synthetic";
+export const DEMO_LABEL = "Demo data: synthetic";
 export const SIMULATED_PRICE_LABEL = "Simulated price feed";
 
 // Anchor all demo dates to a fixed "now" so countdowns are stable in the demo.

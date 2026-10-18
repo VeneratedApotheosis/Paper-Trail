@@ -28,7 +28,7 @@ Raw email bodies are never stored: only orders, findings, drafts, the review que
 | `DELETE /api/merchants/exclude` | `{ merchant: string }` | `{ excludedMerchants: string[] }` | 400 |
 
 Notes:
-- `mode` is `"empty" | "demo" | "upload" | "gmail"`. Show `labels.demo` ("Demo data — synthetic") on every page while
+- `mode` is `"empty" | "demo" | "upload" | "gmail"`. Show `labels.demo` ("Demo data: synthetic") on every page while
   `mode === "demo"`, and `labels.simulatedPrice` on findings with `simulated: true`.
 - `labels.precomputedExtraction` is non-null when extractions came from seed gold labels instead of an LLM
   (demo mode without a committed `seed/llm-cache.json`); show it with the demo banner.

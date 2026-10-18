@@ -1,11 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { Finding, NormalizedOrder } from "@/lib/contracts";
-import type { AccountResponse, LedgerResponse } from "@/lib/api/types";
+import type { Finding, FindingStatus, NormalizedOrder } from "@/lib/contracts";
+import { FINDING_STATUS_UPDATES, type AccountResponse, type FindingStatusUpdate, type LedgerResponse } from "@/lib/api/types";
 import { encodeIdSegment } from "@/lib/api/ids";
 import { countsTowardOwed, isOutstandingFinding } from "@/lib/rules/owed";
-import { useAccount, useLedger, useLoadDemo } from "@/hooks";
+import { useAccount, useLedger, useLoadDemo, useSetFindingStatus } from "@/hooks";
 import { orderSources } from "@/components/sourceAccounts";
 import { AppShell } from "@/components/AppShell";
 import { OwedView, type OwedFindingItem } from "@/components/views/OwedView";
@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/Button";
 function splitFindings(
   ledger: LedgerResponse,
   accounts: AccountResponse["accounts"] = [],
-): { owedItems: OwedFindingItem[]; maybeItems: OwedFindingItem[] } {
+): { owedItems: OwedFindingItem[]; maybeItems: OwedFindingItem[]; claimSentItems: OwedFindingItem[] } {
   const ordersById = new Map<string, NormalizedOrder>(ledger.orders.map((order) => [order.id, order]));
   const toItem = (finding: Finding): OwedFindingItem => ({
     finding,
@@ -28,9 +28,12 @@ function splitFindings(
     sources: orderSources(ordersById.get(finding.orderId)?.sources, accounts),
   });
   const outstanding = ledger.findings.filter(isOutstandingFinding);
+  // Drafted findings still count toward the total (#77) but are listed under "Claims sent", not as open money.
+  const open = outstanding.filter((f) => f.status !== "drafted");
   return {
-    owedItems: outstanding.filter((f) => countsTowardOwed(f, ordersById.get(f.orderId))).map(toItem),
-    maybeItems: outstanding.filter((f) => !countsTowardOwed(f, ordersById.get(f.orderId))).map(toItem),
+    owedItems: open.filter((f) => countsTowardOwed(f, ordersById.get(f.orderId))).map(toItem),
+    maybeItems: open.filter((f) => !countsTowardOwed(f, ordersById.get(f.orderId))).map(toItem),
+    claimSentItems: outstanding.filter((f) => f.status === "drafted").map(toItem),
   };
 }
 
@@ -44,6 +47,14 @@ export default function Home() {
   const ledger = useLedger();
   const loadDemo = useLoadDemo();
   const account = useAccount();
+  const setStatus = useSetFindingStatus();
+
+  // The view offers "Mark resolved" / "Dismiss" on claim-sent rows; only statuses the API accepts are sent.
+  function handleSetStatus(findingId: string, status: FindingStatus) {
+    if ((FINDING_STATUS_UPDATES as readonly string[]).includes(status)) {
+      void setStatus.run(findingId, status as FindingStatusUpdate);
+    }
+  }
 
   // useLoadDemo refreshes the shared cache itself, so there is nothing to refetch here.
   async function handleLoadDemo() {
@@ -78,13 +89,15 @@ export default function Home() {
   }
 
   const data = ledger.data;
-  const { owedItems, maybeItems } = splitFindings(data, account.data?.accounts);
+  const { owedItems, maybeItems, claimSentItems } = splitFindings(data, account.data?.accounts);
 
   return (
     <OwedView
       summary={data.summary}
       owedItems={owedItems}
       maybeItems={maybeItems}
+      claimSentItems={claimSentItems}
+      onSetStatus={handleSetStatus}
       simulatedLabel={data.labels.simulatedPrice}
       onOpenClaim={(id) => router.push(`/claim/${encodeIdSegment(id)}`)}
       onOpenReview={() => router.push("/review")}
