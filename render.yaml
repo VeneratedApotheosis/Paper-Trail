@@ -1,0 +1,28 @@
+﻿# Render blueprint (fast deploy). Secrets are set in the Render dashboard, never here.
+services:
+  - type: web
+    name: papertrail
+    runtime: node
+    plan: starter            # a persistent disk needs a paid plan; free works for a demo but resets data
+    buildCommand: npm install --no-audit --no-fund && npm run build
+    startCommand: npm run start:render   # binds 0.0.0.0 on $PORT (Render default 10000)
+    healthCheckPath: /welcome
+    disk:
+      name: papertrail-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: DATABASE_URL
+        value: /var/data/papertrail.sqlite
+      - key: AUTH_BASE_URL
+        sync: false            # https://<your-app>.onrender.com
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: AUTH_ENCRYPTION_KEY
+        sync: false            # 64 hex chars
+      - key: ANTHROPIC_API_KEY
+        sync: false
