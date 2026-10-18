@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { DemoBanner } from "@/components/DemoBanner";
 import { ShellSyncControl, type AppShellSync } from "@/components/ShellSyncControl";
@@ -151,28 +153,102 @@ export function AppShellView({
           {children}
         </main>
 
-        {/* Mobile bottom nav */}
-        <nav className="neu-raised fixed inset-x-4 bottom-4 z-40 flex items-center justify-around rounded-lg px-2 py-2 md:hidden">
-          {nav.map((item) => {
-            const active = isActive(activePath, item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                onMouseEnter={() => onNavIntent?.(item.href)}
-                onFocus={() => onNavIntent?.(item.href)}
-                onTouchStart={() => onNavIntent?.(item.href)}
-                className={`flex min-h-[44px] items-center justify-center rounded-sm px-1.5 text-xs font-bold transition-shadow ${
-                  active ? "neu-inset text-teal-deep" : "text-ink-muted"
-                }`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <MobileNav nav={nav} activePath={activePath} onNavIntent={onNavIntent} />
       </div>
     </div>
+  );
+}
+
+// Pages that move behind "More" on phones so the bar stays at five tabs (six do not fit at 390px).
+const MORE_HREFS = ["/trust", "/account"];
+
+function MobileNav({
+  nav,
+  activePath,
+  onNavIntent,
+}: {
+  nav: AppShellNavItem[];
+  activePath: string;
+  onNavIntent?: (href: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLElement>(null);
+  const more = nav.filter((item) => MORE_HREFS.includes(item.href));
+  const primary = more.length > 0 ? nav.filter((item) => !MORE_HREFS.includes(item.href)) : nav;
+  const moreActive = more.some((item) => isActive(activePath, item.href));
+
+  // Navigating closes the sheet; so do Escape and a tap outside it.
+  useEffect(() => setOpen(false), [activePath]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    const onPress = (event: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPress);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPress);
+    };
+  }, [open]);
+
+  const tab = (active: boolean) =>
+    `flex min-h-[44px] flex-1 items-center justify-center whitespace-nowrap rounded-sm px-1 text-xs font-bold transition-shadow ${
+      active ? "neu-inset text-teal-deep" : "text-ink-muted"
+    }`;
+  const intent = (href: string) => ({
+    onMouseEnter: () => onNavIntent?.(href),
+    onFocus: () => onNavIntent?.(href),
+    onTouchStart: () => onNavIntent?.(href),
+  });
+
+  return (
+    <nav ref={rootRef} aria-label="Main" className="neu-raised fixed inset-x-4 bottom-4 z-40 flex items-center justify-around gap-1 rounded-lg px-2 py-2 md:hidden">
+      {primary.map((item) => {
+        const active = isActive(activePath, item.href);
+        return (
+          <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} {...intent(item.href)} className={tab(active)}>
+            {item.label}
+          </Link>
+        );
+      })}
+      {more.length > 0 ? (
+        <>
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls="more-nav-sheet"
+            onClick={() => setOpen((v) => !v)}
+            className={tab(moreActive || open)}
+          >
+            More
+          </button>
+          <ul
+            id="more-nav-sheet"
+            hidden={!open}
+            className="neu-raised absolute bottom-full right-0 mb-3 w-56 space-y-1 rounded-lg bg-paper p-2"
+          >
+            {more.map((item) => {
+              const active = isActive(activePath, item.href);
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    {...intent(item.href)}
+                    className={`flex min-h-[44px] items-center rounded-sm px-4 text-sm font-bold ${active ? "neu-inset text-teal-deep" : "text-ink hover:text-teal-deep"}`}
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      ) : null}
+    </nav>
   );
 }
