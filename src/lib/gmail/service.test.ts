@@ -39,7 +39,7 @@ it("runs real classification/redaction/matching/rules and reports malformed mess
   expect(result.parseErrors).toEqual([{ id: "m2", reason: "unsupported_or_malformed_message" }]);
   expect(result.result.reviewQueue.some(item => item.emailId === "m2")).toBe(true);
   expect(result.fetched).toBe(2);
-  expect(pace).toHaveBeenCalledTimes(2);
+  expect(pace).not.toHaveBeenCalled(); // two requests are far under the quota budget
   expect(JSON.stringify(result)).not.toContain("(555) 012-3456");
   expect(JSON.stringify(audit.mock.calls)).not.toContain("synthetic-access");
   expect(onProgress.mock.calls.map(([value]) => value)).toEqual([
@@ -100,7 +100,7 @@ it("fails an atomic Gmail snapshot on extractor exceptions and stops further pro
   });
   const extractor = vi.fn().mockRejectedValue(new Error("synthetic provider outage"));
   await expect(syncGmail({ accessToken: async () => "synthetic", fetcher, audit: vi.fn(), pace: async () => {},
-    pipeline: { now, extractor } })).rejects.toMatchObject({ status: 503, code: "extraction_unavailable" });
+    pipeline: { now, extractor, extractConcurrency: 1 } })).rejects.toMatchObject({ status: 503, code: "extraction_unavailable" });
   expect(extractor).toHaveBeenCalledTimes(1);
 });
 

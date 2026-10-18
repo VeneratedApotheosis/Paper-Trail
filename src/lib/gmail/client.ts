@@ -90,3 +90,31 @@ export function createGmailClient(deps: GmailDeps) {
   };
 }
 export type GmailClient = ReturnType<typeof createGmailClient>;
+
+// Full-message get = 60 quota units; the per-user limit is 6,000 units/min (~100 gets/min). A bucket of BURST tokens
+// refilled at SUSTAINED_PER_SECOND allows at most BURST + 60 * 1.4 = 94 gets in any minute, under that ceiling.
+export const GMAIL_FETCH_BURST = 10;
+export const GMAIL_FETCH_PER_SECOND = 1.4;
+export interface RequestPacerOptions {
+  burst: number;
+  perSecond: number;
+  /** Called only when a request must wait for budget. */
+  sleep: (ms: number) => Promise<void>;
+  now?: () => number;
+}
+/**
+ * Token bucket by reservation: every call takes one token immediately and waits only for the deficit, so callers
+ * (including concurrent ones) are queued fairly and nothing spins. Under budget it never sleeps.
+ */
+export function createRequestPacer(options: RequestPacerOptions): () => Promise<void> {
+  const now = options.now ?? Date.now;
+  let tokens = options.burst;
+  let last = now();
+  return async () => {
+    const current = now();
+    tokens = Math.min(options.burst, tokens + ((current - last) / 1000) * options.perSecond);
+    last = current;
+    tokens -= 1;
+    if (tokens < 0) await options.sleep(Math.ceil((-tokens / options.perSecond) * 1000));
+  };
+}

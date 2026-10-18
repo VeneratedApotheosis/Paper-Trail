@@ -44,7 +44,11 @@ export interface PipelineDeps {
   sourceLabel?: string;
   /** Wall clock for audit timestamps; defaults to the system clock. */
   auditClock?: () => Date;
+  /** Max extractor calls in flight at once (default 4; 1 = sequential). Output order never depends on it. */
+  extractConcurrency?: number;
 }
+
+export const DEFAULT_EXTRACT_CONCURRENCY = 4;
 
 export type ReviewStage = "classify" | "extract" | "match" | "rules";
 
@@ -112,75 +116,89 @@ function orderReviewReason(order: NormalizedOrder, matcherReasons: readonly stri
   return "order needs review: no order confirmation or currency found";
 }
 
-export async function runPipeline(emails: readonly RawEmail[], deps: PipelineDeps): Promise<PipelineResult> {
+/** One email's contribution, filled in by add()/the extraction task and merged in input order by finish(). */
+interface EmailOutcome {
+  prefilteredOut: boolean;
+  classification?: EmailClass;
+  skipped: boolean;
+  origin?: keyof PipelineStats["extractionOrigins"];
+  extracted: boolean;
+  review: ReviewQueueItem[];
+  matchInput?: MatchInput;
+}
+
+/** A pipeline run fed one email at a time, so extraction can start while later emails are still being fetched. */
+export interface PipelineRun {
+  /**
+   * Classifies and redacts synchronously, then starts extraction as soon as one of `extractConcurrency` slots is free.
+   * The returned promise resolves once the email's extraction has started (or immediately if it needs none), so a
+   * caller that awaits it gets backpressure instead of an unbounded queue. Emails keep the order add() was called in.
+   */
+  add(raw: RawEmail): Promise<void>;
+  /** Waits for in-flight extractions, then matches orders and runs rules once over everything added. */
+  finish(): Promise<PipelineResult>;
+}
+
+/**
+ * Streaming form of runPipeline. Extraction results are stored per input index and merged in that order, so stats,
+ * review queue and matcher input are identical to a sequential run whatever order the extractor calls finish in.
+ * `expectedEmails` only labels the sync_start audit row (the true count is known once add() has been called).
+ */
+export function createPipelineRun(deps: PipelineDeps, expectedEmails?: number): PipelineRun {
   const auditClock = deps.auditClock ?? (() => new Date());
   const audit = (event: Omit<PipelineAuditEvent, "at">) => deps.audit?.({ at: auditClock().toISOString(), ...event });
   const source = deps.sourceLabel ?? "pipeline";
   const excluded = deps.excludedMerchants ?? new Set<string>();
+  const extractConcurrency = Math.max(1, Math.floor(deps.extractConcurrency ?? DEFAULT_EXTRACT_CONCURRENCY));
+  audit({
+    type: "sync_start",
+    detail: `Pipeline started (${source}): ${expectedEmails === undefined ? "streaming" : expectedEmails} emails`,
+  });
 
-  const reviewQueue: ReviewQueueItem[] = [];
-  const stats: PipelineStats = {
-    emails: emails.length,
-    prefilteredOut: 0,
-    classes: {},
-    extracted: 0,
-    skipped: 0,
-    extractionOrigins: { llm: 0, cache: 0, gold: 0 },
-    orders: 0,
-    excludedOrders: 0,
-    findings: 0,
-    needsReview: 0,
-  };
-  audit({ type: "sync_start", detail: `Pipeline started (${source}): ${emails.length} emails` });
+  const outcomes: EmailOutcome[] = [];
+  const extractions: Promise<void>[] = [];
+  const waiting: Array<() => void> = [];
+  let inFlight = 0;
+  let finished = false;
 
-  const matchInputs: MatchInput[] = [];
-  for (const raw of emails) {
-    if (deps.applyPrefilter && !isReceiptLike(raw).keep) {
-      stats.prefilteredOut += 1;
-      continue;
+  function acquireSlot(): Promise<void> {
+    if (inFlight < extractConcurrency) {
+      inFlight += 1;
+      return Promise.resolve();
     }
+    return new Promise<void>((resolve) => waiting.push(resolve));
+  }
+  function releaseSlot(): void {
+    const next = waiting.shift();
+    if (next) next(); // the slot passes straight to the next email, so inFlight never exceeds the cap
+    else inFlight -= 1;
+  }
 
-    // Classify the raw email: redaction tokenizes addresses, which hides look-alike sender domains in forwards.
-    const classification = classify(raw);
-    stats.classes[classification.class] = (stats.classes[classification.class] ?? 0) + 1;
-    const redacted = redact(raw);
-
-    if (SKIPPED_EXTRACTION_CLASSES.has(classification.class)) {
-      stats.skipped += 1;
-      if (classification.confidence < REVIEW_CONFIDENCE_THRESHOLD) {
-        reviewQueue.push({
-          emailId: raw.id,
-          stage: "classify",
-          reason: clip(`uncertain ${classification.class} (${classification.confidence}), not extracted: ${classification.reason ?? ""}`),
-        });
-      }
-      continue;
-    }
-
+  async function extractEmail(outcome: EmailOutcome, raw: RawEmail, redacted: RedactedEmail, classification: Classification) {
     let result: ExtractResult;
     try {
       result = await deps.extractor(redacted, classification, raw);
     } catch (error) {
-      reviewQueue.push({ emailId: raw.id, stage: "extract", reason: clip(`extraction failed: ${errorMessage(error)}`) });
-      continue;
+      outcome.review.push({ emailId: raw.id, stage: "extract", reason: clip(`extraction failed: ${errorMessage(error)}`) });
+      return;
     }
 
     if (!result.ok) {
       if ("skipped" in result) {
-        stats.skipped += 1;
+        outcome.skipped = true;
       } else {
-        reviewQueue.push({ emailId: raw.id, stage: "extract", reason: clip(result.reason) });
+        outcome.review.push({ emailId: raw.id, stage: "extract", reason: clip(result.reason) });
       }
-      continue;
+      return;
     }
 
     const { extraction } = result;
-    stats.extracted += 1;
-    if (extraction.model === GOLD_EXTRACTION_MODEL) stats.extractionOrigins.gold += 1;
-    else if (extraction.cached) stats.extractionOrigins.cache += 1;
-    else stats.extractionOrigins.llm += 1;
+    outcome.extracted = true;
+    if (extraction.model === GOLD_EXTRACTION_MODEL) outcome.origin = "gold";
+    else if (extraction.cached) outcome.origin = "cache";
+    else outcome.origin = "llm";
     if (extraction.confMin < REVIEW_CONFIDENCE_THRESHOLD) {
-      reviewQueue.push({
+      outcome.review.push({
         emailId: raw.id,
         stage: "extract",
         reason: `low extraction confidence ${extraction.confMin.toFixed(2)}`,
@@ -189,44 +207,112 @@ export async function runPipeline(emails: readonly RawEmail[], deps: PipelineDep
     // The matcher derives timestamps from the email date; an unparseable one would throw and abort the whole run
     // (real inboxes / uploads can carry odd Date headers). Route that email to review instead (hard rule 5).
     if (Number.isNaN(Date.parse(redacted.date))) {
-      reviewQueue.push({ emailId: raw.id, stage: "match", reason: "email has no readable date, so it can't be matched to an order" });
-      continue;
+      outcome.review.push({ emailId: raw.id, stage: "match", reason: "email has no readable date, so it can't be matched to an order" });
+      return;
     }
     // The matcher sees the redacted email, so nothing derived from it can carry unredacted PII.
-    matchInputs.push({ email: redacted, extraction });
+    outcome.matchInput = { email: redacted, extraction };
   }
 
-  const matched = matchOrdersWithReasons(matchInputs);
-  const allOrders = matched.orders;
-  const includedOrders = allOrders.filter((order) => !isExcludedMerchant(order, excluded));
-  const { findings, failures } = runRulesIsolated(includedOrders, defaultRules, {
-    now: deps.now,
-    priceFeed: deps.priceFeed,
-  });
-  for (const order of includedOrders.filter((candidate) => candidate.needsReview)) {
-    const reason = orderReviewReason(order, matched.reviewReasons.get(order.id));
-    reviewQueue.push({ emailId: order.messageIds[0], stage: "match", reason, orderId: order.id });
+  function add(raw: RawEmail): Promise<void> {
+    if (finished) throw new Error("Pipeline run already finished");
+    const outcome: EmailOutcome = { prefilteredOut: false, skipped: false, extracted: false, review: [] };
+    outcomes.push(outcome);
+    if (deps.applyPrefilter && !isReceiptLike(raw).keep) {
+      outcome.prefilteredOut = true;
+      return Promise.resolve();
+    }
+
+    // Classify the raw email: redaction tokenizes addresses, which hides look-alike sender domains in forwards.
+    const classification = classify(raw);
+    outcome.classification = classification.class;
+    const redacted = redact(raw);
+
+    if (SKIPPED_EXTRACTION_CLASSES.has(classification.class)) {
+      outcome.skipped = true;
+      if (classification.confidence < REVIEW_CONFIDENCE_THRESHOLD) {
+        outcome.review.push({
+          emailId: raw.id,
+          stage: "classify",
+          reason: clip(`uncertain ${classification.class} (${classification.confidence}), not extracted: ${classification.reason ?? ""}`),
+        });
+      }
+      return Promise.resolve();
+    }
+
+    const started = acquireSlot();
+    extractions.push(started.then(() => extractEmail(outcome, raw, redacted, classification)).finally(releaseSlot));
+    return started;
   }
-  // An order whose rules failed has no findings; it goes to review so a human can correct and re-run it.
-  const failedOrderIds = new Set(failures.map((failure) => failure.orderId));
-  const orders = includedOrders.map((order) => (failedOrderIds.has(order.id) ? { ...order, needsReview: true } : order));
-  for (const failure of failures) {
-    const order = includedOrders.find((candidate) => candidate.id === failure.orderId);
-    reviewQueue.push({
-      emailId: order?.messageIds[0] ?? failure.orderId,
-      stage: "rules",
-      reason: clip(`rules failed, no findings for this order: ${failure.reason}`),
-      orderId: failure.orderId,
+
+  async function finish(): Promise<PipelineResult> {
+    finished = true;
+    await Promise.all(extractions);
+    const reviewQueue: ReviewQueueItem[] = [];
+    const stats: PipelineStats = {
+      emails: outcomes.length,
+      prefilteredOut: 0,
+      classes: {},
+      extracted: 0,
+      skipped: 0,
+      extractionOrigins: { llm: 0, cache: 0, gold: 0 },
+      orders: 0,
+      excludedOrders: 0,
+      findings: 0,
+      needsReview: 0,
+    };
+    const matchInputs: MatchInput[] = [];
+    for (const outcome of outcomes) {
+      if (outcome.prefilteredOut) stats.prefilteredOut += 1;
+      if (outcome.classification) stats.classes[outcome.classification] = (stats.classes[outcome.classification] ?? 0) + 1;
+      if (outcome.skipped) stats.skipped += 1;
+      if (outcome.extracted) stats.extracted += 1;
+      if (outcome.origin) stats.extractionOrigins[outcome.origin] += 1;
+      reviewQueue.push(...outcome.review);
+      if (outcome.matchInput) matchInputs.push(outcome.matchInput);
+    }
+
+    const matched = matchOrdersWithReasons(matchInputs);
+    const allOrders = matched.orders;
+    const includedOrders = allOrders.filter((order) => !isExcludedMerchant(order, excluded));
+    const { findings, failures } = runRulesIsolated(includedOrders, defaultRules, {
+      now: deps.now,
+      priceFeed: deps.priceFeed,
     });
+    for (const order of includedOrders.filter((candidate) => candidate.needsReview)) {
+      const reason = orderReviewReason(order, matched.reviewReasons.get(order.id));
+      reviewQueue.push({ emailId: order.messageIds[0], stage: "match", reason, orderId: order.id });
+    }
+    // An order whose rules failed has no findings; it goes to review so a human can correct and re-run it.
+    const failedOrderIds = new Set(failures.map((failure) => failure.orderId));
+    const orders = includedOrders.map((order) => (failedOrderIds.has(order.id) ? { ...order, needsReview: true } : order));
+    for (const failure of failures) {
+      const order = includedOrders.find((candidate) => candidate.id === failure.orderId);
+      reviewQueue.push({
+        emailId: order?.messageIds[0] ?? failure.orderId,
+        stage: "rules",
+        reason: clip(`rules failed, no findings for this order: ${failure.reason}`),
+        orderId: failure.orderId,
+      });
+    }
+
+    stats.orders = orders.length;
+    stats.excludedOrders = allOrders.length - orders.length;
+    stats.findings = findings.length;
+    stats.needsReview = reviewQueue.length;
+    audit({
+      type: "sync_complete",
+      detail: `Pipeline finished (${source}): ${orders.length} orders, ${findings.length} findings, ${reviewQueue.length} need review`,
+    });
+    return { orders, findings, reviewQueue, stats };
   }
 
-  stats.orders = orders.length;
-  stats.excludedOrders = allOrders.length - orders.length;
-  stats.findings = findings.length;
-  stats.needsReview = reviewQueue.length;
-  audit({
-    type: "sync_complete",
-    detail: `Pipeline finished (${source}): ${orders.length} orders, ${findings.length} findings, ${reviewQueue.length} need review`,
-  });
-  return { orders, findings, reviewQueue, stats };
+  return { add, finish };
+}
+
+/** Runs the whole pipeline over an in-memory list; see createPipelineRun() for the streaming form. */
+export async function runPipeline(emails: readonly RawEmail[], deps: PipelineDeps): Promise<PipelineResult> {
+  const run = createPipelineRun(deps, emails.length);
+  for (const raw of emails) await run.add(raw);
+  return run.finish();
 }
