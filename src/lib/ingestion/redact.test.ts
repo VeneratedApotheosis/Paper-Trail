@@ -217,3 +217,119 @@ describe("names overlapping purchase facts", () => {
     expect(result.redactions.name).toBe(2);
   });
 });
+
+
+describe("false positives: purchase data survives redaction (#123)", () => {
+  const bareTo = { to: "customer@mail.example" };
+  it.each(([
+    "12800 JPY", "Total\n12800 JPY", "1299 PLN", "4500 SEK", "3000 円", "1500 Pts", "1500 Points", "2026 Spring Sale",
+    "1234 Cotton Socks", "12345 Items shipped",
+    "Color Red ID 12345", "Qty OR 10001", "SKU AB1 2CD", "Shipping WA 98101",
+    "5 Boulevard Coffee Beans $12", "3 Avenue Trading Co Order #5 $12.00", "2 Route Planner Pro $9.99", "5 Rue Skinny Jeans $40",
+    "Rue 21 Skinny Jeans", "Route 66 Tee", "Park Avenue Hotel", "4 Place Setting Dinnerware $50", "Shipped via Standard 5-7 days",
+    "SKU +12345678", "+1234567 pts", "〒150-0002", "Postal code: 150-0002",
+    "Order 1234 5678, call us if it is late", "Call by 2026-09-01", "Call 12.50 1,299.00",
+  ]).map(text => ({ text })))("keeps $text untouched", ({ text }) => {
+    const result = redact({ ...email(text), ...bareTo });
+    expect(result.text).toBe(text);
+    expect(result.redactions).toEqual({ pan: 0, phone: 0, address: 0, email: 0, name: 0 });
+  });
+
+  it.each(([
+    ["Hi Amazon Customer,\nYour Amazon.com order of Amazon Basics is ready. Amazon", "Amazon <orders@amazon.example>"],
+    ["Hello Nike Member,\nNike Air Max $120", "Nike <orders@nike.example>"],
+    ["Hello Nike Member,\nNike Air Max $120", "Northwind <orders@northwind.example>"],
+    ["Customer: Dr. Martens\nDr. Martens 1460 Boots $150", "Northwind <orders@northwind.example>"],
+    ["Ship to: Acme Corp\nAcme Corp total $5", "Northwind <orders@northwind.example>"],
+    ["Ship to: Home Office\nHome Office Chair $5", "Northwind <orders@northwind.example>"],
+    ["Deliver to: Amazon Locker\nAmazon Locker pickup", "Northwind <orders@northwind.example>"],
+    ["Name: Trail Runner\nTrail Runner $5", "Northwind <orders@northwind.example>"],
+    ["Sold to: Acme Inc\nAcme Inc paid $5; Billing: Example LLC", "Northwind <orders@northwind.example>"],
+  ] as Array<[string, string]>).map(([text, from]) => ({ text, from })))("does not mistake brands, organisations and products for customer names: $text", ({ text, from }) => {
+    const result = redact({ ...email(text), ...bareTo, from });
+    expect(result.text).toBe(text);
+    expect(result.redactions.name).toBe(0);
+  });
+
+  it("redacts only the salutation for a first name, so brands, products and dates survive", () => {
+    const hello = redact({ ...email("Hello Jordan,\nJordan 1 Retro $180\nOrder #5"), ...bareTo });
+    expect(hello.text).toBe("Hello [NAME_1],\nJordan 1 Retro $180\nOrder #5");
+    const will = redact({ ...email("Hi Will,\nI will ship it. Total $5"), ...bareTo });
+    expect(will.text).toBe("Hi [NAME_1],\nI will ship it. Total $5");
+    const may = redact({ ...email("Dear May,\nPlaced May 12, 2026 total $5"), ...bareTo });
+    expect(may.text).toBe("Dear [NAME_1],\nPlaced May 12, 2026 total $5");
+  });
+
+  it("does not expand a first name from a salutation when the recipient is known from the To header", () => {
+    const result = redact(email("Hello Jordan,\nJordan 1 Retro $180"));
+    expect(result.text).toBe("Hello Jordan,\nJordan 1 Retro $180");
+  });
+
+  it("keeps prices and brand names around a redacted name and postal line", () => {
+    const text = "Ship to:\nMaya Chen\n12 Maple Street\nLondon SW1A 2AA\nNike Air Max 12800 JPY\nTotal 12800 JPY";
+    const result = redact({ ...email(text), ...bareTo });
+    expect(result.text).toBe("Ship to:\n[NAME_1]\n[ADDRESS_1]\n[ADDRESS_2]\nNike Air Max 12800 JPY\nTotal 12800 JPY");
+  });
+});
+
+describe("misses: PII that used to leak (#123)", () => {
+  const bareTo = { to: "customer@mail.example" };
+  it.each([
+    "Call us 020 7946 0958", "Tel: 07911 123456", "Tél : 01 23 45 67 89", "Telefon: 030 1234567", "Mobile: 98765 43210",
+    "Phone: 03-1234-5678", "Phone: 090-1234-5678", "Phone: 0412 345 678", "Call 0044 20 7946 0958", "Phone no. (020) 7946 0958",
+    "Contact number 07911 123456 (mobile)",
+  ])("redacts the national-format phone in %j", text => {
+    const result = redact({ ...email(text), ...bareTo });
+    expect(result.text).toMatch(/\[PHONE_1\]/);
+    expect(result.text).not.toMatch(/\d{3}/);
+    expect(result.redactions.phone).toBe(1);
+  });
+
+  it.each([
+    ["Ship to 22 Acacia Gardens", "Ship to [ADDRESS_1]"],
+    ["Ship to 9 Elm Close", "Ship to [ADDRESS_1]"],
+    ["Ship to 4 Orchard Crescent", "Ship to [ADDRESS_1]"],
+    ["Ship to 7 Market Square", "Ship to [ADDRESS_1]"],
+    ["Berliner Str. 5", "[ADDRESS_1]"],
+    ["Calle Mayor 12", "[ADDRESS_1]"],
+    ["Via Roma 10", "[ADDRESS_1]"],
+    ["Keizersgracht 123", "[ADDRESS_1]"],
+    ["3 place de la République", "[ADDRESS_1]"],
+    ["12 rue de Rivoli, 75001 Paris", "[ADDRESS_1] [ADDRESS_2]"],
+    ["5 Rue Rivoli, 75001 Paris", "[ADDRESS_1] [ADDRESS_2]"],
+    ["PO Box 123", "[ADDRESS_1]"],
+    ["Ship to: 456 Queen St W, Toronto ON M5V 2B7", "Ship to: [ADDRESS_1] [ADDRESS_2]"],
+    ["Deliver to 22 Acacia Gardens, Leeds LS1 4AP", "Deliver to [ADDRESS_1] [ADDRESS_2]"],
+    ["Musterstraße 12, 80331 München", "[ADDRESS_1] [ADDRESS_2]"],
+    ["Ship to:\n10115 Berlin\nTotal 12800 JPY", "Ship to:\n[ADDRESS_1]\nTotal 12800 JPY"],
+    ["Ship to:\nMaya Chen\nSpringfield IL 62704", "Ship to:\n[NAME_1]\n[ADDRESS_1]"],
+  ])("redacts the address in %j", (text, expected) => {
+    const result = redact({ ...email(text), ...bareTo });
+    expect(result.text).toBe(expected);
+  });
+
+  it.each([
+    ["Thanks for your order, Priya Natarajan!", "Thanks for your order, [NAME_1]!"],
+    ["Account holder: Jane Doe", "Account holder: [NAME_1]"],
+    ["Order for Jane Doe", "Order for [NAME_1]"],
+    ["Order for: Jane Doe", "Order for: [NAME_1]"],
+    ["Placed by Jane Doe", "Placed by [NAME_1]"],
+    ["Cardholder: JANE DOE", "Cardholder: [NAME_1]"],
+    ["Name on card: Jane Doe", "Name on card: [NAME_1]"],
+    ["Name: Jane Doe\nPhone: 555-0123", "Name: [NAME_1]\nPhone: [PHONE_1]"],
+  ])("redacts the name in %j without a To display name", (text, expected) => {
+    expect(redact({ ...email(text), ...bareTo }).text).toBe(expected);
+  });
+
+  it("tokenizes the surname and honorific forms when the To name is known", () => {
+    const result = redact({ ...email("Dear Ms. Rivera,\nMs Rivera will pick it up\nRivera household"), to: "Jane Rivera <jane@mail.example>" });
+    expect(result.text).not.toMatch(/Rivera/);
+    const short = redact({ ...email("Dear Ms. Doe,\nDoe party"), to: "Jane Doe <jane@mail.example>" });
+    expect(short.text).toBe("Dear [NAME_1],\nDoe party");
+  });
+
+  it('handles a To display name written as "Doe, Jane"', () => {
+    const result = redact({ ...email("Hi Jane,\nJane Doe and Doe, Jane both ordered"), to: '"Doe, Jane" <jane@mail.example>' });
+    expect(result.text).not.toMatch(/Jane|Doe/);
+  });
+});

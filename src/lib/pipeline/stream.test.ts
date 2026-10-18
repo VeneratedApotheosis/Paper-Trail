@@ -14,10 +14,11 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 /** Seed gold extractor behind a latency that differs per email (later emails answer sooner) plus injected failures. */
 function instrumentedExtractor(audit: PipelineAuditEvent[]) {
   const inner = createSeedExtractor({ seedCache: null, audit: (event) => audit.push(event) });
-  const state = { inFlight: 0, maxInFlight: 0, calls: 0 };
+  const state = { inFlight: 0, maxInFlight: 0, calls: 0, emailIds: [] as string[] };
   const extractor: PipelineExtractor = async (redacted, classification, raw) => {
     const order = seedInbox.emails.findIndex((email) => email.id === raw.id);
     state.calls += 1;
+    state.emailIds.push(raw.id);
     state.inFlight += 1;
     state.maxInFlight = Math.max(state.maxInFlight, state.inFlight);
     try {
@@ -59,13 +60,18 @@ describe("bounded-concurrency extraction", () => {
     }
   });
 
-  it("audits every extraction exactly once whatever the order they finish in", async () => {
+  it("extracts every email exactly once whatever the order they finish in", async () => {
     const sequential = await run(1);
     const parallel = await run(4);
-    const calls = (audit: PipelineAuditEvent[]) => audit.filter((event) => event.type === "llm_call").map((event) => event.detail).sort();
-    expect(calls(parallel.audit)).toEqual(calls(sequential.audit));
-    expect(calls(parallel.audit).length).toBe(0);
-    expect(parallel.audit.filter((event) => event.type === "sync_start")).toHaveLength(1);
+    // Gold extractions are not LLM calls, so they leave no llm_call audit rows (#40); provenance is in the stats.
+    expect(parallel.audit.filter((event) => event.type === "llm_call")).toEqual([]);
+    expect(sequential.result.stats.extractionOrigins.gold).toBeGreaterThan(0);
+    expect(parallel.result.stats.extractionOrigins).toEqual(sequential.result.stats.extractionOrigins);
+    expect(parallel.result.stats).toEqual(sequential.result.stats);
+    expect(parallel.result.orders.map((order) => order.id)).toEqual(sequential.result.orders.map((order) => order.id));
+    expect(parallel.state.emailIds.length).toBe(sequential.state.emailIds.length);
+    expect(new Set(parallel.state.emailIds).size).toBe(parallel.state.emailIds.length);
+    expect([...parallel.state.emailIds].sort()).toEqual([...sequential.state.emailIds].sort());    expect(parallel.audit.filter((event) => event.type === "sync_start")).toHaveLength(1);
     expect(parallel.audit.filter((event) => event.type === "sync_complete")).toHaveLength(1);
     expect(parallel.audit[0].type).toBe("sync_start");
     expect(parallel.audit.at(-1)?.type).toBe("sync_complete");

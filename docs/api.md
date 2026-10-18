@@ -41,8 +41,10 @@ Notes:
   one `delete` audit record. OAuth revocation is a hook (`setRevokeOAuthHook` in `src/lib/store`) that #3 registers;
   until then `revokedToken` is `false`.
 - Audit `llm_call` entries carry model, `redactedTokenCount` (= number of PII tokens redaction replaced in that email)
-  and token counts in `detail`; never email text. Demo-mode gold extractions are logged with `model: "gold"` and
-  "Precomputed extraction from seed gold label, no LLM call".
+  and token counts in `detail`; never email text. Only a provider request that was actually attempted writes one (a
+  failed request writes a `failed: <class>` row). Cache hits, seed gold extractions and a missing API key
+  (`LlmUnavailableError`: nothing was sent) write no `llm_call` row, so the demo audit log is just `sync_start` and
+  `sync_complete`. Where each extraction came from is in `stats.extractionOrigins` (`{ llm, cache, gold }`).
 - Uploads use real extraction (`ANTHROPIC_API_KEY`) with a session cache; without a key, cache misses land in the
   review queue instead of failing. Uploads replace the current ledger.
 
@@ -323,11 +325,11 @@ demo), `Cache-Control: no-store`, and built from counts, safe metadata and **red
 | `POST /api/quality/skipped/:emailId/receipt` `{ class? }` | "This is a receipt": extracts the email (receipt path forced; cache first, else Claude), merges it through the normal matcher + rules, saves a label, writes an audit row, removes it from the list. Returns `{ emailId, class, extracted, needsReview, orderId, excludedMerchant, labeled, summary }`. No Claude key / provider down: 503 with `details.labeled: true` (label saved, email stays listed) |
 | `POST /api/quality/skipped/:emailId/not-receipt` | For a false positive (an extracted email): removes its order when it was the order's only email, saves a label, lists the email as skipped. An order that also holds other emails is kept (`keptSharedOrders`): fix it in Review |
 | `GET /api/quality/eval` | Scores the saved labels: receipt-gate precision/recall (prefilter + classifier on the stored redacted text) and per-field extraction accuracy. **Cache only, never calls a model**: labels without a cached extraction are listed as `unscored` |
-| `POST /api/quality/experiment` `{ model?, promptVariant? }` | Runs the labeled set (at most 50 labels with corrected fields, newest first) through `model` / `promptVariant` (`default`, `conservative`, `itemized`) and the current setting, returns both side by side (accuracy, per-field, calls, tokens, estimated USD cost). **Calls Claude** (once per label per side; the current side is answered from the live cache where possible). Does not change `LLM_MODEL`, the live cache or the ledger. Audited. 400 without labels, 503 without a key, 409 while one is running |
+| `POST /api/quality/experiment` `{ model?, promptVariant? }` | Runs the labeled set (at most 50 labels with corrected fields, newest first) through `model` / `promptVariant` (`default`, `conservative`, `itemized`) and the current setting, returns both side by side (accuracy, per-field, calls, tokens, estimated USD cost). **Calls Claude** (once per label per side, counted with the same rule as `llmCalls`; the current side is answered from the live cache where possible). Does not change `LLM_MODEL`, the live cache or the ledger. Audited. 400 without labels, 503 without a key, 409 while one is running |
 
 `SyncQualityReport`: `{ id, at, source: gmail|upload|demo, accountId?, fetched, prefilteredOut, classified: {class: n},
 skippedNonReceipt, extracted, lowConfidence, extractionFailures, matchedOrders, findings, llmCalls, inputTokens,
-outputTokens, bodySource: { plain, html } }`. `llmCalls` counts requests that left the machine (cache hits are free);
+outputTokens, bodySource: { plain, html } }`. `llmCalls` counts requests that left the machine (cache hits, gold labels and a missing API key are not calls; a failed request is);
 `bodySource` counts decoded Gmail messages and `.eml` uploads (zero for the demo and `.mbox` uploads).
 `SkippedEmail`: `{ emailId, accountId?, from: { name, domain }, subject (redacted), date, reason: prefilter|marketing|not_receipt|phishing, classConfidence }`.
 

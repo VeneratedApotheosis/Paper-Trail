@@ -86,6 +86,7 @@ Edge cases show an **X-PT-Expect vs actual** table: every row should say *pass* 
 | E8 | Run `26-empty-body.eml` and `27-extremely-long-body.eml` | empty body handled; long body processed, trailing phone redacted | crash, timeout or missed phone |
 | E9 | Paste text with no `Date:` header | 400 "Could not parse the email: missing or unparseable Date header" | crash |
 | E10 | Lifecycle files `10`–`19` | class matches the file name (see table below) | wrong class |
+| E11 | Paste a receipt with `Total 12800 JPY`, `Nike Air Max`, `Order #5 $12.00`, `Tel: 07911 123456` and a greeting `Hi Amazon Customer,` from an Amazon sender | redacted text keeps the JPY amount, the brand names and the order line; only the phone becomes `[PHONE_1]`; the greeting and every "Amazon" stay | a price, brand or date becomes `[ADDRESS_n]`/`[NAME_n]`; the phone survives |
 
 ## 4. Claims tab
 
@@ -112,7 +113,7 @@ opens it here.
 
 | # | Steps | Expected | Bug if |
 |---|---|---|---|
-| T1 | **Refresh audit log** after loading the demo | `sync_start`, `llm_call` rows (model `gold`, "Precomputed extraction…, no LLM call"), `sync_complete`; PII-token counts, no email text | email text in details; LLM call without audit row |
+| T1 | **Refresh audit log** after loading the demo | only `sync_start` and `sync_complete` (gold and cached extractions are not LLM calls, so no `llm_call` rows); `stats.extractionOrigins` shows the `gold`/`cache` count in the response | email text in details; an `llm_call` row for a gold/cached extraction |
 | T2 | **Delete everything…** → confirm | result shows deleted/ok, time, OAuth revoked flag, purged counts; ✓ "everything is gone"; ledger tab shows mode `empty`, no orders/findings/review items/exclusions; audit log has only the `delete` row | anything remains (✗ check) |
 | T3 | **Run eval** | synthetic report: gate table (all PASS), classifier accuracy/macro F1 per split (all/dev/holdout), phishing-as-order count, finding precision/recall for oracle-extraction and realistic-routing, misses listed | any gate FAIL; phishing-as-order > 0; oracle mode not 100% |
 
@@ -152,7 +153,7 @@ Known classifier bug (marked `it.fails` in `tools/playground/edge-cases.test.ts`
    evidence quotes, confMin, model; one `llm_call` audit row (also visible on the Trust tab) with token counts and
    PII-token count; stage 6 shows the matched order and any findings at the chosen "now" (e.g. set now to
    2026-10-27 for a return-deadline finding).
-4. Run the same email again: extraction `cached: yes`, audit row says "cache hit, no LLM call".
+4. Run the same email again: extraction `cached: yes` and no new `llm_call` audit row (cache hits are not calls; the origin shows as `cache` in `stats.extractionOrigins`). Without a key a miss writes no audit row either.
 5. Run `02-order-full-pan.eml` with Claude: evidence quotes contain `[PAN_1]`, never the card number.
 6. Run `06-phishing-lookalike.eml` with Claude ticked: still skipped, no audit row (no tokens spent).
 7. Claims: tick **Rephrase with Claude**, click **Regenerate with these options** on a ledger finding. Expected: either "Rephrased by Claude (fact-checked)" with all

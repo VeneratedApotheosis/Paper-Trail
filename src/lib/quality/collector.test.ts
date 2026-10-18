@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { runUploadPipeline } from "@/lib/demo";
 import { createMemoryCache } from "@/lib/ingestion";
+import { LlmHttpError, type LlmClient } from "@/lib/llm";
+import type { PipelineAuditEvent } from "@/lib/pipeline/run";
 import { createSyncCollector } from "./collector";
 import { NEWSLETTER, NOW, PROMO, fakeLlm, order, unavailableLlm } from "./test-helpers";
 
@@ -37,7 +39,21 @@ describe("sync quality collector", () => {
 
   it("counts failed extractions and low confidence separately", async () => {
     const { collected } = await collect([order("o1", "NW-1")], unavailableLlm as never);
-    expect(collected.report).toMatchObject({ extracted: 0, extractionFailures: 1, llmCalls: 1, inputTokens: 0 });
+    expect(collected.report).toMatchObject({ extracted: 0, extractionFailures: 1, llmCalls: 0, inputTokens: 0 });
+  });
+
+  it("counts a failed provider request as an LLM call, but a missing API key as none, in the report and the audit log", async () => {
+    const run = async (llm: LlmClient) => {
+      const collector = createSyncCollector({ source: "upload" });
+      const audit: PipelineAuditEvent[] = [];
+      const result = await runUploadPipeline([order("o1", "NW-1")], {
+        cache: createMemoryCache(), now: NOW, llm, audit: (event) => audit.push(event), observer: collector.observe, onUsage: collector.recordUsage,
+      });
+      return { report: collector.finish(result).report, llmCallRows: audit.filter((event) => event.type === "llm_call").length };
+    };
+    const failing: LlmClient = { model: "m", callTool: async () => { throw new LlmHttpError(503, "provider"); } };
+    expect(await run(failing)).toMatchObject({ report: { llmCalls: 1, extractionFailures: 1 }, llmCallRows: 1 });
+    expect(await run(unavailableLlm)).toMatchObject({ report: { llmCalls: 0, extractionFailures: 1 }, llmCallRows: 0 });
   });
 
   it("lists skipped emails with safe metadata and a reason", async () => {

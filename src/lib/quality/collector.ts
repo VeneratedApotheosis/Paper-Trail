@@ -45,7 +45,6 @@ export function createSyncCollector(options: SyncCollectorOptions): SyncCollecto
   return {
     observe: (observation) => void observations.push(observation),
     recordUsage(entry) {
-      if (entry.cached) return;
       usage.llmCalls += 1;
       usage.inputTokens += entry.inputTokens;
       usage.outputTokens += entry.outputTokens;

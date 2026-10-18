@@ -25,6 +25,7 @@ describe("dispute drafts", () => {
     if (!result.ok) return;
     expect(result.draft.body).toContain(order.lineItems[0].name);
     expect(result.draft.body).toContain("Synthetic blue mug");
+    expect(result.draft.body).toContain("instead: Synthetic blue mug\n\nPlease let me know");
     expect(result.draft.subject).toContain("Wrong item received");
     expect(draftDispute(order, { reason: "wrong_item", confirmed: true, lineItemId: "other-order-item", receivedItem: "Mug" })).toMatchObject({ ok: false, reason: "unknown_item" });
   });

@@ -34,7 +34,7 @@ export function draftDispute(order: NormalizedOrder, input: unknown): DisputeRes
   const signedName = name && !/\[(?:NAME|EMAIL|ADDRESS)_\d+\]/i.test(name) ? name : "Customer";
   const scenario = request.reason === "item_not_received"
     ? "I have not received this purchase. Please investigate its delivery status and let me know the next steps."
-    : `I ordered ${item!.name}, but received the following instead: ${request.receivedItem}\nPlease let me know how to correct this and whether you need photos or other information.`;
+    : `I ordered ${item!.name}, but received the following instead: ${request.receivedItem}\n\nPlease let me know how to correct this and whether you need photos or other information.`;
   const warnings = ["This scenario is confirmed by you, not established by the email evidence. Review the facts and recipient before approving and sending yourself."];
   if (request.reason === "item_not_received" && order.events.some(event => event.type === "delivered")) {
     warnings.push("Your inbox includes a delivery notice. Check the delivery location and merchant record before sending.");

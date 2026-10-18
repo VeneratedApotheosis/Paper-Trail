@@ -69,7 +69,7 @@ PaperTrail uses Gmail API message listing and full-message retrieval with a rece
 
 The local deterministic classifier handles receipt types and phishing/marketing exclusions. Before Claude extraction, `redact()` replaces recognized card numbers, phone numbers, street/postal addresses, email addresses and recognized customer names with tokens. The prompt includes the sender domain, date, and redacted subject/body, not full From/To headers. Claude output is Zod-validated, retried once after invalid output, and otherwise routed to Review. The matcher groups extracted events into orders; pure rules compute every amount and deadline.
 
-Redaction covers the international/contextual phone, postal-line and customer-name cases added in [#94](https://github.com/VeneratedApotheosis/Paper-Trail/issues/94). It remains pattern-based, not a guarantee that every piece of personal information is removed. Raw full email bodies are processed in memory rather than persisted; extracted fields and bounded evidence quotes are retained.
+Redaction covers the international/contextual phone, postal-line and customer-name cases added in [#94](https://github.com/VeneratedApotheosis/Paper-Trail/issues/94) and is context-gated so prices, dates, brands and order references survive ([#123](https://github.com/VeneratedApotheosis/Paper-Trail/issues/123); coverage and limits in `docs/architecture.md`). It remains pattern-based and Latin-script, not a guarantee that every piece of personal information is removed. Raw full email bodies are processed in memory rather than persisted; extracted fields and bounded evidence quotes are retained.
 
 ## Data, trust and limitations
 

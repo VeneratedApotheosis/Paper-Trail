@@ -9,7 +9,7 @@ import {
   type Extraction,
   type RedactedEmail,
 } from "@/lib/contracts";
-import { AnthropicLlmClient, type LlmClient } from "@/lib/llm";
+import { AnthropicLlmClient, LlmUnavailableError, type LlmClient } from "@/lib/llm";
 import { llmErrorClass } from "@/lib/llm/audit";
 import type { ExtractionCache } from "./cache";
 import {
@@ -33,7 +33,10 @@ const MAX_ATTEMPTS = 2;
 const EVIDENCE_MAX_CHARS = EvidenceSchema.maxLength ?? 200;
 const MAX_VALIDATION_ERROR_CHARS = 1000;
 
-/** One audit row per provider call; cache reads are not calls. Carries token counts only, never email text. */
+/**
+ * One audit row per provider call that was actually attempted. Cache reads and gold labels are not calls, and neither is
+ * LlmUnavailableError (no API key: nothing was sent). Carries token counts only, never email text.
+ */
 export type ExtractionAuditEntry = {
   at: string;
   actor: "llm";
@@ -42,7 +45,6 @@ export type ExtractionAuditEntry = {
   inputTokens: number;
   outputTokens: number;
   emailId: string;
-  cached: boolean;
   outcome?: "success" | "error";
   errorClass?: string;
 };
@@ -144,8 +146,8 @@ export async function extract(
 
   const now = deps.now ?? (() => new Date());
   const audit = deps.audit ?? (() => undefined);
-  const logCall = (model: string, inputTokens: number, outputTokens: number, cached: boolean) =>
-    audit({ at: now().toISOString(), actor: "llm", action: "llm_call", model, inputTokens, outputTokens, emailId: email.id, cached, outcome: "success" });
+  const logCall = (model: string, inputTokens: number, outputTokens: number) =>
+    audit({ at: now().toISOString(), actor: "llm", action: "llm_call", model, inputTokens, outputTokens, emailId: email.id, outcome: "success" });
 
   const hit = deps.cache?.get(email.textHash);
   if (hit) {
@@ -164,12 +166,14 @@ export async function extract(
       tool: EXTRACTION_TOOL,
       textHash: email.textHash,
     }).catch(error => {
-      audit({ at: now().toISOString(), actor: "llm", action: "llm_call", model: llm.model,
-        inputTokens: 0, outputTokens: 0, emailId: email.id, cached: false,
-        outcome: "error", errorClass: llmErrorClass(error) });
+      if (!(error instanceof LlmUnavailableError)) {
+        audit({ at: now().toISOString(), actor: "llm", action: "llm_call", model: llm.model,
+          inputTokens: 0, outputTokens: 0, emailId: email.id,
+          outcome: "error", errorClass: llmErrorClass(error) });
+      }
       throw error;
     });
-    logCall(response.model, response.usage.inputTokens, response.usage.outputTokens, false);
+    logCall(response.model, response.usage.inputTokens, response.usage.outputTokens);
     raw = response.toolInput;
 
     const validation = validateToolInput(response.toolInput, email, classification, response.model);

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createMemoryCache } from "@/lib/ingestion";
-import type { LlmClient } from "@/lib/llm";
+import { LlmHttpError, type LlmClient } from "@/lib/llm";
 import type { PipelineAuditEvent } from "@/lib/pipeline/run";
 import { MAX_EXPERIMENT_LABELS, PROMPT_VARIANTS, experimentLabels, runExperiment } from "./experiment";
 import { fakeLlm, unavailableLlm } from "./test-helpers";
@@ -86,5 +86,16 @@ describe("runExperiment", () => {
   it("refuses when there are no labels with corrected fields (400) or no model access (503)", async () => {
     await expect(runExperiment([labeled("1", 1, { fields: null })], {})).rejects.toMatchObject({ status: 400 });
     await expect(runExperiment([labeled("1")], {}, { currentModel: "m", llmFor: () => unavailableLlm as LlmClient })).rejects.toMatchObject({ status: 503 });
+  });
+
+  it("audits and counts a failed provider request like a call, but never a missing API key (same rule as sync reports)", async () => {
+    const audit: PipelineAuditEvent[] = [];
+    const callRows = () => audit.filter((event) => event.type === "llm_call").length;
+    await expect(runExperiment([labeled("1")], {}, { currentModel: "m", llmFor: () => unavailableLlm as LlmClient, audit: (event) => audit.push(event) })).rejects.toMatchObject({ status: 503 });
+    expect(callRows()).toBe(0);
+    const failing: LlmClient = { model: "m", callTool: async () => { throw new LlmHttpError(503, "provider"); } };
+    const result = await runExperiment([labeled("1")], {}, { currentModel: "m", llmFor: () => failing, audit: (event) => audit.push(event) });
+    expect(result.current).toMatchObject({ llmCalls: 1, unscored: 1 });
+    expect(callRows()).toBe(1);
   });
 });

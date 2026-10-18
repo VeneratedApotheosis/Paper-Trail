@@ -221,7 +221,6 @@ describe("extract: cache", () => {
     expect(second.ok).toBe(true);
     if (!second.ok || !first.ok) return;
     expect(second.extraction).toEqual({ ...first.extraction, emailId: "m-nw-1001-dup", cached: true });
-    expect(entries.map((entry) => entry.cached)).toEqual([false]);
     expect(entries).toHaveLength(1);
   });
 
@@ -237,7 +236,6 @@ describe("extract: audit", () => {
     [new LlmHttpError(429, "private-provider"), "http_error"],
     [new LlmHttpError(503, "private-provider"), "http_error"],
     [new LlmTimeoutError(100), "timeout"],
-    [new LlmUnavailableError("private-provider"), "unavailable"],
     [new LlmError("private-provider"), "network_error"],
   ])("audits a failed attempt without provider error text (%#)", async (error, errorClass) => {
     const { entries, audit } = auditLog();
@@ -247,14 +245,21 @@ describe("extract: audit", () => {
     expect(entries[0]).toMatchObject({ model: "synthetic-model", outcome: "error", errorClass });
     expect(JSON.stringify(entries)).not.toContain("private-provider");
   });
+  it("does not audit a missing API key: no request was sent, so it is not an LLM call", async () => {
+    const { entries, audit } = auditLog();
+    const error = new LlmUnavailableError("ANTHROPIC_API_KEY is not set");
+    const llm: LlmClient = { model: "synthetic-model", callTool: async () => { throw error; } };
+    await expect(extract(EMAIL, ORDER, { llm, audit })).rejects.toBe(error);
+    expect(entries).toEqual([]);
+  });
   it("logs every LLM call with model and token counts but no email text", async () => {
     const invalid = { ...VALID_TOOL_INPUT, fields: { ...VALID_TOOL_INPUT.fields, currency: "dollars" } };
     const { entries, audit } = auditLog();
     await extract(EMAIL, ORDER, { llm: scriptedLlm(invalid, VALID_TOOL_INPUT), audit, now: () => FIXED_NOW });
 
     expect(entries).toEqual([
-      { at: FIXED_NOW.toISOString(), actor: "llm", action: "llm_call", model: "fake-model", inputTokens: 500, outputTokens: 120, emailId: RAW.id, cached: false, outcome: "success" },
-      { at: FIXED_NOW.toISOString(), actor: "llm", action: "llm_call", model: "fake-model", inputTokens: 500, outputTokens: 120, emailId: RAW.id, cached: false, outcome: "success" },
+      { at: FIXED_NOW.toISOString(), actor: "llm", action: "llm_call", model: "fake-model", inputTokens: 500, outputTokens: 120, emailId: RAW.id, outcome: "success" },
+      { at: FIXED_NOW.toISOString(), actor: "llm", action: "llm_call", model: "fake-model", inputTokens: 500, outputTokens: 120, emailId: RAW.id, outcome: "success" },
     ]);
     const serialized = JSON.stringify(entries);
     for (const text of [EMAIL.subject, "Trail Runner", "Northwind", "Sam", "[PAN_1]"]) {

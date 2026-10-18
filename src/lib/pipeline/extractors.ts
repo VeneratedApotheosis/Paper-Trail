@@ -10,8 +10,8 @@ export function redactedTokenCount(email: RedactedEmail): number {
 
 /** Converts extract()'s audit row into a store audit event: ids, model and token counts only. */
 export function llmCallAuditEvent(entry: ExtractionAuditEntry, email: RedactedEmail): PipelineAuditEvent {
-  const usage = entry.outcome === "error" ? `failed: ${entry.errorClass}` : entry.cached
-    ? "cache hit, no LLM call"
+  const usage = entry.outcome === "error"
+    ? `failed: ${entry.errorClass}`
     : `${entry.inputTokens} input / ${entry.outputTokens} output tokens`;
   return {
     at: entry.at,
@@ -27,7 +27,7 @@ export interface LlmExtractorOptions {
   /** Defaults to extract()'s AnthropicLlmClient, which throws LlmUnavailableError without ANTHROPIC_API_KEY. */
   llm?: LlmClient;
   audit?: (event: PipelineAuditEvent) => void;
-  /** Sees every extract() audit row (token counts, cache hits, failures) for quality reports (#117). */
+  /** Sees every extract() audit row (token counts, provider failures) for quality reports (#117). */
   onUsage?: (entry: ExtractionAuditEntry) => void;
   now?: () => Date;
 }
