@@ -1,4 +1,4 @@
-import type { OrderDetailViewProps } from "@/components/views/OrderDetailView";
+﻿import type { OrderDetailViewProps } from "@/components/views/OrderDetailView";
 
 // Sample props for previewing OrderDetailView in isolation. Standalone synthetic
 // data (not from @/lib/mock) so the view stays decoupled from the data layer.
@@ -99,4 +99,5 @@ export const orderDetailViewFixture: OrderDetailViewProps = {
   ],
   simulatedLabel: "Simulated price feed",
   onBack: noop,
+  onOpenClaim: noop,
 };
