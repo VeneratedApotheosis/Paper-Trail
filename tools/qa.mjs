@@ -60,12 +60,15 @@ async function paperTrailApiUp() {
   }
 }
 
-function start(label, command, args, env = {}) {
+function start(label, command, args, env = {}, { shell = isWindows } = {}) {
   const child = spawn(command, args, {
     cwd: ROOT,
     env: { ...process.env, ...env },
     stdio: ["ignore", "pipe", "pipe"],
-    shell: isWindows, // npx is a .cmd shim on Windows
+    // npx is a .cmd shim on Windows so it needs a shell; a real binary path
+    // (process.execPath) must NOT go through cmd.exe, which splits unquoted
+    // paths containing spaces like "C:\Program Files\nodejs\node.exe".
+    shell,
   });
   const prefix = (chunk) =>
     chunk
@@ -138,10 +141,16 @@ async function main() {
   // 2. Playground on a free port.
   const playgroundPort = await findFreePort(Number(process.env.PT_PLAYGROUND_PORT || 4000));
   const playgroundUrl = `http://localhost:${playgroundPort}`;
-  start("playground", process.execPath, [path.join("tools", "playground", "server.mjs")], {
-    PT_PLAYGROUND_PORT: String(playgroundPort),
-    PT_API_BASE: API_BASE,
-  });
+  start(
+    "playground",
+    process.execPath,
+    [path.join("tools", "playground", "server.mjs")],
+    {
+      PT_PLAYGROUND_PORT: String(playgroundPort),
+      PT_API_BASE: API_BASE,
+    },
+    { shell: false },
+  );
   for (let i = 0; i < 40; i += 1) {
     try {
       if ((await fetch(playgroundUrl, { signal: AbortSignal.timeout(2000) })).ok) break;
