@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { GoldLabelsFileSchema, SeedInboxSchema, type GoldLabel } from "@/lib/contracts";
 import { createFileCache, extract, type ExtractionCache } from "@/lib/ingestion";
 import { FixtureLlmClient } from "@/lib/llm";
-import { redactedTokenCount, llmCallAuditEvent } from "@/lib/pipeline/extractors";
+import { llmCallAuditEvent } from "@/lib/pipeline/extractors";
 import { extractionFromGoldLabel } from "@/lib/pipeline/gold";
 import { runPipeline, type PipelineAuditEvent, type PipelineExtractor, type PipelineResult } from "@/lib/pipeline/run";
 import { PriceFeedSchema, type PriceFeed } from "@/lib/prices/feed";
@@ -16,8 +16,8 @@ import priceFeedJson from "../../../seed/price-feed.json";
  *
  * Extraction source per email:
  * 1. `seed/llm-cache.json` (`{ [textHash]: Extraction }`, recorded real LLM output) via extract()'s cache path.
- * 2. Otherwise the seed gold label via extractionFromGoldLabel(): model "gold", audited as
- *    "precomputed, no LLM call", so gold labels are never presented as LLM output.
+ * 2. Otherwise the seed gold label via extractionFromGoldLabel(): model "gold", counted as
+ *    precomputed in pipeline statistics, never presented as an LLM call.
  */
 
 export const SEED_LLM_CACHE_PATH = join(process.cwd(), "seed", "llm-cache.json");
@@ -62,13 +62,7 @@ export function createSeedExtractor(options: SeedExtractorOptions): PipelineExtr
     }
     // Built from the redacted email so evidence quotes never carry unredacted PII.
     const extraction = extractionFromGoldLabel(redacted, label);
-    options.audit?.({
-      at: now().toISOString(),
-      type: "llm_call",
-      model: extraction.model,
-      redactedTokenCount: redactedTokenCount(redacted),
-      detail: `Precomputed extraction from seed gold label, no LLM call — email ${raw.id}`,
-    });
+    // Gold-label work is counted in pipeline statistics, never as an LLM call.
     return { ok: true, extraction };
   };
 }

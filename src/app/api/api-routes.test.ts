@@ -161,7 +161,7 @@ describe("merchant exclude route", () => {
 describe("delete-all + audit routes", () => {
   it("purges everything and leaves a single delete audit record", async () => {
     await loadDemo();
-    expect((await json<AuditResponse>(await audit.GET(new Request("http://localhost/api/audit", { method: "GET" })))).entries.length).toBeGreaterThan(2);
+    expect((await json<AuditResponse>(await audit.GET(new Request("http://localhost/api/audit", { method: "GET" })))).entries.length).toBe(2);
 
     const response = await deleteAllRoute.POST(new Request("http://localhost/api/delete-all", { method: "POST" }));
     const body = await json<DeleteAllResponse>(response);

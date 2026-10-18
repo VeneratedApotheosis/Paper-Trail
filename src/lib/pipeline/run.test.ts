@@ -84,11 +84,7 @@ describe("runPipeline on the synthetic seed (gold extractions)", () => {
     expect(stats.extractionOrigins).toEqual({ llm: 0, cache: 0, gold: stats.extracted });
     expect(stats.findings).toBe(expected.findings.length);
     const extractionAudits = audit.filter((event) => event.type === "llm_call");
-    expect(extractionAudits).toHaveLength(stats.extracted);
-    for (const event of extractionAudits) {
-      expect(event.model).toBe("gold");
-      expect(event.detail).toMatch(/Precomputed .* no LLM call/);
-    }
+    expect(extractionAudits).toHaveLength(0);
     expect(audit[0].type).toBe("sync_start");
     expect(audit.at(-1)?.type).toBe("sync_complete");
   });

@@ -212,8 +212,8 @@ describe("extract: cache", () => {
     expect(second.ok).toBe(true);
     if (!second.ok || !first.ok) return;
     expect(second.extraction).toEqual({ ...first.extraction, emailId: "m-nw-1001-dup", cached: true });
-    expect(entries.map((entry) => entry.cached)).toEqual([false, true]);
-    expect(entries[1]).toMatchObject({ inputTokens: 0, outputTokens: 0, emailId: "m-nw-1001-dup", model: "fake-model" });
+    expect(entries.map((entry) => entry.cached)).toEqual([false]);
+    expect(entries).toHaveLength(1);
   });
 
   it("does not cache needs-review results", async () => {

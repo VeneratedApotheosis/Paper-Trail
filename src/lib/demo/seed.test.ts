@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { GoldLabelsFileSchema } from "@/lib/contracts";
+import { computeOwed } from "@/lib/rules/owed";
 import { redact } from "@/lib/ingestion";
 import { extractionFromGoldLabel } from "@/lib/pipeline/gold";
 import type { PipelineAuditEvent } from "@/lib/pipeline/run";
@@ -27,10 +28,11 @@ describe("loadSeedDemo", () => {
     expect(result.asOf).toBe(seedInbox.asOf);
     expect(result.simulatedPriceFeed).toBe(true);
     expect(result.findings).toHaveLength(14);
+    expect(computeOwed(result.findings, result.orders).owedTotal).toBe(1774.23);
     expect(result.stats.extractionOrigins.cache).toBe(0);
     expect(result.stats.extractionOrigins.gold).toBe(result.stats.extracted);
     expect(result.reviewQueue).toEqual([]);
-    expect(audit.filter((event) => event.type === "llm_call").every((event) => event.model === "gold")).toBe(true);
+    expect(audit.filter((event) => event.type === "llm_call")).toEqual([]);
   });
 
   it("serves recorded LLM extractions from seed/llm-cache.json by textHash when present", async () => {
@@ -47,8 +49,8 @@ describe("loadSeedDemo", () => {
     expect(result.stats.extractionOrigins.cache).toBe(1);
     expect(result.stats.extractionOrigins.gold).toBe(result.stats.extracted - 1);
     const cacheAudit = audit.filter((event) => event.model === "recorded-llm");
-    expect(cacheAudit).toHaveLength(1);
-    expect(cacheAudit[0].detail).toContain("cache hit, no LLM call");
+    expect(cacheAudit).toHaveLength(0);
+    expect(audit.filter(event => event.type === "llm_call")).toEqual([]);
     expect(result.findings).toHaveLength(14);
   });
 });

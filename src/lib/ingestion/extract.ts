@@ -33,7 +33,7 @@ const MAX_ATTEMPTS = 2;
 const EVIDENCE_MAX_CHARS = EvidenceSchema.maxLength ?? 200;
 const MAX_VALIDATION_ERROR_CHARS = 1000;
 
-/** One audit row per LLM call or cache hit. Carries token counts only, never email text. */
+/** One audit row per provider call; cache reads are not calls. Carries token counts only, never email text. */
 export type ExtractionAuditEntry = {
   at: string;
   actor: "llm";
@@ -146,7 +146,7 @@ export async function extract(
 
   const hit = deps.cache?.get(email.textHash);
   if (hit) {
-    logCall(hit.model, 0, 0, true);
+    // A cache read is not a provider call; provenance is counted by the pipeline.
     return { ok: true, extraction: { ...hit, emailId: email.id, class: classification.class, cached: true } };
   }
 
