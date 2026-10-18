@@ -4,15 +4,20 @@ import { buildPipelineRunResponse } from "@/lib/api/ledger";
 import { jsonError } from "@/lib/api/http";
 import type { UploadResponse } from "@/lib/api/types";
 import { MAX_UPLOAD_BYTES, parseEml, parseMboxDetailed, runUploadPipeline } from "@/lib/demo";
-import { appendAudit, getExcludedMerchants, getExtractionCache, setPipelineResult } from "@/lib/store";
+import { beginStoreWork, getExcludedMerchants, getExtractionCache, setPipelineResult } from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ALLOWED_EXTENSION = /\.(eml|mbox)$/i;
+const DELETED_DURING_UPLOAD = "Your data was deleted while this upload was processing; nothing was saved. Upload again to continue.";
 
 /** Multipart form with one or more .eml / .mbox files (any field name), max 5 MB in total. */
 async function handlePOST(request: Request): Promise<Response> {
+  // Captured before any await: a delete-all during the upload must not be undone by this upload's commit.
+  const work = beginStoreWork();
+  const cache = getExtractionCache();
+  const excludedMerchants = getExcludedMerchants();
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
   if (declaredLength > MAX_UPLOAD_BYTES * 1.1) return jsonError(413, "Upload exceeds the 5 MB limit");
 
@@ -50,14 +55,11 @@ async function handlePOST(request: Request): Promise<Response> {
     }
   }
   if (emails.length === 0) return jsonError(400, "No parseable emails in the upload", parseErrors);
+  if (!work.isCurrent()) return jsonError(409, DELETED_DURING_UPLOAD);
 
   const now = new Date();
-  const result = await runUploadPipeline(emails, {
-    cache: getExtractionCache(),
-    now,
-    audit: appendAudit,
-    excludedMerchants: getExcludedMerchants(),
-  });
+  const result = await runUploadPipeline(emails, { cache, now, audit: work.appendAudit, excludedMerchants });
+  if (!work.isCurrent()) return jsonError(409, DELETED_DURING_UPLOAD);
   setPipelineResult("upload", now.toISOString(), result);
   const body: UploadResponse = { ...buildPipelineRunResponse(), files: fileSummaries, parseErrors };
   return Response.json(body);

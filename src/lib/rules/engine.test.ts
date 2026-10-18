@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FindingSchema, type Finding, type NormalizedOrder } from "@/lib/contracts";
-import { findingId, ruleVersionOf, runRules, severityFor, type Rule } from "./engine";
+import { findingId, ruleVersionOf, runRules, runRulesIsolated, severityFor, type Rule } from "./engine";
 import { defaultRules } from "./index";
 import { makeEvent, makeOrder } from "./test-helpers";
 
@@ -125,5 +125,47 @@ describe("runRules", () => {
     };
     runRules([makeOrder()], [spy], { now: NOW });
     expect(seen).toEqual([NOW]);
+  });
+});
+
+describe("runRulesIsolated (#93)", () => {
+  const orders = ["good-1", "poisoned", "good-2"].map((id) => makeOrder({ id }));
+  const fine = fixedRule("FINE", (order) => [{ kind: "refund_overdue", amountAtStake: order.id === "good-1" ? 5 : 7 }]);
+
+  it("isolates a rule that throws to that order; other orders keep their findings", () => {
+    const throwing: Rule = {
+      id: "BOOM",
+      version: "2",
+      evaluate: (order) => {
+        if (order.id === "poisoned") throw new RangeError("Invalid time value");
+        return [];
+      },
+    };
+    const { findings, failures } = runRulesIsolated(orders, [fine, throwing], { now: NOW });
+    // The poisoned order's FINE finding is dropped too: an order's findings are all-or-nothing.
+    expect(findings.map((finding) => finding.id)).toEqual(["refund_overdue:good-2", "refund_overdue:good-1"]);
+    expect(failures).toEqual([
+      { orderId: "poisoned", reason: "Rule BOOM@2 failed on order poisoned: RangeError: Invalid time value" },
+    ]);
+  });
+
+  it("isolates an invalid finding (negative amountAtStake) to that order", () => {
+    const negative = fixedRule("NEG", (order) => (order.id === "poisoned" ? [{ amountAtStake: -12.5 }] : []));
+    const { findings, failures } = runRulesIsolated(orders, [fine, negative], { now: NOW });
+    expect(findings.map((finding) => finding.orderId).sort()).toEqual(["good-1", "good-2"]);
+    expect(failures).toHaveLength(1);
+    expect(failures[0].orderId).toBe("poisoned");
+    expect(failures[0].reason).toMatch(/^Rule NEG@1 produced an invalid finding price_drop:poisoned: amountAtStake: /);
+  });
+
+  it("returns no failures and the same findings as runRules for healthy orders", () => {
+    const result = runRulesIsolated(orders, [fine], { now: NOW });
+    expect(result.failures).toEqual([]);
+    expect(result.findings).toEqual(runRules(orders, [fine], { now: NOW }));
+  });
+
+  it("runRules still throws on the first failure", () => {
+    const negative = fixedRule("NEG", (order) => (order.id === "poisoned" ? [{ amountAtStake: -1 }] : []));
+    expect(() => runRules(orders, [negative], { now: NOW })).toThrow(/NEG@1 produced an invalid finding price_drop:poisoned/);
   });
 });

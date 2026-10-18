@@ -24,6 +24,16 @@ export interface MatchOptions {
   fallbackMaxDays?: number;
 }
 
+export interface MatchResult {
+  orders: NormalizedOrder[];
+  /**
+   * Order id -> why the matcher flagged it for review, for problems the order itself cannot explain later
+   * (negative/invalid amounts, non-ISO dates). Orders flagged only for low confidence, a missing confirmation or
+   * currency have no entry.
+   */
+  reviewReasons: Map<string, string[]>;
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_FALLBACK_MAX_DAYS = 3;
 /** Classes that never create or join an order (promos, phishing, account notices). */
@@ -49,8 +59,15 @@ interface OrderGroup {
  *   placedAt is within 3 days; otherwise they form their own order.
  * - The latest order confirmation wins for totals and line items; duplicate lifecycle emails produce one event.
  * - Orders with no order confirmation, no currency, or confMin < REVIEW_CONFIDENCE_THRESHOLD need review.
+ * - Orders with a negative or non-finite amount, or an email date that is not ISO 8601, need review (see
+ *   matchOrdersWithReasons for the reasons).
  */
 export function matchOrders(inputs: readonly MatchInput[], opts: MatchOptions = {}): NormalizedOrder[] {
+  return matchOrdersWithReasons(inputs, opts).orders;
+}
+
+/** matchOrders plus the matcher's review reasons per order id. */
+export function matchOrdersWithReasons(inputs: readonly MatchInput[], opts: MatchOptions = {}): MatchResult {
   const fallbackMaxDays = opts.fallbackMaxDays ?? DEFAULT_FALLBACK_MAX_DAYS;
   const relevant = [...inputs]
     .filter((input) => !IGNORED_CLASSES.includes(input.extraction.class))
@@ -82,9 +99,15 @@ export function matchOrders(inputs: readonly MatchInput[], opts: MatchOptions = 
     }
   }
 
-  return [...groups.values()]
-    .map((group) => buildOrder(group))
+  const built = [...groups.values()].map((group) => buildOrder(group));
+  const reviewReasons = new Map<string, string[]>();
+  for (const { order, reasons } of built) {
+    if (reasons.length > 0) reviewReasons.set(order.id, reasons);
+  }
+  const orders = built
+    .map(({ order }) => order)
     .sort((a, b) => a.placedAt.localeCompare(b.placedAt) || a.id.localeCompare(b.id));
+  return { orders, reviewReasons };
 }
 
 function compareInputs(a: MatchInput, b: MatchInput): number {
@@ -177,19 +200,57 @@ function primaryConfirmation(inputs: readonly MatchInput[]): MatchInput | null {
 }
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+/** ISO 8601 / RFC 3339 datetime: date, `T` or space, hh:mm[:ss[.fff]], optional `Z` or ±hh[:]mm offset. */
+const ISO_DATETIME_PATTERN = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)(Z|[+-]\d{2}:?\d{2})?$/i;
+/** Confidence given to an extracted date that is not ISO 8601 (below REVIEW_CONFIDENCE_THRESHOLD: needs review). */
+const NON_ISO_DATE_CONFIDENCE = 0.5;
+
+type ParsedExtractedDate = { kind: "date"; day: string } | { kind: "datetime"; iso: string };
+
+/**
+ * Parses an extracted date without ever using the server's local time zone: offset-less datetimes are UTC.
+ * Returns null for anything that is not a valid ISO 8601 date or datetime.
+ */
+function parseExtractedDate(date: string): ParsedExtractedDate | null {
+  const value = date.trim();
+  if (DATE_ONLY_PATTERN.test(value)) {
+    const ms = Date.parse(`${value}T00:00:00Z`);
+    return !Number.isNaN(ms) && new Date(ms).toISOString().slice(0, 10) === value ? { kind: "date", day: value } : null;
+  }
+  const match = ISO_DATETIME_PATTERN.exec(value);
+  if (!match) return null;
+  const [, day, time, rawOffset] = match;
+  const offset = !rawOffset || rawOffset.toUpperCase() === "Z" ? "Z" : rawOffset.replace(/^([+-]\d{2}):?(\d{2})$/, "$1:$2");
+  const ms = Date.parse(`${day}T${time}${offset}`);
+  if (Number.isNaN(ms) || new Date(Date.parse(`${day}T00:00:00Z`)).toISOString().slice(0, 10) !== day) return null;
+  return { kind: "datetime", iso: new Date(ms).toISOString() };
+}
+
+/** True when the extraction has a date that is not ISO 8601 (it was ignored in favour of the email date). */
+function hasNonIsoDate(input: MatchInput): boolean {
+  const { date } = input.extraction.fields;
+  return date != null && parseExtractedDate(date) === null;
+}
+
+/** Extraction confidence with a non-ISO date counted as a low-confidence field. */
+function inputConfMin(input: MatchInput): number {
+  const { confMin } = input.extraction;
+  return hasNonIsoDate(input) ? Math.min(confMin, NON_ISO_DATE_CONFIDENCE) : confMin;
+}
 
 /**
  * ISO datetime for an extracted date. A date-only value takes the time of the earliest candidate email sent that
- * UTC day (the body date and the send time agree), else midnight UTC. Unparseable/missing => fallback.
+ * UTC day (the body date and the send time agree), else midnight UTC. Non-ISO/missing => fallback (the email date).
  */
 function resolveDate(date: string | null, candidates: readonly string[], fallback: string): string {
-  if (date && DATE_ONLY_PATTERN.test(date)) {
+  const parsed = date == null ? null : parseExtractedDate(date);
+  if (parsed?.kind === "date") {
     const sameDay = candidates
-      .filter((candidate) => new Date(candidate).toISOString().slice(0, 10) === date)
+      .filter((candidate) => new Date(candidate).toISOString().slice(0, 10) === parsed.day)
       .sort((a, b) => Date.parse(a) - Date.parse(b));
-    return sameDay.length > 0 ? new Date(sameDay[0]).toISOString() : `${date}T00:00:00.000Z`;
+    return sameDay.length > 0 ? new Date(sameDay[0]).toISOString() : `${parsed.day}T00:00:00.000Z`;
   }
-  if (date && !Number.isNaN(Date.parse(date))) return new Date(date).toISOString();
+  if (parsed?.kind === "datetime") return parsed.iso;
   return new Date(fallback).toISOString();
 }
 
@@ -301,7 +362,7 @@ function buildEvents(orderId: string, sortedInputs: readonly MatchInput[], lineI
       if (item) quantities.set(item.id, (quantities.get(item.id) ?? 0) + extracted.qty);
     }
     const lineItemIds = [...quantities.keys()].sort();
-    const amount = extraction.fields.eventAmount ?? null;
+    const amount = finiteOrNull(extraction.fields.eventAmount);
     // The same lifecycle email received twice (resend/copy) must not produce a second event.
     const dedupeKey = `${type}|${at.slice(0, 10)}|${amount ?? ""}|${lineItemIds.join(",")}`;
     if (seen.has(dedupeKey)) continue;
@@ -314,7 +375,7 @@ function buildEvents(orderId: string, sortedInputs: readonly MatchInput[], lineI
         at,
         ...(amount !== null ? { amount } : {}),
         messageId: email.id,
-        conf: extraction.confMin,
+        conf: inputConfMin(input),
         ...(evidence !== undefined ? { evidence } : {}),
         ...(lineItemIds.length > 0 ? { lineItemIds } : {}),
       },
@@ -374,7 +435,31 @@ function buildPolicy(policyInputs: readonly MatchInput[]): MerchantPolicy {
   };
 }
 
-function buildOrder(group: OrderGroup): NormalizedOrder {
+function finiteOrNull(amount: number | null | undefined): number | null {
+  return amount != null && Number.isFinite(amount) ? amount : null;
+}
+
+/** Review reasons for amounts no rule can use: negative or non-finite totals and event amounts. */
+function amountReviewReasons(
+  amounts: Record<"subtotal" | "tax" | "shipping" | "discount" | "total", number | null>,
+  sortedInputs: readonly MatchInput[],
+): string[] {
+  const reasons: string[] = [];
+  for (const [name, amount] of Object.entries(amounts)) {
+    if (amount === null) continue;
+    if (!Number.isFinite(amount)) reasons.push(`${name} is not a number`);
+    else if (amount < 0) reasons.push(`${name} is negative (${amount.toFixed(2)})`);
+  }
+  for (const input of sortedInputs) {
+    const amount = input.extraction.fields.eventAmount;
+    if (amount == null) continue;
+    if (!Number.isFinite(amount)) reasons.push(`event amount in email ${input.email.id} is not a number`);
+    else if (amount < 0) reasons.push(`event amount in email ${input.email.id} is negative (${amount.toFixed(2)})`);
+  }
+  return reasons;
+}
+
+function buildOrder(group: OrderGroup): { order: NormalizedOrder; reasons: string[] } {
   const sorted = [...group.inputs].sort(compareInputs);
   const primary = primaryConfirmation(sorted);
   const confirmationsLatestFirst = sorted.filter(isConfirmation).reverse();
@@ -408,27 +493,36 @@ function buildOrder(group: OrderGroup): NormalizedOrder {
     totalsSource.total ?? (subtotal ?? itemsSum) + (tax ?? 0) + (shipping ?? 0) - (discount ?? 0),
   );
 
+  const reasons = [
+    ...amountReviewReasons({ subtotal, tax, shipping, discount, total }, sorted),
+    ...sorted
+      .filter(hasNonIsoDate)
+      .map((input) => `date "${input.extraction.fields.date}" in email ${input.email.id} is not ISO 8601; used the email date`),
+  ];
+
   const currency = firstValue(byPrecedence, (input) => fieldsOf(input).currency);
-  const confMin = Math.min(...sorted.map((input) => input.extraction.confMin));
+  const confMin = Math.min(...sorted.map(inputConfMin));
   // Without a confirmation the totals are unverified; without a currency the amounts cannot be compared.
-  const needsReview = confMin < REVIEW_CONFIDENCE_THRESHOLD || primary === null || currency === null;
+  const needsReview =
+    confMin < REVIEW_CONFIDENCE_THRESHOLD || primary === null || currency === null || reasons.length > 0;
 
   const messageIds = primary
     ? [primary.email.id, ...sorted.filter((input) => input !== primary).map((input) => input.email.id)]
     : sorted.map((input) => input.email.id);
 
-  return NormalizedOrderSchema.parse({
+  const order = NormalizedOrderSchema.parse({
     id,
     merchant: { name: merchantName, domain, policy: buildPolicy(byPrecedence) },
     orderRef,
     placedAt: resolvePlacedAt(sorted),
     // Unknown currency only ever reaches the needs-review queue (needsReview is forced above).
     currency: currency ?? "USD",
-    subtotal,
-    tax,
-    shipping,
-    discount,
-    total,
+    // Non-finite amounts only ever reach the needs-review queue (a reason is recorded above).
+    subtotal: finiteOrNull(subtotal),
+    tax: finiteOrNull(tax),
+    shipping: finiteOrNull(shipping),
+    discount: finiteOrNull(discount),
+    total: Number.isFinite(total) ? total : 0,
     last4: firstValue(byPrecedence, (input) => fieldsOf(input).last4),
     customerName: firstValue(byPrecedence, (input) => fieldsOf(input).customerName),
     lineItems,
@@ -437,4 +531,5 @@ function buildOrder(group: OrderGroup): NormalizedOrder {
     confMin,
     needsReview,
   });
+  return { order, reasons };
 }

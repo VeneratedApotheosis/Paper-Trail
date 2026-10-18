@@ -40,40 +40,89 @@ export function severityFor(amount: number): FindingSeverity {
   return "low";
 }
 
+/** One order whose rules threw or produced an invalid finding; none of that order's findings are kept. */
+export interface RuleFailure {
+  orderId: string;
+  reason: string;
+}
+
+export interface RulesRun {
+  findings: Finding[];
+  failures: RuleFailure[];
+}
+
 /**
- * Runs every rule over every order and returns validated, de-duplicated, sorted findings.
+ * Runs every rule over every order and returns validated, de-duplicated, sorted findings plus per-order failures.
  *
  * - Orders with `needsReview = true` are skipped: their extracted fields are below the confidence threshold and
  *   unconfirmed, so any amount computed from them would be unverified (AGENTS.md rule 7). They stay in the
  *   needs-review queue and produce findings once a human confirms them and the order is re-run.
  * - Each finding's id is set to `findingId(kind, orderId, lineItemId)`; the first finding per id wins.
- * - Every finding is validated with FindingSchema; an invalid finding is a rule bug and throws.
+ * - Every finding is validated with FindingSchema. A rule that throws or produces an invalid finding fails only that
+ *   order: all of its findings are dropped and it is reported in `failures`, the other orders are unaffected.
  * - Sorted by `dueAt` ascending (null last), then `amountAtStake` descending, then id.
  */
+export function runRulesIsolated(
+  orders: readonly NormalizedOrder[],
+  rules: readonly Rule[],
+  ctx: RuleContext,
+): RulesRun {
+  const findingsById = new Map<string, Finding>();
+  const failures: RuleFailure[] = [];
+  for (const order of orders) {
+    if (order.needsReview) continue;
+    try {
+      for (const finding of evaluateOrder(order, rules, ctx, findingsById)) findingsById.set(finding.id, finding);
+    } catch (error) {
+      failures.push({ orderId: order.id, reason: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return { findings: [...findingsById.values()].sort(compareFindings), failures };
+}
+
+/** runRulesIsolated for callers where any rule failure is a bug (eval, tests, single-order re-runs): throws on the first. */
 export function runRules(
   orders: readonly NormalizedOrder[],
   rules: readonly Rule[],
   ctx: RuleContext,
 ): Finding[] {
-  const findingsById = new Map<string, Finding>();
-  for (const order of orders) {
-    if (order.needsReview) continue;
-    for (const rule of rules) {
-      for (const candidate of rule.evaluate(order, ctx)) {
-        const id = findingId(candidate.kind, candidate.orderId, candidate.lineItemId);
-        if (findingsById.has(id)) continue;
-        findingsById.set(id, validateFinding({ ...candidate, id }, rule));
-      }
+  const { findings, failures } = runRulesIsolated(orders, rules, ctx);
+  if (failures.length > 0) throw new Error(failures[0].reason);
+  return findings;
+}
+
+/** Validated findings for one order, skipping ids already in `existing` or produced earlier for this order. */
+function evaluateOrder(
+  order: NormalizedOrder,
+  rules: readonly Rule[],
+  ctx: RuleContext,
+  existing: ReadonlyMap<string, Finding>,
+): Finding[] {
+  const byId = new Map<string, Finding>();
+  for (const rule of rules) {
+    let candidates: Finding[];
+    try {
+      candidates = rule.evaluate(order, ctx);
+    } catch (error) {
+      const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      throw new Error(`Rule ${ruleVersionOf(rule)} failed on order ${order.id}: ${message}`);
+    }
+    for (const candidate of candidates) {
+      const id = findingId(candidate.kind, candidate.orderId, candidate.lineItemId);
+      if (existing.has(id) || byId.has(id)) continue;
+      byId.set(id, validateFinding({ ...candidate, id }, rule));
     }
   }
-  return [...findingsById.values()].sort(compareFindings);
+  return [...byId.values()];
 }
 
 function validateFinding(finding: Finding, rule: Rule): Finding {
   const parsed = FindingSchema.safeParse(finding);
   if (!parsed.success) {
     throw new Error(
-      `Rule ${ruleVersionOf(rule)} produced an invalid finding ${finding.id}: ${parsed.error.message}`,
+      `Rule ${ruleVersionOf(rule)} produced an invalid finding ${finding.id}: ${parsed.error.issues
+        .map((issue) => `${issue.path.join(".") || "finding"}: ${issue.message}`)
+        .join("; ")}`,
     );
   }
   return parsed.data;

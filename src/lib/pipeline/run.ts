@@ -8,15 +8,16 @@ import {
   type RedactedEmail,
 } from "@/lib/contracts";
 import { SKIPPED_EXTRACTION_CLASSES, classify, isReceiptLike, redact, type ExtractResult } from "@/lib/ingestion";
-import { matchOrders, type MatchInput } from "@/lib/orders/matcher";
+import { matchOrdersWithReasons, type MatchInput } from "@/lib/orders/matcher";
 import type { PriceFeed } from "@/lib/prices/feed";
-import { defaultRules, runRules } from "@/lib/rules";
+import { defaultRules, runRulesIsolated } from "@/lib/rules";
 import type { AuditEntry } from "@/lib/types";
 
 /**
  * Pipeline runner (issue #4): every input source (Gmail sync, seed demo, .eml/.mbox upload) goes through this one
  * code path: [prefilter] -> classify (raw) -> redact -> extract (redacted) -> matchOrders -> runRules.
- * Nothing low-confidence or failed is dropped silently: it lands in `reviewQueue` with a reason.
+ * Nothing low-confidence or failed is dropped silently: it lands in `reviewQueue` with a reason. One bad email or
+ * order never aborts the run: extraction failures and per-order rule failures are isolated to that email/order.
  */
 
 /** Audit row without the store-assigned id. Details carry ids, classes, models and counts only, never email text. */
@@ -45,13 +46,13 @@ export interface PipelineDeps {
   auditClock?: () => Date;
 }
 
-export type ReviewStage = "classify" | "extract" | "match";
+export type ReviewStage = "classify" | "extract" | "match" | "rules";
 
 export interface ReviewQueueItem {
   emailId: string;
   stage: ReviewStage;
   reason: string;
-  /** Set for match-stage items (orders that need review). */
+  /** Set for match- and rules-stage items (orders that need review). */
   orderId?: string;
 }
 
@@ -103,7 +104,8 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}` : "unknown error";
 }
 
-function orderReviewReason(order: NormalizedOrder): string {
+function orderReviewReason(order: NormalizedOrder, matcherReasons: readonly string[] | undefined): string {
+  if (matcherReasons && matcherReasons.length > 0) return clip(`order needs review: ${matcherReasons.join("; ")}`);
   if (order.confMin < REVIEW_CONFIDENCE_THRESHOLD) {
     return `order needs review: lowest extraction confidence ${order.confMin.toFixed(2)}`;
   }
@@ -188,11 +190,28 @@ export async function runPipeline(emails: readonly RawEmail[], deps: PipelineDep
     matchInputs.push({ email: redacted, extraction });
   }
 
-  const allOrders = matchOrders(matchInputs);
-  const orders = allOrders.filter((order) => !isExcludedMerchant(order, excluded));
-  const findings = runRules(orders, defaultRules, { now: deps.now, priceFeed: deps.priceFeed });
-  for (const order of orders.filter((candidate) => candidate.needsReview)) {
-    reviewQueue.push({ emailId: order.messageIds[0], stage: "match", reason: orderReviewReason(order), orderId: order.id });
+  const matched = matchOrdersWithReasons(matchInputs);
+  const allOrders = matched.orders;
+  const includedOrders = allOrders.filter((order) => !isExcludedMerchant(order, excluded));
+  const { findings, failures } = runRulesIsolated(includedOrders, defaultRules, {
+    now: deps.now,
+    priceFeed: deps.priceFeed,
+  });
+  for (const order of includedOrders.filter((candidate) => candidate.needsReview)) {
+    const reason = orderReviewReason(order, matched.reviewReasons.get(order.id));
+    reviewQueue.push({ emailId: order.messageIds[0], stage: "match", reason, orderId: order.id });
+  }
+  // An order whose rules failed has no findings; it goes to review so a human can correct and re-run it.
+  const failedOrderIds = new Set(failures.map((failure) => failure.orderId));
+  const orders = includedOrders.map((order) => (failedOrderIds.has(order.id) ? { ...order, needsReview: true } : order));
+  for (const failure of failures) {
+    const order = includedOrders.find((candidate) => candidate.id === failure.orderId);
+    reviewQueue.push({
+      emailId: order?.messageIds[0] ?? failure.orderId,
+      stage: "rules",
+      reason: clip(`rules failed, no findings for this order: ${failure.reason}`),
+      orderId: failure.orderId,
+    });
   }
 
   stats.orders = orders.length;

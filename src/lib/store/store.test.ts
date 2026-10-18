@@ -3,6 +3,7 @@ import { loadSeedDemo } from "@/lib/demo/seed";
 import type { PipelineResult } from "@/lib/pipeline/run";
 import {
   appendAudit,
+  beginStoreWork,
   clearLedger,
   deleteAll,
   excludeMerchant,
@@ -16,6 +17,7 @@ import {
   setFindingStatus,
   setRevokeOAuthHook,
   upsertDraft,
+  withStoreScope,
 } from "./index";
 
 let seed: PipelineResult & { asOf: string };
@@ -153,6 +155,45 @@ describe("store", () => {
     expect(result.revokedToken).toBe(false);
     expect(getState().orders).toEqual([]);
     expect(getState().audit[0].detail).toContain("OAuth revoke failed");
+  });
+});
+
+describe("beginStoreWork: delete-all race guard (#93)", () => {
+  const event = (detail: string) => ({ at: "2026-10-17T00:00:00.000Z", type: "llm_call" as const, detail });
+
+  it("stays current while nothing is deleted, and audits into the live store", () => {
+    const work = beginStoreWork();
+    setPipelineResult("demo", seed.asOf, seed);
+    work.appendAudit(event("in flight"));
+    expect(work.isCurrent()).toBe(true);
+    expect(getState().audit[0].detail).toBe("in flight");
+  });
+
+  it("is no longer current after deleteAll, and its audit rows never reach the fresh store", async () => {
+    const work = beginStoreWork();
+    await deleteAll();
+    expect(work.isCurrent()).toBe(false);
+    expect(beginStoreWork().generation).toBe(work.generation + 1);
+    work.appendAudit(event("late llm call"));
+    expect(getState().audit.map((entry) => entry.type)).toEqual(["delete"]);
+  });
+
+  it("is no longer current after clearLedger (demo reset), which keeps the audit log", () => {
+    const work = beginStoreWork();
+    clearLedger();
+    expect(work.isCurrent()).toBe(false);
+    work.appendAudit(event("late llm call"));
+    expect(getState().audit[0].detail).toBe("late llm call");
+  });
+
+  it("only reacts to deletes in its own store scope", async () => {
+    const work = beginStoreWork();
+    await withStoreScope("store-race-test-a", () => deleteAll());
+    expect(work.isCurrent()).toBe(true);
+    const scoped = withStoreScope("store-race-test-b", () => beginStoreWork());
+    await deleteAll();
+    expect(withStoreScope("store-race-test-b", () => scoped.isCurrent())).toBe(true);
+    expect(work.isCurrent()).toBe(false);
   });
 });
 

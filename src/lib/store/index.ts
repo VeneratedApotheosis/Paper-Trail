@@ -36,6 +36,8 @@ interface StoreData {
   excludedMerchants: Set<string>;
   extractionCache: ExtractionCache;
   revokeOAuth: RevokeOAuthHook | null;
+  /** Bumped by deleteAll and clearLedger so in-flight work (upload, demo load) can tell its data was deleted. */
+  generation: number;
 }
 
 /** Read-only snapshot with exclusions applied. */
@@ -96,6 +98,7 @@ function emptyData(): StoreData {
     excludedMerchants: new Set(),
     extractionCache: createMemoryCache(),
     revokeOAuth: null,
+    generation: 0,
   };
 }
 
@@ -176,9 +179,36 @@ export function setPipelineResult(mode: Exclude<StoreMode, "empty">, asOf: strin
   store.drafts = [];
 }
 
+/**
+ * Async work that commits to the store later (upload, demo load). Capture it before the first await, mirroring
+ * Gmail sync's `active()` guard: if delete-all or a demo reset ran meanwhile, the work must not commit.
+ */
+export interface StoreWork {
+  /** Store generation when the work began. */
+  generation: number;
+  /** True while no deleteAll / clearLedger ran in this store scope since the work began. */
+  isCurrent(): boolean;
+  /**
+   * Appends to the store the work began in. deleteAll replaces that store, so rows from work still in flight after
+   * a delete land in the discarded store, never in the fresh one.
+   */
+  appendAudit(event: PipelineAuditEvent): AuditEntry;
+}
+
+export function beginStoreWork(): StoreWork {
+  const store = data();
+  const generation = store.generation;
+  return {
+    generation,
+    isCurrent: () => data() === store && store.generation === generation,
+    appendAudit: (event) => appendAuditTo(store, event),
+  };
+}
+
 /** Clears the ledger (orders, findings, drafts, review queue) but keeps the audit log and exclusions. */
 export function clearLedger(): void {
   const store = data();
+  store.generation += 1;
   store.mode = "empty";
   store.asOf = null;
   store.orders = [];
@@ -224,7 +254,10 @@ export function setFindingStatus(id: string, status: FindingStatus): Finding | u
 }
 
 export function appendAudit(event: PipelineAuditEvent): AuditEntry {
-  const store = data();
+  return appendAuditTo(data(), event);
+}
+
+function appendAuditTo(store: StoreData, event: PipelineAuditEvent): AuditEntry {
   store.auditSeq += 1;
   const entry: AuditEntry = { id: `aud_${store.auditSeq}`, ...event };
   store.audit.push(entry);
@@ -284,6 +317,7 @@ export async function deleteAll(
   const at = clock().toISOString();
   const fresh = emptyData();
   fresh.revokeOAuth = store.revokeOAuth;
+  fresh.generation = store.generation + 1;
   replaceData(fresh);
   appendAudit({
     at,

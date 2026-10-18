@@ -227,6 +227,59 @@ describe("upload route", () => {
   });
 });
 
+describe("delete-all during an upload or demo load (#93)", () => {
+  const deleteAllRequest = () => new Request("http://localhost/api/delete-all", { method: "POST" });
+  const auditEntries = async () =>
+    (await json<AuditResponse>(await audit.GET(new Request("http://localhost/api/audit", { method: "GET" })))).entries;
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("POST /api/demo does not commit when delete-all ran while it was loading", async () => {
+    const pending = demo.POST(new Request("http://localhost/api/demo", { method: "POST" }));
+    expect((await deleteAllRoute.POST(deleteAllRequest())).status).toBe(200);
+    const response = await pending;
+    expect(response.status).toBe(409);
+    expect((await json<ApiErrorBody>(response)).error).toMatch(/deleted while the demo was loading; nothing was saved/);
+    expect(await getLedger()).toMatchObject({ mode: "empty", orders: [], findings: [], reviewQueue: [] });
+    expect((await auditEntries()).map((entry) => entry.type)).toEqual(["delete"]);
+  });
+
+  it("POST /api/demo does not commit when DELETE /api/demo ran while it was loading", async () => {
+    const pending = demo.POST(new Request("http://localhost/api/demo", { method: "POST" }));
+    expect(await json(await demo.DELETE(new Request("http://localhost/api/demo", { method: "DELETE" })))).toEqual({ mode: "empty" });
+    expect((await pending).status).toBe(409);
+    expect((await getLedger()).mode).toBe("empty");
+  });
+
+  it("POST /api/upload does not commit when delete-all ran during parsing", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
+    const pending = upload.POST(uploadRequest([{ name: "order.eml", content: ORDER_EML }]));
+    await deleteAllRoute.POST(deleteAllRequest());
+    const response = await pending;
+    expect(response.status).toBe(409);
+    expect((await json<ApiErrorBody>(response)).error).toMatch(/deleted while this upload was processing; nothing was saved/);
+    expect(await getLedger()).toMatchObject({ mode: "empty", orders: [], reviewQueue: [] });
+    expect((await auditEntries()).map((entry) => entry.type)).toEqual(["delete"]);
+  });
+
+  it("POST /api/upload does not commit, or audit into the fresh store, when delete-all ran during an LLM call", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
+    let deletes = 0;
+    vi.stubGlobal("fetch", async () => {
+      if (deletes === 0) {
+        deletes += 1;
+        await deleteAllRoute.POST(deleteAllRequest());
+      }
+      return Response.json({ type: "error", error: { type: "invalid_request_error" } }, { status: 400 });
+    });
+    const response = await upload.POST(uploadRequest([{ name: "order.eml", content: ORDER_EML }]));
+    expect(deletes).toBe(1);
+    expect(response.status).toBe(409);
+    expect(await getLedger()).toMatchObject({ mode: "empty", orders: [], reviewQueue: [] });
+    expect((await auditEntries()).map((entry) => entry.type)).toEqual(["delete"]);
+  });
+});
+
 describe("prefilter route", () => {
   it("returns the Gmail query and its description", async () => {
     const body = await json<{ query: string; description: string; windowDays: number }>(await prefilter.GET());

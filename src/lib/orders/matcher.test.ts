@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   NormalizedOrderSchema,
   type EmailClass,
@@ -6,7 +6,7 @@ import {
   type Extraction,
   type RawEmail,
 } from "@/lib/contracts";
-import { matchOrders, type MatchInput } from "./matcher";
+import { matchOrders, matchOrdersWithReasons, type MatchInput } from "./matcher";
 
 // Synthetic fixtures only: fictional merchant "Northwind Outfitters" on a reserved .example domain.
 
@@ -344,5 +344,101 @@ describe("matchOrders", () => {
       matchOrders([orderEmail({ fields: { lineItems: [JACKET, SOCKS], totals: { tax: 8, shipping: 5, discount: 3 } } })]),
     );
     expect(order.total).toBe(110);
+  });
+});
+
+describe("matchOrdersWithReasons: odd amounts go to review (#93)", () => {
+  it("flags a discount larger than the subtotal (negative computed total) instead of producing a negative order", () => {
+    const { orders, reviewReasons } = matchOrdersWithReasons([
+      orderEmail({ fields: { lineItems: [SOCKS], totals: { subtotal: 20, discount: 30 } } }),
+    ]);
+    const order = only(orders);
+    expect(NormalizedOrderSchema.parse(order)).toEqual(order);
+    expect(order.total).toBe(-10);
+    expect(order.needsReview).toBe(true);
+    expect(reviewReasons.get(order.id)).toEqual(["total is negative (-10.00)"]);
+  });
+
+  it("flags negative extracted totals and event amounts", () => {
+    const { orders, reviewReasons } = matchOrdersWithReasons([
+      orderEmail({ fields: { lineItems: [JACKET], totals: { subtotal: 80, tax: -8, total: -5 } } }),
+      input({ id: "refund", cls: "refund", date: "2026-09-20T12:00:00Z", fields: { eventAmount: -40 } }),
+    ]);
+    const order = only(orders);
+    expect(order.needsReview).toBe(true);
+    expect(reviewReasons.get(order.id)).toEqual([
+      "tax is negative (-8.00)",
+      "total is negative (-5.00)",
+      "event amount in email refund is negative (-40.00)",
+    ]);
+  });
+
+  it("routes non-finite amounts to review without failing order validation", () => {
+    const { orders, reviewReasons } = matchOrdersWithReasons([
+      orderEmail({ fields: { lineItems: [JACKET], totals: { subtotal: Number.NaN, total: Number.POSITIVE_INFINITY } } }),
+      input({ id: "refund", cls: "refund", date: "2026-09-20T12:00:00Z", fields: { eventAmount: Number.NaN } }),
+    ]);
+    const order = only(orders);
+    expect(NormalizedOrderSchema.parse(order)).toEqual(order);
+    expect(order).toMatchObject({ subtotal: null, total: 0, needsReview: true });
+    expect(order.events[0].amount).toBeUndefined();
+    expect(reviewReasons.get(order.id)).toEqual([
+      "subtotal is not a number",
+      "total is not a number",
+      "event amount in email refund is not a number",
+    ]);
+  });
+
+  it("has no reasons for a clean order", () => {
+    const { orders, reviewReasons } = matchOrdersWithReasons([orderEmail()]);
+    expect(only(orders).needsReview).toBe(false);
+    expect(reviewReasons.size).toBe(0);
+  });
+});
+
+describe("matchOrders: extracted dates are parsed as UTC (#93)", () => {
+  // A non-UTC server zone: parsing offset-less dates as local time would shift them by 5:30.
+  beforeEach(() => vi.stubEnv("TZ", "Asia/Kolkata"));
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each([
+    ["2026-09-01T18:30:00", "2026-09-01T18:30:00.000Z"],
+    ["2026-09-01T18:30", "2026-09-01T18:30:00.000Z"],
+    ["2026-09-01 18:30:00", "2026-09-01T18:30:00.000Z"],
+    ["2026-09-01T18:30:00Z", "2026-09-01T18:30:00.000Z"],
+    ["2026-09-01T18:30:00+05:30", "2026-09-01T13:00:00.000Z"],
+    ["2026-09-01T18:30:00-0400", "2026-09-01T22:30:00.000Z"],
+  ])("reads %s as %s regardless of the server time zone", (date, placedAt) => {
+    const order = only(matchOrders([orderEmail({ fields: { date } })]));
+    expect(order.placedAt).toBe(placedAt);
+    expect(order.needsReview).toBe(false);
+  });
+
+  it("uses UTC for offset-less event datetimes too", () => {
+    const order = only(
+      matchOrders([orderEmail(), input({ id: "delivered", cls: "delivered", date: "2026-09-05T12:00:00Z", fields: { date: "2026-09-05T23:30:00" } })]),
+    );
+    expect(order.events[0].at).toBe("2026-09-05T23:30:00.000Z");
+  });
+
+  it.each(["October 5, 2026", "10/05/2026", "2026-02-30", "2026-09-01T25:00:00", "yesterday"])(
+    "marks the non-ISO date %j low confidence, uses the email date and sends the order to review",
+    (date) => {
+      const { orders, reviewReasons } = matchOrdersWithReasons([
+        orderEmail(),
+        input({ id: "refund", cls: "refund", date: "2026-09-20T12:00:00Z", fields: { eventAmount: 50, date } }),
+      ]);
+      const order = only(orders);
+      expect(order.events[0]).toMatchObject({ at: "2026-09-20T12:00:00.000Z", conf: 0.5 });
+      expect(order.confMin).toBe(0.5);
+      expect(order.needsReview).toBe(true);
+      expect(reviewReasons.get(order.id)).toEqual([`date ${JSON.stringify(date)} in email refund is not ISO 8601; used the email date`]);
+    },
+  );
+
+  it("does not flag a missing date", () => {
+    const order = only(matchOrders([orderEmail({ fields: { date: null } })]));
+    expect(order.placedAt).toBe("2026-09-01T10:00:00.000Z");
+    expect(order.needsReview).toBe(false);
   });
 });
