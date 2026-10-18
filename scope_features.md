@@ -1,6 +1,8 @@
 # PaperTrail — Feature Scope (Receipt Ledger + Refunds + Rewards Manager)
 
 > **Update 2026-10-17:** Devin / Cognition *Best Use of Devin* was **dropped** (see plan.md decision log). Targets are Paper + Visa (+ optional Sentry). Any "Devin ticket" below is just a work item, now done by the team and its own agents (pi, Codex, ...) coordinated via GitHub Issues.
+>
+> **Update 2026-10-18:** Devin is back as a coding agent under Kenan's supervised use (`kenan-devin-*`, same process as other agents; see plan.md decision log). Sponsor targets are unchanged.
 Derived from plan.md (S14, locked constraints), deepdive_S14.md, brief.md. Software-only custom web app · targets Devin + Paper + Visa (optional Sentry). Scope doc only; not a decision record. Visa tags: **Inn**ovation · **UX** · **Tech** · **Imp**act · **Trust**. Priority: P0 must (demo breaks without) · P1 should · P2 nice. Effort: S ≤2h · M ≈2-6h · L >6h.
 
 ## 1. Product summary

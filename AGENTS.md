@@ -1,12 +1,12 @@
 # AGENTS.md — PaperTrail
 
-Instructions for every AI coding agent (pi, Claude Code, Codex, Cursor, etc.) and humans working in this repo.
+Instructions for every AI coding agent (pi, Claude Code, Codex, Cursor, Devin, etc.) and humans working in this repo.
 **Read this file and [COORDINATION.md](COORDINATION.md) before starting any task.**
 
 ## What we're building
 PaperTrail (LA Hacks 2026): read-only Gmail → every purchase becomes a ledger row → rules find money the user is owed
 (overdue/short refunds, closing return windows, price drops) → one **"You're owed $X"** number, each finding backed by an
-evidence quote + confidence, with a drafted claim the user approves and sends themselves. Sponsor targets: Paper, Visa (optional Sentry). **Devin/Cognition was dropped (2026-10-17): don't add Devin workflows, PRs, or session logs.**
+evidence quote + confidence, with a drafted claim the user approves and sends themselves. Sponsor targets: Paper, Visa (optional Sentry). **Devin is back (2026-10-18) under Kenan's supervised use** (agent ID `kenan-devin-<n>`): Kenan directs it, and it follows the same process as every other agent (claim, ownership, push to `main`, `Agent:` trailer). No Devin-specific workflows, PR flow, or session logs.
 
 ## Source of truth (read the relevant section, don't guess)
 | Doc | Use it for |

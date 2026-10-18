@@ -1,6 +1,8 @@
 # S14 Tally (working name) — Receipt Ledger + Refund Watcher + Rewards Manager — Deep Dive
 
 > **Update 2026-10-17:** Devin / Cognition *Best Use of Devin* was **dropped** (see plan.md decision log). Targets are Paper + Visa (+ optional Sentry). Any "Devin ticket" below is just a work item, now done by the team and its own agents (pi, Codex, ...) coordinated via GitHub Issues.
+>
+> **Update 2026-10-18:** Devin is back as a coding agent under Kenan's supervised use (`kenan-devin-*`, same process as other agents; see plan.md decision log). Sponsor targets are unchanged.
 Software-only custom web app · Devin + Paper + Visa (+ optional Sentry). Tags: **[V]** verified 2026-10-16 by fetching Google docs · **[A]** assumed/unverified. Web *search* unavailable; direct doc fetches only. plan.md untouched.
 
 ## 1. Concept & Visa fit

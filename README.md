@@ -142,7 +142,7 @@ The gate in `src/lib/eval/gate.test.ts` requires a 15-email holdout, no phishing
 | Chelsea | [@chelsearwang](https://github.com/chelsearwang) | OAuth/Gmail/backend and reserved implementation queues through Codex |
 | Ethan Lowe | [@ethanwlowe7-cmyk](https://github.com/ethanwlowe7-cmyk) | Team member; currently inactive |
 
-Coding agents work under human direction, with claims, interface decisions and commit-SHA handoffs on GitHub. Read [AGENTS.md](AGENTS.md) and [COORDINATION.md](COORDINATION.md) before contributing. Claim one issue, use an isolated worktree, respect file ownership, and pass lint/typecheck/tests before pushing. Agent commits include an `Agent:` trailer. Devin/Cognition is not used. Paper and Visa are the documented sponsor targets; the app does not call Visa or another payment API.
+Coding agents work under human direction, with claims, interface decisions and commit-SHA handoffs on GitHub. Read [AGENTS.md](AGENTS.md) and [COORDINATION.md](COORDINATION.md) before contributing. Claim one issue, use an isolated worktree, respect file ownership, and pass lint/typecheck/tests before pushing. Agent commits include an `Agent:` trailer. Devin is back under Kenan's supervised use (agent IDs `kenan-devin-*`) and follows the same process. Paper and Visa are the documented sponsor targets; the app does not call Visa or another payment API.
 
 ## License
 

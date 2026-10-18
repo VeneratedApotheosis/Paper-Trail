@@ -1,6 +1,8 @@
 # GitHub Issue Plan — PaperTrail
 
 > **Update 2026-10-17:** Devin / Cognition *Best Use of Devin* was **dropped** (see plan.md decision log). Targets are Paper + Visa (+ optional Sentry). Any "Devin ticket" below is just a work item, now done by the team and its own agents (pi, Codex, ...) coordinated via GitHub Issues.
+>
+> **Update 2026-10-18:** Devin is back as a coding agent under Kenan's supervised use (`kenan-devin-*`, same process as other agents; see plan.md decision log). Sponsor targets are unchanged.
 
 Derived from: `plan.md`, `scope_features.md`, `deepdive_S14.md`, `brief.md`.  
 Design guidance: `frontend-design-skill.md` (linked in relevant issues, not turned into issues).

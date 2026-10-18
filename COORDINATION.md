@@ -13,7 +13,7 @@ Repo: `VeneratedApotheosis/Paper-Trail`
 
 | Person | GitHub | Owns |
 |---|---|---|
-| **Kenan** | `VeneratedApotheosis` | Repo owner, final say on scope. **Data + routing:** thin pages, middleware, hooks, backend. Orchestrated `kenan-pi-*` agents (section 5) |
+| **Kenan** | `VeneratedApotheosis` | Repo owner, final say on scope. **Data + routing:** thin pages, middleware, hooks, backend. Orchestrated `kenan-pi-*` agents (section 5) and supervised `kenan-devin-*` agents (Devin, back 2026-10-18) |
 | **Alex** | `ptatoo` | **How it looks:** design system, styles, visual components and views (Paper) |
 | Ethan Lowe | `ethanwlowe7-cmyk` | **On the team but inactive (no time to code, 2026-10-17).** Any claim by him is stale and may be taken over immediately (comment that it's stale, then claim). Don't assign him work |
 | Chelsea | `chelsearwang` | part-time via Codex (2026-10-17): she prompts occasionally; **chelsea-codex** works the issues reserved for her (assigned to `chelsearwang`; queue 2: #40, #101, #111, #78, #118, #94, #119). Claims on those are valid; anything else of hers is stale. Her former area (auth, Gmail, review, DB) stays Kenan's |
@@ -59,7 +59,7 @@ Rules:
 Several agents can post from the **same GitHub account** (e.g. all of Alex's agents post as `ptatoo`).
 The assignee shows the **human**; the **agent ID** in comments shows which agent.
 
-**Agent ID format:** `<person>-<tool>-<n>`, e.g. `kenan-pi-1`, `alex-pi-ui-2`, `chelsea-codex-1`.
+**Agent ID format:** `<person>-<tool>-<n>`, e.g. `kenan-pi-1`, `kenan-devin-1`, `alex-pi-ui-2`, `chelsea-codex-1`.
 - Pick it at session start. If your operator didn't give you one, use `<person>-<tool>-1`; if that ID already has an
   open claim that isn't yours, increment `n`.
 - Put the agent ID in **every** comment you post (claims, progress, handoffs).
@@ -323,8 +323,10 @@ Run at most ~3–4 backend agents at once; more creates conflicts faster than th
 ---
 
 ## 12. AI agent usage log (for the README / Devpost "how we built it")
-Devin is **not used** (dropped 2026-10-17). Agent work is documented through GitHub itself: every agent posts its
-agent ID in `CLAIMED`/`DONE` comments and an `Agent: <id>` commit trailer, so the log can be rebuilt any time:
+Devin was dropped on 2026-10-17 and is **back since 2026-10-18 under Kenan's supervised use** (`kenan-devin-*`,
+same claim/commit/handoff rules as every other agent; no separate session log). Agent work is documented through
+GitHub itself: every agent posts its agent ID in `CLAIMED`/`DONE` comments and an `Agent: <id>` commit trailer, so
+the log can be rebuilt any time:
 ```powershell
 git log --format="%h %an | %s | %(trailers:key=Agent,valueonly,separator=%x2C)"
 gh search issues "DONE by" --repo VeneratedApotheosis/Paper-Trail --state closed
