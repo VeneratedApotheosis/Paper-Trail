@@ -7,10 +7,10 @@ simulated and labeled as such.
 
 ## Start
 
-**Quickest (one command, issue #41):**
+**Quickest (one command, issues #41/#99; `npm run demo` is an old alias):**
 ```powershell
-npm run demo         # starts Next + playground, preloads the synthetic demo, opens your browser
-npm run demo -- --no-open   # same, without opening a browser; Ctrl+C stops everything
+npm run qa           # starts Next + playground, preloads the synthetic demo, opens your browser
+npm run qa -- --no-open     # same, without opening a browser; Ctrl+C stops everything
 ```
 It reuses a PaperTrail dev server already on port 3000, picks a free playground port (prints the URL), and
 loads the demo so the Ledger tab has data immediately.

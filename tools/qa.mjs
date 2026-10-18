@@ -1,10 +1,12 @@
 #!/usr/bin/env node
-// One-command local demo (issue #41): starts (or reuses) the Next dev server, starts the dev playground (#34)
-// on a free port, preloads the synthetic seed demo, and opens the browser.
+// Dev QA launcher (issues #41, #99): starts (or reuses) the Next dev server, starts the dev playground (#34)
+// on a free port, preloads the synthetic seed demo, and opens the browser. This is a TESTING tool, not the
+// product demo: the product demo is `npm run dev` -> "Try demo data" in the real app.
 //
-//   npm run demo                 # default
-//   npm run demo -- --no-open    # don't open a browser
-//   PT_API_PORT=3001 npm run demo
+//   npm run qa                   # default
+//   npm run qa -- --no-open      # don't open a browser
+//   PT_API_PORT=3001 npm run qa
+//   (`npm run demo` is a temporary alias that prints a rename notice)
 //
 // Node built-ins only. Ctrl+C stops everything this script started.
 import { spawn, execFile } from "node:child_process";
@@ -19,7 +21,11 @@ const OPEN_BROWSER = !process.argv.includes("--no-open");
 const isWindows = process.platform === "win32";
 const children = [];
 
-const log = (msg) => console.log(`[demo] ${msg}`);
+const log = (msg) => console.log(`[qa] ${msg}`);
+
+if (process.env.npm_lifecycle_event === "demo") {
+  log('"npm run demo" was renamed to "npm run qa" (dev testing playground). The product demo is "npm run dev" -> "Try demo data".');
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -109,7 +115,7 @@ async function main() {
     log(`reusing the PaperTrail dev server already running at ${API_BASE}`);
   } else if (!(await portIsFree(API_PORT))) {
     console.error(
-      `[demo] port ${API_PORT} is in use by something that isn't the PaperTrail API. ` +
+      `[qa] port ${API_PORT} is in use by something that isn't the PaperTrail API. ` +
         `Stop it, or run with PT_API_PORT=<free port>.`,
     );
     process.exit(1);
@@ -120,7 +126,7 @@ async function main() {
     while (!(await paperTrailApiUp())) {
       if (shuttingDown) return;
       if (Date.now() > deadline) {
-        console.error("[demo] Next dev server did not become ready within 3 minutes.");
+        console.error("[qa] Next dev server did not become ready within 3 minutes.");
         shutdown(1);
         return;
       }
@@ -172,6 +178,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(`[demo] ${err.stack ?? err}`);
+  console.error(`[qa] ${err.stack ?? err}`);
   shutdown(1);
 });

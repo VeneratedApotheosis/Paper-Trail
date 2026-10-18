@@ -28,7 +28,7 @@ Next route handlers for the API · Playwright for e2e. Do not add a new framewor
 ```
 npm ci              # ~1-3 min; Node 22 LTS recommended (Node 25 works but may compile better-sqlite3)
 npm run dev         # localhost:3000: the real app (the demo must work here)
-npm run demo        # dev QA tool: next dev + tools/playground + preloaded demo (not the product UI)
+npm run qa          # dev QA tool: next dev + tools/playground + preloaded demo (not the product UI; `npm run demo` = old alias)
 npm run lint        # `next lint` prints a deprecation notice; it still works
 npm run typecheck
 npm test            # vitest (src/** and scripts/** tests)

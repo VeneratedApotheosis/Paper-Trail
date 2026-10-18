@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "playground": "node tools/playground/server.mjs",
-    "demo": "node tools/demo.mjs",
+    "qa": "node tools/qa.mjs",
+    "demo": "node tools/qa.mjs",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push"
   },
