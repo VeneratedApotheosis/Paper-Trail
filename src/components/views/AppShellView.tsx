@@ -18,11 +18,20 @@ export interface AppShellAccount {
   sublabel?: string;
 }
 
+// Which data the app is showing. Drives the demo banner and keeps chrome honest
+// (AGENTS.md: synthetic data is always labelled as such).
+export type AppShellMode = "empty" | "demo" | "gmail";
+
 export interface AppShellViewProps {
   children: ReactNode;
   activePath: string;
   nav?: AppShellNavItem[];
   account?: AppShellAccount;
+  mode?: AppShellMode;
+  demoLabel?: string;
+  onLeaveDemo?: () => void;
+  // Deprecated: use `mode`. Kept so existing wrappers keep compiling; when `mode`
+  // is absent we derive it from this (`demo` -> "demo", otherwise "gmail").
   demo?: boolean;
 }
 
@@ -33,11 +42,7 @@ const defaultNav: AppShellNavItem[] = [
   { href: "/trust", label: "Trust" },
 ];
 
-const defaultAccount: AppShellAccount = {
-  initials: "AS",
-  name: "Alex Song",
-  sublabel: "Demo data",
-};
+const DEFAULT_DEMO_LABEL = "Demo data \u2014 synthetic, not real purchases";
 
 function isActive(activePath: string, href: string): boolean {
   return href === "/" ? activePath === "/" : activePath.startsWith(href);
@@ -47,9 +52,17 @@ export function AppShellView({
   children,
   activePath,
   nav = defaultNav,
-  account = defaultAccount,
-  demo = true,
+  account,
+  mode,
+  demoLabel = DEFAULT_DEMO_LABEL,
+  onLeaveDemo,
+  demo,
 }: AppShellViewProps) {
+  // Prefer the explicit `mode`; fall back to the legacy `demo` boolean so older
+  // call sites keep working until ui-wiring (#75) passes a real mode.
+  const effectiveMode: AppShellMode = mode ?? (demo === false ? "gmail" : "demo");
+  const showDemoBanner = effectiveMode === "demo";
+
   return (
     <div className="min-h-screen md:flex">
       {/* Desktop sidebar */}
@@ -74,27 +87,31 @@ export function AppShellView({
             );
           })}
         </nav>
-        <div className="mt-auto flex items-center gap-3 px-1">
-          <div className="neu-raised-sm flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold text-ink-muted">
-            {account.initials}
+        {account ? (
+          <div className="mt-auto flex items-center gap-3 px-1">
+            <div className="neu-raised-sm flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold text-ink-muted">
+              {account.initials}
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-ink">{account.name}</div>
+              {account.sublabel ? <div className="text-xs text-ink-faint">{account.sublabel}</div> : null}
+            </div>
           </div>
-          <div>
-            <div className="text-sm font-semibold text-ink">{account.name}</div>
-            {account.sublabel ? <div className="text-xs text-ink-faint">{account.sublabel}</div> : null}
-          </div>
-        </div>
+        ) : null}
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {demo ? <DemoBanner /> : null}
+        {showDemoBanner ? <DemoBanner label={demoLabel} onLeaveDemo={onLeaveDemo} /> : null}
         {/* Mobile masthead */}
         <header className="flex items-center justify-between px-5 py-4 md:hidden">
           <Link href="/" className="font-serif text-lg font-semibold text-ink">
             PaperTrail
           </Link>
-          <div className="neu-raised-sm flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-ink-muted">
-            {account.initials}
-          </div>
+          {account ? (
+            <div className="neu-raised-sm flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-ink-muted">
+              {account.initials}
+            </div>
+          ) : null}
         </header>
 
         <main className="mx-auto w-full max-w-ledger flex-1 px-5 pb-28 pt-2 md:px-10 md:py-10">

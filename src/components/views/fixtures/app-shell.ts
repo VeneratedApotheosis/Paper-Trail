@@ -5,7 +5,9 @@ import type { AppShellViewProps } from "@/components/views/AppShellView";
 // data (not from @/lib/mock) so the view stays decoupled from the data layer.
 export const appShellViewFixture: AppShellViewProps = {
   activePath: "/ledger",
-  demo: true,
+  mode: "demo",
+  demoLabel: "Demo data \u2014 synthetic, not real purchases",
+  onLeaveDemo: () => {},
   nav: [
     { href: "/", label: "Owed" },
     { href: "/ledger", label: "Ledger" },
@@ -13,8 +15,8 @@ export const appShellViewFixture: AppShellViewProps = {
     { href: "/trust", label: "Trust" },
   ],
   account: {
-    initials: "AS",
-    name: "Alex Song",
+    initials: "SR",
+    name: "Sample account",
     sublabel: "Demo data",
   },
   children: createElement("div", { className: "neu-inset rounded-lg p-6 text-ink" }, "Page content goes here"),
