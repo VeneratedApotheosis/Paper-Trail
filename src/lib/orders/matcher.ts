@@ -9,14 +9,28 @@ import {
   type NormalizedOrder,
   type OrderEvent,
   type OrderEventType,
+  type PurchaseDetails,
+  type PurchaseKind,
   type RawEmail,
+  type Shipment,
 } from "@/lib/contracts";
+import { isCarrierName } from "@/lib/ingestion/carriers";
+import { foldText, senderDisplayName, senderDomain } from "@/lib/ingestion/text";
 import { roundCents } from "@/lib/rules/money";
 import { clusterCandidates } from "./dedup/cluster";
 import { emailKeys, type CopyReason } from "./dedup/exact";
 import { merchantKeys } from "./dedup/merchant";
 import { canonicalRef, canonicalRefs, refsFromSubject } from "./dedup/refs";
 import type { DedupCandidate, MergeReason } from "./dedup/score";
+import { decideKind, digitalPlatformOf, isFoodOrTravelMerchant, subscriptionIntervalOf, type KindEvidence } from "./kind";
+import {
+  buildShipments,
+  isShippingClass,
+  isoOrNull,
+  packageStatusOf,
+  packageUpdateOf,
+  trackingNumbersOf,
+} from "./shipments";
 
 /** An exact copy of a matched email that was collapsed before extraction (#126 A); kept as provenance. */
 export interface EmailCopy {
@@ -55,6 +69,14 @@ export interface MatchDedupSummary {
   possibleDuplicates: number;
 }
 
+/** Shipping / tracking emails (shipped, delivered classes) by what became of them (#127). */
+export interface MatchLifecycleSummary {
+  /** In an order that has a confirmation. */
+  linked: number;
+  /** In a package-only entry: no receipt was found for them. */
+  orphaned: number;
+}
+
 export interface MatchResult {
   orders: NormalizedOrder[];
   /**
@@ -64,6 +86,7 @@ export interface MatchResult {
    */
   reviewReasons: Map<string, string[]>;
   dedup: MatchDedupSummary;
+  lifecycle: MatchLifecycleSummary;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -114,7 +137,14 @@ export function matchOrdersWithReasons(inputs: readonly MatchInput[], opts: Matc
     ? { groups: legacyGroups(relevant, legacyKeyOf, opts.fallbackMaxDays ?? DEFAULT_FALLBACK_MAX_DAYS), dedup: { merges: {}, possibleDuplicates: 0 } }
     : dedupGroups(relevant, legacyKeyOf);
 
-  const built = groups.map((group) => buildOrder(group));
+  const recurring = recurringGroups(groups);
+  const built = groups.map((group) => buildOrder(group, recurring.has(group)));
+  const lifecycle: MatchLifecycleSummary = { linked: 0, orphaned: 0 };
+  built.forEach(({ order }, index) => {
+    const shipping = groups[index].inputs.filter((input) => isShippingClass(input.extraction.class)).length;
+    if (order.packageOnly) lifecycle.orphaned += shipping;
+    else lifecycle.linked += shipping;
+  });
   const reviewReasons = new Map<string, string[]>();
   for (const { order, reasons } of built) {
     if (reasons.length > 0) reviewReasons.set(order.id, reasons);
@@ -122,7 +152,7 @@ export function matchOrdersWithReasons(inputs: readonly MatchInput[], opts: Matc
   const orders = built
     .map(({ order }) => order)
     .sort((a, b) => a.placedAt.localeCompare(b.placedAt) || a.id.localeCompare(b.id));
-  return { orders, reviewReasons, dedup };
+  return { orders, reviewReasons, dedup, lifecycle };
 }
 
 /** Id of the order an email would have formed on its own before #126 (merchant name slug + ref slug, else email id). */
@@ -181,10 +211,13 @@ function candidateOf(input: MatchInput): DedupCandidate {
   const confirmation = extraction.class === "order";
   const keys = merchantKeys({ from: email.from, subject: email.subject, merchant: fields.merchant, merchantDomain: fields.merchantDomain });
   const total = finiteOrNull(fields.totals.total);
+  const trackingNumbers = confirmation || isShippingClass(extraction.class) ? trackingNumbersOf(input) : [];
+  // A tracking number printed where an order number belongs must not count as a reference.
+  const trackingRefs = new Set(trackingNumbers.map((number) => canonicalRef(number)));
   return {
     merchantKeys: keys.length > 0 ? keys : ["unknown"],
-    refs: [...new Set([...canonicalRefs(fields.orderRef, fields.otherRefs), ...refsFromSubject(email.subject)])],
-    primaryRef: canonicalRef(fields.orderRef),
+    refs: [...new Set([...canonicalRefs(fields.orderRef, fields.otherRefs), ...refsFromSubject(email.subject)])].filter((ref) => !trackingRefs.has(ref)),
+    primaryRef: trackingRefs.has(canonicalRef(fields.orderRef)) ? null : canonicalRef(fields.orderRef),
     kind: confirmation ? "confirmation" : "lifecycle",
     emailClass: extraction.class,
     currency: fields.currency,
@@ -193,6 +226,7 @@ function candidateOf(input: MatchInput): DedupCandidate {
     items: fields.lineItems.map((item) => ({ key: slugify(item.name), sku: item.sku ?? null, unitPrice: item.unitPrice, qty: item.qty })),
     exactKeys: inputKeys(input).filter(isStrongKeyOf),
     threadKey: email.threadId ? `${email.sourceAccount ?? ""}:${email.threadId}` : null,
+    trackingNumbers,
   };
 }
 
@@ -211,9 +245,13 @@ function dedupGroups(
   const usedIds = new Map<string, number>();
   const groups: OrderGroup[] = clustering.clusters.map((cluster) => {
     const inputs = cluster.map((node) => relevant[node]);
-    const idInput = inputs.find((input) => normalizeRef(input.extraction.fields.orderRef) !== null) ?? inputs[0];
+    const idInput =
+      inputs.find((input) => normalizeRef(input.extraction.fields.orderRef) !== null) ??
+      inputs.find((input) => !isCarrierInput(input)) ??
+      inputs[0];
     const merchantKey = legacyKeyOf(idInput);
-    const baseId = legacyOrderId(idInput, merchantKey);
+    const packageNumber = packageTrackingKey(inputs);
+    const baseId = packageNumber ? `order:${merchantKey}:pkg-${slugify(packageNumber)}` : legacyOrderId(idInput, merchantKey);
     const seen = (usedIds.get(baseId) ?? 0) + 1;
     usedIds.set(baseId, seen);
     const id = seen === 1 ? baseId : `${baseId}:${seen}`;
@@ -238,6 +276,24 @@ function dedupGroups(
   const merges: Partial<Record<MergeReason, number>> = {};
   for (const merge of clustering.merges) merges[merge.reason] = (merges[merge.reason] ?? 0) + 1;
   return { groups, dedup: { merges, possibleDuplicates } };
+}
+
+/** A carrier or pickup network writing about somebody else's package: its name is never the shop. */
+function isCarrierInput(input: MatchInput): boolean {
+  const merchant = input.extraction.fields.merchant;
+  if (merchant) return isCarrierName(merchant);
+  return isCarrierName(senderDisplayName(input.email.from));
+}
+
+/**
+ * Smallest tracking number of a group that is only tracking emails and names no order reference: the group is a package
+ * on its own, so its id comes from the package instead of an email id (stable while more updates arrive).
+ */
+function packageTrackingKey(inputs: readonly MatchInput[]): string | null {
+  if (!inputs.every((input) => isShippingClass(input.extraction.class))) return null;
+  if (inputs.some((input) => normalizeRef(input.extraction.fields.orderRef) !== null)) return null;
+  const numbers = inputs.flatMap((input) => trackingNumbersOf(input)).sort();
+  return numbers[0] ?? null;
 }
 
 function compareInputs(a: MatchInput, b: MatchInput): number {
@@ -450,13 +506,29 @@ function matchLineItem(items: readonly NormalizedLineItem[], extracted: Extracte
   return items.find((item) => slugify(item.name) === name) ?? null;
 }
 
+/** Event a tracking email stands for: its package status (#127); null for a package returned to its sender. */
+function shippingEventType(input: MatchInput): OrderEventType | null {
+  switch (packageStatusOf(input)) {
+    case "out_for_delivery":
+      return "out_for_delivery";
+    case "ready_for_pickup":
+      return "ready_for_pickup";
+    case "delivered":
+      return "delivered";
+    case "returned":
+    case "unknown":
+      return null;
+    default:
+      return "shipped";
+  }
+}
+
 function eventTypeFor(input: MatchInput): OrderEventType | null {
   const { extraction, email } = input;
   switch (extraction.class) {
     case "shipped":
-      return "shipped";
     case "delivered":
-      return "delivered";
+      return shippingEventType(input);
     case "return_started":
       return DROP_OFF_PATTERN.test(`${email.subject}\n${email.text}`) ? "return_dropped" : "return_started";
     case "return_received":
@@ -478,9 +550,35 @@ interface BuiltEvent {
   quantities: Map<string, number>;
 }
 
-function buildEvents(orderId: string, sortedInputs: readonly MatchInput[], lineItems: NormalizedLineItem[]): BuiltEvent[] {
+/** Tie-break for events at the same instant: the purchase lifecycle reads in order, everything else after it. */
+const LIFECYCLE_EVENT_RANK: Partial<Record<OrderEventType, number>> = {
+  placed: 0, shipped: 1, out_for_delivery: 2, ready_for_pickup: 3, delivered: 4,
+};
+const eventRank = (type: OrderEventType) => LIFECYCLE_EVENT_RANK[type] ?? 10;
+
+/** The "placed" event of an order: its earliest confirmation, at the order date (#127). */
+function placedEvent(orderId: string, sortedInputs: readonly MatchInput[], placedAt: string): BuiltEvent | null {
+  const confirmation = sortedInputs.find(isConfirmation);
+  if (!confirmation) return null;
+  const { extraction, email } = confirmation;
+  return {
+    event: {
+      id: `${orderId}:placed:${email.id}`,
+      type: "placed",
+      at: placedAt,
+      messageId: email.id,
+      conf: inputConfMin(confirmation),
+      evidence: (extraction.evidence.date ?? email.subject).slice(0, 200),
+    },
+    quantities: new Map(),
+  };
+}
+
+function buildEvents(orderId: string, sortedInputs: readonly MatchInput[], lineItems: NormalizedLineItem[], placedAt: string): BuiltEvent[] {
   const seen = new Set<string>();
   const built: BuiltEvent[] = [];
+  const placed = placedEvent(orderId, sortedInputs, placedAt);
+  if (placed) built.push(placed);
   for (const input of sortedInputs) {
     const type = eventTypeFor(input);
     if (!type) continue;
@@ -494,10 +592,11 @@ function buildEvents(orderId: string, sortedInputs: readonly MatchInput[], lineI
     const lineItemIds = [...quantities.keys()].sort();
     const amount = finiteOrNull(extraction.fields.eventAmount);
     // The same lifecycle email received twice (resend/copy) must not produce a second event.
-    const dedupeKey = `${type}|${at.slice(0, 10)}|${amount ?? ""}|${lineItemIds.join(",")}`;
+    const tracking = isShippingClass(extraction.class) ? trackingNumbersOf(input).join(",") : "";
+    const dedupeKey = `${type}|${at.slice(0, 10)}|${amount ?? ""}|${lineItemIds.join(",")}|${tracking}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
-    const evidence = extraction.evidence.eventAmount ?? extraction.evidence.date;
+    const evidence = extraction.evidence.eventAmount ?? extraction.evidence.date ?? (isShippingClass(extraction.class) ? email.subject.slice(0, 200) : undefined);
     built.push({
       event: {
         id: `${orderId}:${type}:${email.id}`,
@@ -513,7 +612,10 @@ function buildEvents(orderId: string, sortedInputs: readonly MatchInput[], lineI
     });
   }
   return built.sort(
-    (a, b) => Date.parse(a.event.at) - Date.parse(b.event.at) || a.event.id.localeCompare(b.event.id),
+    (a, b) =>
+      Date.parse(a.event.at) - Date.parse(b.event.at) ||
+      eventRank(a.event.type) - eventRank(b.event.type) ||
+      a.event.id.localeCompare(b.event.id),
   );
 }
 
@@ -589,7 +691,87 @@ function amountReviewReasons(
   return reasons;
 }
 
-function buildOrder(group: OrderGroup): { order: NormalizedOrder; reasons: string[] } {
+/** Folded subject + body of up to this many emails: enough to read recurring-billing wording without folding a whole inbox. */
+const KIND_TEXT_EMAILS = 6;
+
+/**
+ * Orders of one merchant with the same total about a month apart are recurring charges (#127): subscriptions. Groups,
+ * not orders, because the order objects do not exist yet.
+ */
+function recurringGroups(groups: readonly OrderGroup[]): Set<OrderGroup> {
+  const recurring = new Set<OrderGroup>();
+  const charged = groups.flatMap((group) => {
+    const primary = primaryConfirmation(group.inputs);
+    const total = primary ? finiteOrNull(primary.extraction.fields.totals.total) : null;
+    return primary && total !== null && total > 0
+      ? [{ group, total, at: Date.parse(resolvePlacedAt(group.inputs)), currency: primary.extraction.fields.currency }]
+      : [];
+  });
+  for (let a = 0; a < charged.length; a += 1) {
+    for (let b = a + 1; b < charged.length; b += 1) {
+      const [x, y] = [charged[a], charged[b]];
+      if (x.group.merchantKey !== y.group.merchantKey || x.currency !== y.currency) continue;
+      const gapDays = Math.abs(x.at - y.at) / DAY_MS;
+      if (Math.abs(x.total - y.total) <= 0.005 && gapDays >= 20 && gapDays <= 45) {
+        recurring.add(x.group);
+        recurring.add(y.group);
+      }
+    }
+  }
+  return recurring;
+}
+
+/** Display name for the shop: a real merchant name before a carrier's, then domain, then the package's carrier. */
+function pickMerchantName(inputs: readonly MatchInput[], shipments: readonly Shipment[], fallback: string): { name: string; domain: string | null } {
+  const shopInputs = inputs.filter((input) => !isCarrierInput(input));
+  const firstName = (list: readonly MatchInput[]) => firstValue(list, (input) => input.extraction.fields.merchant || null);
+  const firstDomain = (list: readonly MatchInput[]) => firstValue(list, (input) => normalizeDomain(input.extraction.fields.merchantDomain));
+  const domain = firstDomain(shopInputs) ?? firstDomain(inputs);
+  return { name: firstName(shopInputs) ?? firstName(inputs) ?? domain ?? shipments[0]?.carrier ?? fallback, domain };
+}
+
+function kindDetailsOf(
+  kind: PurchaseKind,
+  inputs: readonly MatchInput[],
+  shipments: readonly Shipment[],
+  lineItems: readonly NormalizedLineItem[],
+  events: readonly OrderEvent[],
+  evidence: KindEvidence,
+): PurchaseDetails {
+  const fieldsOf = (input: MatchInput) => input.extraction.fields;
+  switch (kind) {
+    case "shipped":
+      return { kind, shipments: [...shipments] };
+    case "in_store":
+      return { kind, location: firstValue(inputs, (input) => fieldsOf(input).storeLocation?.trim() || null) };
+    case "digital":
+      return { kind, platform: firstValue(inputs, (input) => fieldsOf(input).platform?.trim() || null) ?? digitalPlatformOf(evidence) };
+    case "subscription":
+      return {
+        kind,
+        plan: firstValue(inputs, (input) => fieldsOf(input).subscription?.plan?.trim() || null) ?? lineItems[0]?.name ?? null,
+        interval: firstValue(inputs, (input) => fieldsOf(input).subscription?.interval) ?? subscriptionIntervalOf(evidence.text),
+        nextRenewal: isoOrNull(firstValue(inputs, (input) => fieldsOf(input).subscription?.nextRenewal)),
+      };
+    case "food_delivery":
+      return {
+        kind,
+        restaurant: firstValue(inputs, (input) => fieldsOf(input).restaurant?.trim() || null),
+        deliveredAt: events.find((event) => event.type === "delivered")?.at ?? null,
+      };
+    case "travel": {
+      const segments = new Map<string, { label: string; start: string | null; end: string | null }>();
+      for (const input of inputs) {
+        for (const segment of fieldsOf(input).travel?.segments ?? []) segments.set(`${segment.label}|${segment.start ?? ""}`, segment);
+      }
+      return { kind, segments: [...segments.values()], confirmation: firstValue(inputs, (input) => fieldsOf(input).travel?.confirmation?.trim() || null) };
+    }
+    default:
+      return { kind: "other" };
+  }
+}
+
+function buildOrder(group: OrderGroup, recurring: boolean): { order: NormalizedOrder; reasons: string[] } {
   const sorted = [...group.inputs].sort(compareInputs);
   const primary = primaryConfirmation(sorted);
   const confirmationsLatestFirst = sorted.filter(isConfirmation).reverse();
@@ -601,25 +783,51 @@ function buildOrder(group: OrderGroup): { order: NormalizedOrder; reasons: strin
   const orderRef = firstValue(byPrecedence, (input) => fieldsOf(input).orderRef);
   const id = group.id;
 
-  const merchantName =
-    firstValue(byPrecedence, (input) => fieldsOf(input).merchant) ??
-    firstValue(byPrecedence, (input) => fieldsOf(input).merchantDomain) ??
-    merchantSlug;
-  const domain = normalizeDomain(firstValue(byPrecedence, (input) => fieldsOf(input).merchantDomain));
+  const placedAt = resolvePlacedAt(sorted);
+  const lineItemsBase = buildLineItems(id, pickLineItems(sorted));
+  const builtEvents = buildEvents(id, sorted, lineItemsBase, placedAt);
+  const lineItems = applyReturnedQty(lineItemsBase, builtEvents);
+  const events = builtEvents.map(({ event }) => event);
+
+  const shipments = buildShipments(
+    sorted
+      .filter((input) => isShippingClass(input.extraction.class))
+      .map((input) => {
+        const itemIds = new Set<string>();
+        for (const extracted of fieldsOf(input).lineItems) {
+          const item = matchLineItem(lineItems, extracted);
+          if (item) itemIds.add(item.id);
+        }
+        return packageUpdateOf(input, resolveEventAt(input), [...itemIds]);
+      }),
+  );
+  const { name: merchantName, domain } = pickMerchantName(byPrecedence, shipments, merchantSlug);
+
+  const kindEvidence: KindEvidence = {
+    names: [...new Set([...byPrecedence.map((input) => fieldsOf(input).merchant), ...byPrecedence.map((input) => senderDisplayName(input.email.from))].filter((name): name is string => Boolean(name)))],
+    domains: [...new Set([...byPrecedence.map((input) => senderDomain(input.email.from)), ...byPrecedence.map((input) => normalizeDomain(fieldsOf(input).merchantDomain))].filter((name): name is string => Boolean(name)))],
+    text: byPrecedence.slice(0, KIND_TEXT_EMAILS).map((input) => foldText(`${input.email.subject}\n${input.email.text}`)).join("\n"),
+    shippingEvidence: shipments.length > 0 || sorted.some((input) => isShippingClass(input.extraction.class)),
+    recurringCharge: recurring,
+    llmSubscriptionInterval: byPrecedence.some((input) => fieldsOf(input).subscription?.interval != null),
+    llmGuess: firstValue(byPrecedence, (input) => fieldsOf(input).kindGuess),
+    confMin: Math.min(...sorted.map(inputConfMin)),
+  };
+  // Tracking emails with no receipt form one package entry; a food or travel merchant's "delivered" is not a parcel.
+  const packageOnly = primary === null && sorted.every((input) => isShippingClass(input.extraction.class)) && !isFoodOrTravelMerchant(kindEvidence);
+  const decision = packageOnly ? { kind: "shipped" as const } : decideKind(kindEvidence);
+  const details = kindDetailsOf(decision.kind, byPrecedence, shipments, lineItems, events, kindEvidence);
 
   const totalsSource = primary ? fieldsOf(primary).totals : {};
-  const lineItemsBase = buildLineItems(id, pickLineItems(sorted));
-  const builtEvents = buildEvents(id, sorted, lineItemsBase);
-  const lineItems = applyReturnedQty(lineItemsBase, builtEvents);
-
   const subtotal = totalsSource.subtotal ?? null;
   const tax = totalsSource.tax ?? null;
   const shipping = totalsSource.shipping ?? null;
   const discount = totalsSource.discount ?? null;
   const itemsSum = lineItems.reduce((sum, item) => sum + item.qty * item.unitPrice, 0);
-  const total = roundCents(
-    totalsSource.total ?? (subtotal ?? itemsSum) + (tax ?? 0) + (shipping ?? 0) - (discount ?? 0),
-  );
+  // A package entry has no receipt, so no amount: whatever a tracking email prints (item prices) is not a charge.
+  const total = packageOnly
+    ? 0
+    : roundCents(totalsSource.total ?? (subtotal ?? itemsSum) + (tax ?? 0) + (shipping ?? 0) - (discount ?? 0));
 
   const reasons = [
     ...amountReviewReasons({ subtotal, tax, shipping, discount, total }, sorted),
@@ -631,9 +839,11 @@ function buildOrder(group: OrderGroup): { order: NormalizedOrder; reasons: strin
 
   const currency = firstValue(byPrecedence, (input) => fieldsOf(input).currency);
   const confMin = Math.min(...sorted.map(inputConfMin));
-  // Without a confirmation the totals are unverified; without a currency the amounts cannot be compared.
-  const needsReview =
-    confMin < REVIEW_CONFIDENCE_THRESHOLD || primary === null || currency === null || reasons.length > 0;
+  // Without a confirmation the totals are unverified; without a currency the amounts cannot be compared. A package
+  // entry has no amounts, so only a conflict (reasons) sends it to review.
+  const needsReview = packageOnly
+    ? reasons.length > 0
+    : confMin < REVIEW_CONFIDENCE_THRESHOLD || primary === null || currency === null || reasons.length > 0;
 
   const copies = sorted.flatMap((input) => input.copies ?? []);
   const messageIds = [
@@ -655,24 +865,27 @@ function buildOrder(group: OrderGroup): { order: NormalizedOrder; reasons: strin
     id,
     merchant: { name: merchantName, domain, policy: buildPolicy(byPrecedence) },
     orderRef,
-    placedAt: resolvePlacedAt(sorted),
+    placedAt,
     // Unknown currency only ever reaches the needs-review queue (needsReview is forced above).
     currency: currency ?? "USD",
     // Non-finite amounts only ever reach the needs-review queue (a reason is recorded above).
-    subtotal: finiteOrNull(subtotal),
-    tax: finiteOrNull(tax),
-    shipping: finiteOrNull(shipping),
-    discount: finiteOrNull(discount),
+    subtotal: packageOnly ? null : finiteOrNull(subtotal),
+    tax: packageOnly ? null : finiteOrNull(tax),
+    shipping: packageOnly ? null : finiteOrNull(shipping),
+    discount: packageOnly ? null : finiteOrNull(discount),
     total: Number.isFinite(total) ? total : 0,
     last4: firstValue(byPrecedence, (input) => fieldsOf(input).last4),
     customerName: firstValue(byPrecedence, (input) => fieldsOf(input).customerName),
     lineItems,
-    events: builtEvents.map(({ event }) => event),
+    events,
     messageIds,
     ...(sources.length > 0 ? { sources } : {}),
     ...(group.aliasIds.length > 0 ? { aliasIds: group.aliasIds } : {}),
     ...(keys.length > 0 ? { emailKeys: keys } : {}),
     ...(group.possibleDuplicateOf ? { possibleDuplicateOf: group.possibleDuplicateOf } : {}),
+    kind: decision.kind,
+    details,
+    ...(packageOnly ? { packageOnly: true } : {}),
     confMin,
     needsReview,
   });

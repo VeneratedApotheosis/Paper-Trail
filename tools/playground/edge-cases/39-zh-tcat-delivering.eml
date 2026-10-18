@@ -1,0 +1,12 @@
+From: "黑貓宅急便" <service@t-cat.com.tw>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: 黑貓宅急便 配送中通知
+Date: Sun, 18 Oct 2026 01:00:00 +0000
+Message-ID: <39-zh-tcat@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=shipped; keep=true; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+您的包裹配送中。
+查貨號碼：123456789012

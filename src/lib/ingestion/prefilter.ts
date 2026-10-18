@@ -21,6 +21,18 @@ export const RECEIPT_SUBJECT_TERMS = [
   "pedido",
   "reembolso",
   "devolución",
+  "shipment",
+  "tracking",
+  "package",
+  "out for delivery",
+  "arriving",
+  "出貨",
+  "配送",
+  "取貨",
+  "到店",
+  "送達",
+  "簽收",
+  "訂單",
 ] as const;
 
 /** Sender words the Gmail query matches (typical transactional mailbox names). */
@@ -32,6 +44,12 @@ export const RECEIPT_SENDER_TERMS = [
   "refunds",
   "billing",
   "auto-confirm",
+  "shipment-tracking",
+  "ups",
+  "fedex",
+  "usps",
+  "dhl",
+  "shopee",
 ] as const;
 
 function gmailGroup(terms: readonly string[]): string {
@@ -57,10 +75,13 @@ export function describePrefilterQuery(): string {
 export type PrefilterDecision = { keep: boolean; reason: string };
 
 const SUBJECT_KEYWORDS =
-  /\b(order|receipt|shipped|shipment|delivered|return|refund|price adjustment|invoice|cancel(?:l)?ed|pedido|recibo|reembolso|devolucion|enviado|entregado|factura|cancelado)\b/;
+  /\b(order|receipt|shipped|shipment|delivered|return|refund|price adjustment|invoice|cancel(?:l)?ed|pedido|recibo|reembolso|devolucion|enviado|entregado|factura|cancelado|tracking|package|parcel|out for delivery|arriving|delivery (?:attempted|update|attempt)|attempted delivery|label created|ready for pickup)\b/;
+
+/** Traditional Chinese shipping and order words (no word boundaries in CJK). */
+const SUBJECT_KEYWORDS_ZH = /出貨|配送|取貨|取件|到店|送達|簽收|訂單|訂購|發票|已寄出|貨態/;
 
 const SENDER_KEYWORDS =
-  /^(orders?|receipts?|shipping|shipment|returns?|refunds?|billing|invoices?|auto-confirm|pedidos)$/;
+  /^(orders?|receipts?|shipping|shipment|shipment-tracking|returns?|refunds?|billing|invoices?|auto-confirm|pedidos|pkginfo)$/;
 
 /** Body phrases typical of transactional mail; two or more distinct hits keep the email. */
 const BODY_KEYWORDS = [
@@ -74,6 +95,8 @@ const BODY_KEYWORDS = [
   /\binvoice\b/,
   /\bshipped\b/,
   /\bdelivered\b/,
+  /出貨|配送中|取貨|到店|送達|簽收/,
+  /\bout for delivery\b|\barriving (?:today|tomorrow)\b|\bready (?:for|to) (?:be )?pick ?up\b/,
   /\bqty\b|\bquantity\b/,
   /\b(numero de pedido|reembolso|devolucion|enviado|entregado)\b/,
 ];
@@ -86,6 +109,8 @@ export function isReceiptLike(email: RawEmail): PrefilterDecision {
   const subject = foldText(email.subject);
   const subjectHit = SUBJECT_KEYWORDS.exec(subject);
   if (subjectHit) return { keep: true, reason: `subject mentions "${subjectHit[1]}"` };
+  const subjectZh = SUBJECT_KEYWORDS_ZH.exec(subject);
+  if (subjectZh) return { keep: true, reason: `subject mentions "${subjectZh[0]}"` };
 
   const localPart = senderLocalPart(email.from);
   if (localPart && SENDER_KEYWORDS.test(localPart)) {

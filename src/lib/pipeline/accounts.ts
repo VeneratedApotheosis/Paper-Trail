@@ -6,7 +6,7 @@ import type { DedupCandidate, MergeReason } from "@/lib/orders/dedup/score";
 import { slugify } from "@/lib/orders/matcher";
 import { mergeSameOrder } from "@/lib/orders/merge";
 import { defaultRules, runRulesIsolated } from "@/lib/rules";
-import type { PipelineDedupStats, PipelineResult, PipelineStats, ReviewQueueItem } from "./run";
+import { countKinds, type PipelineDedupStats, type PipelineResult, type PipelineStats, type ReviewQueueItem } from "./run";
 
 /**
  * One linked Gmail account's last published sync (#114). The store keeps one per account and rebuilds the merged
@@ -144,7 +144,7 @@ export function mergeAccountResults(accounts: readonly AccountPipelineResult[], 
       orders: finalOrders, findings, reviewQueue,
       stats: sumStats(ordered.map(({ result }) => result.stats), { orders: finalOrders.length,
         findings: findings.length, needsReview: reviewQueue.length }, crossMerges,
-        finalOrders.filter((order) => order.possibleDuplicateOf).length),
+        finalOrders.filter((order) => order.possibleDuplicateOf).length, countKinds(finalOrders)),
     },
   };
 }
@@ -158,14 +158,16 @@ function orderCandidate(order: NormalizedOrder): DedupCandidate {
     merchantKeys: keys.length > 0 ? keys : ["unknown"],
     refs: canonicalRefs(order.orderRef, []),
     primaryRef: canonicalRef(order.orderRef),
-    kind: "confirmation",
-    emailClass: "order",
+    // A package-only entry (#127) is a lifecycle candidate: it joins an order through a shared tracking number or reference.
+    kind: order.packageOnly ? "lifecycle" : "confirmation",
+    emailClass: order.packageOnly ? "shipped" : "order",
     currency: order.currency,
-    amount: order.total,
+    amount: order.packageOnly ? null : order.total,
     at: Date.parse(order.placedAt),
     items: order.lineItems.map((item) => ({ key: slugify(item.name), sku: item.sku ?? null, unitPrice: item.unitPrice, qty: item.qty })),
     exactKeys: order.emailKeys ?? [],
     threadKey: null,
+    trackingNumbers: order.details?.kind === "shipped" ? order.details.shipments.map((shipment) => shipment.trackingNumber) : [],
   };
 }
 function stampSource(order: NormalizedOrder, accountId: string): NormalizedOrder {
@@ -188,12 +190,14 @@ function sumStats(
   merged: Pick<PipelineStats, "orders" | "findings" | "needsReview">,
   crossMerges: PipelineDedupStats["merges"],
   possibleDuplicates: number,
+  kinds: NonNullable<PipelineStats["kinds"]>,
 ): PipelineStats {
   const stats: PipelineStats = {
     emails: 0, prefilteredOut: 0, classes: {}, extracted: 0, skipped: 0,
     extractionOrigins: { llm: 0, cache: 0, gold: 0 }, excludedOrders: 0, ...merged,
   };
   const dedup: PipelineDedupStats = { emailsCollapsed: 0, merges: { ...crossMerges }, possibleDuplicates };
+  const lifecycle = { linked: 0, orphaned: 0 };
   for (const part of all) {
     stats.emails += part.emails;
     stats.prefilteredOut += part.prefilteredOut;
@@ -201,11 +205,13 @@ function sumStats(
     stats.skipped += part.skipped;
     stats.excludedOrders += part.excludedOrders;
     dedup.emailsCollapsed += part.dedup?.emailsCollapsed ?? 0;
+    lifecycle.linked += part.lifecycle?.linked ?? 0;
+    lifecycle.orphaned += part.lifecycle?.orphaned ?? 0;
     for (const [reason, merges] of Object.entries(part.dedup?.merges ?? {}) as Array<[MergeReason, number]>) dedup.merges[reason] = (dedup.merges[reason] ?? 0) + merges;
     for (const kind of ["llm", "cache", "gold"] as const) stats.extractionOrigins[kind] += part.extractionOrigins[kind];
     for (const [name, count] of Object.entries(part.classes) as Array<[keyof PipelineStats["classes"], number]>) {
       stats.classes[name] = (stats.classes[name] ?? 0) + count;
     }
   }
-  return { ...stats, dedup };
+  return { ...stats, dedup, lifecycle, kinds };
 }

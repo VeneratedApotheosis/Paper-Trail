@@ -2,9 +2,14 @@ import type { ZodError } from "zod";
 import {
   EvidenceSchema,
   ExtractedFieldNameSchema,
+  MAX_TRACKING_NUMBERS,
+  MAX_TRAVEL_SEGMENTS,
   OTHER_REFS_MAX,
   OTHER_REF_MAX_CHARS,
   ExtractionSchema,
+  PurchaseKindSchema,
+  ShipmentStatusSchema,
+  SubscriptionIntervalSchema,
   type Classification,
   type EmailClass,
   type ExtractedFieldName,
@@ -89,6 +94,55 @@ function cleanOtherRefs(fields: unknown): unknown {
   return { ...fields, otherRefs: [...new Set(cleaned)].slice(0, OTHER_REFS_MAX) };
 }
 
+/** The value when it is one of the enum's options, else null. */
+function enumOrNull(options: readonly string[], value: unknown): string | null {
+  return typeof value === "string" && options.includes(value) ? value : null;
+}
+
+function cleanStrings(value: unknown, maxChars: number, maxCount: number): string[] {
+  if (!Array.isArray(value)) return [];
+  const cleaned = value
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => entry.trim().slice(0, maxChars))
+    .filter((entry) => entry !== "");
+  return [...new Set(cleaned)].slice(0, maxCount);
+}
+
+/**
+ * Kind and kind details (#127) are unscored hints, so a malformed piece is repaired or dropped instead of failing the
+ * whole extraction: unknown enum values become null, tracking numbers are trimmed and capped, bad travel segments go.
+ */
+function cleanKindDetails(fields: unknown): unknown {
+  if (!isRecord(fields)) return fields;
+  const next: Record<string, unknown> = { ...fields };
+  if ("kindGuess" in next) next.kindGuess = enumOrNull(PurchaseKindSchema.options, next.kindGuess);
+  if (isRecord(next.shipment)) {
+    next.shipment = {
+      ...next.shipment,
+      trackingNumbers: cleanStrings(next.shipment.trackingNumbers, 64, MAX_TRACKING_NUMBERS),
+      status: enumOrNull(ShipmentStatusSchema.options, next.shipment.status),
+    };
+  }
+  if (isRecord(next.subscription)) {
+    next.subscription = { ...next.subscription, interval: enumOrNull(SubscriptionIntervalSchema.options, next.subscription.interval) };
+  }
+  if (isRecord(next.travel)) {
+    const segments = Array.isArray(next.travel.segments) ? next.travel.segments : [];
+    next.travel = {
+      ...next.travel,
+      segments: segments
+        .filter((segment): segment is Record<string, unknown> => isRecord(segment) && typeof segment.label === "string" && segment.label.trim() !== "")
+        .map((segment) => ({
+          label: String(segment.label).trim(),
+          start: typeof segment.start === "string" ? segment.start : null,
+          end: typeof segment.end === "string" ? segment.end : null,
+        }))
+        .slice(0, MAX_TRAVEL_SEGMENTS),
+    };
+  }
+  return next;
+}
+
 function truncatePolicyQuote(fields: unknown): unknown {
   if (!isRecord(fields) || !("policyQuote" in fields)) return fields;
   return { ...fields, policyQuote: truncate(fields.policyQuote) };
@@ -132,7 +186,7 @@ function validateToolInput(
   const parsed = ExtractionSchema.safeParse({
     emailId: email.id,
     class: classification.class,
-    fields: cleanOtherRefs(truncatePolicyQuote(toolInput.fields)),
+    fields: cleanKindDetails(cleanOtherRefs(truncatePolicyQuote(toolInput.fields))),
     confidence: toolInput.confidence,
     evidence: truncateEvidence(toolInput.evidence),
     confMin: 0,

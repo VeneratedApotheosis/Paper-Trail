@@ -76,7 +76,7 @@ describe("seed pipeline (gold extractions -> matchOrders -> runRules)", () => {
 
   it("keeps both shipments of the split OH-11590 order on one timeline", () => {
     const types = orderByRef("OH-11590")?.events.map((event) => event.type);
-    expect(types).toEqual(["shipped", "delivered", "shipped", "delivered"]);
+    expect(types).toEqual(["placed", "shipped", "delivered", "shipped", "delivered"]);
   });
 
   it("produces the expected count of findings per kind", () => {

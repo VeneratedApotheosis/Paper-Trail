@@ -31,7 +31,7 @@ describe("mergeAccountResults", () => {
     const shared = merged.orders[0];
     expect(shared.sources).toEqual(["acct-a", "acct-b"]);
     expect(shared.messageIds.sort()).toEqual(["a-1", "a-2", "b-1", "b-2"]);
-    expect(shared.events.map(event => event.type)).toEqual(["return_received"]); // duplicate notice is one event
+    expect(shared.events.map(event => event.type)).toEqual(["placed", "return_received"]); // duplicate notice is one event
     expect(shared.total).toBe(80);
     expect(merged.orders[1].sources).toEqual(["acct-b"]);
     expect(merged.findings.map(finding => finding.id)).toEqual(a.result.findings.map(finding => finding.id));
@@ -73,7 +73,7 @@ describe("mergeAccountResults", () => {
     ], NOW).result;
     expect(merged.orders).toHaveLength(1);
     expect(merged.orders[0]).toMatchObject({ total: 80, needsReview: false, sources: ["acct-a", "acct-b"] });
-    expect(merged.orders[0].events.map(event => event.type)).toEqual(["return_received"]);
+    expect(merged.orders[0].events.map(event => event.type)).toEqual(["placed", "return_received"]);
     expect(merged.findings.map(finding => finding.kind)).toEqual(["refund_overdue"]);
     expect(merged.reviewQueue).toEqual([review]);
   });

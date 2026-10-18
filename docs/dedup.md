@@ -62,3 +62,7 @@ precision: two identical coffees, monthly subscription, refund above total 0 -> 
 - Refless identical receipts are only flagged; "This is a receipt" single-email adds are not deduplicated.
 - Phase 2: Review "Possible duplicates" card (merge / not a duplicate, remembered), payment-service receipts (PayPal,
   Stripe) as evidence, learned thresholds, merging lifecycle-only groups with each other.
+
+## Tracking numbers (#127)
+A shared tracking number joins `shipped`/`delivered` emails of any sender (merge reason `tracking_number`, after shared reference, before scoring); see `docs/purchase-kinds.md`. Lifecycle-only clusters are scored against confirmations as a whole. Package-only entries (no receipt) are one order each until the receipt arrives.
+

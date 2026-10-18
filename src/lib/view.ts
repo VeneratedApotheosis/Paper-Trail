@@ -14,7 +14,10 @@ export type OrderDisplayStatus =
   | "cancelled";
 
 const EVENT_TO_STATUS: Record<OrderEvent["type"], OrderDisplayStatus> = {
+  placed: "ordered",
   shipped: "shipped",
+  out_for_delivery: "shipped",
+  ready_for_pickup: "shipped",
   delivered: "delivered",
   return_started: "return in progress",
   return_dropped: "return in progress",

@@ -56,4 +56,18 @@ describe("mergeSameOrder", () => {
     const merged = mergeSameOrder([order({ lineItems: [{ ...item, qty: 2, returnedQty: 1 }] }), order({ sources: ["acct-b"], lineItems: [{ ...item, qty: 2, returnedQty: 2 }] })]);
     expect(merged.lineItems).toEqual([{ ...item, qty: 2, returnedQty: 2 }]);
   });
+
+  it("merges a package-only entry into the real order: shipments joined, flag gone, amounts from the receipt (#127)", () => {
+    const shipment = (status: "shipped" | "delivered") => ({ carrier: "UPS", trackingNumber: "1Z999AA10123456784", trackingUrl: null, status, eta: null, shippedAt: "2026-09-02T09:00:00.000Z", deliveredAt: status === "delivered" ? "2026-09-04T09:00:00.000Z" : null, itemIds: [] });
+    const receipt = order({ kind: "shipped", details: { kind: "shipped", shipments: [shipment("shipped")] } });
+    const pkg = order({ id: "order:ups:pkg-1z", orderRef: null, total: 0, lineItems: [], packageOnly: true, kind: "shipped", messageIds: ["p1"], sources: ["acct-b"],
+      details: { kind: "shipped", shipments: [shipment("delivered")] }, events: [event("e9", "shipped", "2026-09-02T09:00:00.000Z", "p1")] });
+    const merged = mergeSameOrder([pkg, receipt]);
+    expect(merged).toMatchObject({ id: receipt.id, total: 80, kind: "shipped" });
+    expect(merged.packageOnly).toBeUndefined();
+    expect(merged.details).toMatchObject({ kind: "shipped", shipments: [{ trackingNumber: "1Z999AA10123456784", status: "delivered", deliveredAt: "2026-09-04T09:00:00.000Z" }] });
+    expect(merged.aliasIds).toContain("order:ups:pkg-1z");
+    expect(mergeSameOrder([receipt, pkg])).toEqual(merged);
+    expect(mergeSameOrder([pkg, { ...pkg, id: "order:ups:pkg-1z:2", sources: ["acct-c"] }]).packageOnly).toBe(true);
+  });
 });

@@ -13,7 +13,7 @@ describe("matchOrders dedup (#126): merging", () => {
     expect(order.id).toBe("order:amazon-com:112-1234567-1234567");
     expect(order.aliasIds).toEqual(["order:amazon-marketplace:112-1234567-1234567", "order:amazon:1121234567-1234567"]);
     expect(order.messageIds.sort()).toEqual(["amz-delivered", "amz-order", "amz-ship"]);
-    expect(order.events.map((event) => event.type)).toEqual(["shipped", "delivered"]);
+    expect(order.events.map((event) => event.type)).toEqual(["placed", "shipped", "delivered"]);
   });
 
   it("joins an invoice and a confirmation through ANY shared reference (otherRefs)", () => {
@@ -29,7 +29,7 @@ describe("matchOrders dedup (#126): merging", () => {
     expect(delivered[0].id).toBe("order:freshcart-home:fc-9001");
     const refunded = matchOrders(inputs("nw-order-4001", "nw-refund-4001"));
     expect(refunded).toHaveLength(1);
-    expect(refunded[0].events.map((event) => event.type)).toEqual(["refund_issued"]);
+    expect(refunded[0].events.map((event) => event.type)).toEqual(["placed", "refund_issued"]);
   });
 
   it("keeps every copy's id, account and keys as provenance when the pipeline collapsed copies into an email", () => {
@@ -79,7 +79,7 @@ describe("matchOrders dedup (#126): never merging", () => {
   it("a refund above the order total is its own (review) order, not that order's refund", () => {
     const { orders } = matchOrdersWithReasons(inputs("vl-order", "vl-big-refund"));
     expect(orders).toHaveLength(2);
-    expect(orders.find((order) => order.messageIds.includes("vl-order"))?.events).toEqual([]);
+    expect(orders.find((order) => order.messageIds.includes("vl-order"))?.events.map((event) => event.type)).toEqual(["placed"]);
   });
 
   it("a refund above the total that names the order attaches but goes to review with a reason", () => {
@@ -103,7 +103,7 @@ describe("matchOrders dedup (#126): never merging", () => {
     expect(order).toMatchObject({ id: "order:bowlish-keys:blk-9129", total: 66, orderRef: "BLK-9129" });
     expect(order.messageIds).toHaveLength(4);
     expect(order.merchant.domain).toBe("bowlish-keys.example");
-    expect(order.events.map((event) => event.type)).toEqual(["shipped", "shipped", "delivered"]);
+    expect(order.events.map((event) => event.type)).toEqual(["placed", "shipped", "out_for_delivery", "delivered"]);
     // Order of arrival must not matter (delivered first, confirmation last).
     expect(matchOrders(inputs("blk-delivered", "blk-out-for-delivery", "blk-on-the-way", "blk-confirmed"))).toEqual([order]);
   });
@@ -111,7 +111,7 @@ describe("matchOrders dedup (#126): never merging", () => {
   it("a bare lifecycle email (no number, items or amount) joins the merchant's only order in its window, not a second one", () => {
     const orders = matchOrders(inputs("bare-order", "bare-delivered"));
     expect(orders).toHaveLength(1);
-    expect(orders[0].events.map((event) => event.type)).toEqual(["delivered"]);
+    expect(orders[0].events.map((event) => event.type)).toEqual(["placed", "delivered"]);
     const two = matchOrders([...inputs("bare-order", "bare-delivered"), inputOf({ ...spec("bare-order"), id: "bare-order-2", ref: "TH-9999", date: "2026-09-11T10:00:00Z" })]);
     // With two open orders it is ambiguous, so the delivery email stays alone (for review) rather than guessing.
     expect(two).toHaveLength(3);

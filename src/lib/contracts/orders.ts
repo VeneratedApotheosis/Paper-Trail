@@ -1,9 +1,15 @@
 import { z } from "zod";
 import { CurrencySchema, EvidenceSchema } from "./extraction";
+import { PurchaseKindSchema, ShipmentStatusSchema, SubscriptionIntervalSchema } from "./purchase";
 
 /** Mirrors the `event.type` enum in src/db/schema/orders.ts. */
 export const OrderEventTypeSchema = z.enum([
+  /** The order confirmation (#127); lets a purchase timeline start at "placed". */
+  "placed",
   "shipped",
+  /** Tracking updates (#127): the carrier has the package on the final leg / it waits at a pickup point. */
+  "out_for_delivery",
+  "ready_for_pickup",
   "delivered",
   "return_started",
   "return_dropped",
@@ -53,6 +59,54 @@ export const NormalizedLineItemSchema = z.object({
 });
 export type NormalizedLineItem = z.infer<typeof NormalizedLineItemSchema>;
 
+/** One package (one tracking number). Split shipments are several of these on one order. */
+export const ShipmentSchema = z.object({
+  /** Carrier name as shown to the shopper ("UPS", "FedEx", "7-ELEVEN", ...); null when unknown. */
+  carrier: z.string().nullable(),
+  /** As printed, upper case without spaces. */
+  trackingNumber: z.string().min(1),
+  /** Public tracking page, built by code from carrier + number (never by the LLM); null when the carrier has no public URL pattern. */
+  trackingUrl: z.string().url().nullable(),
+  status: ShipmentStatusSchema,
+  /** ISO date or datetime of the expected delivery / pickup deadline; null when unknown or not ISO. */
+  eta: z.string().nullable(),
+  shippedAt: z.string().nullable(),
+  deliveredAt: z.string().nullable(),
+  /** Order line items in this package; empty when the emails do not say. */
+  itemIds: z.array(z.string()),
+  /** Pickup store / locker for `ready_for_pickup` flows ("7-ELEVEN Xinyi Store"); null otherwise. Additive to the issue contract. */
+  pickupLocation: z.string().nullable().optional(),
+});
+export type Shipment = z.infer<typeof ShipmentSchema>;
+
+export const TravelSegmentSchema = z.object({
+  label: z.string(),
+  start: z.string().nullable(),
+  end: z.string().nullable(),
+});
+export type TravelSegment = z.infer<typeof TravelSegmentSchema>;
+
+/** Kind-specific facts (#127). `details.kind` always equals the order's `kind`. */
+export const PurchaseDetailsSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("shipped"), shipments: z.array(ShipmentSchema) }),
+  z.object({ kind: z.literal("in_store"), location: z.string().nullable() }),
+  z.object({ kind: z.literal("digital"), platform: z.string().nullable() }),
+  z.object({
+    kind: z.literal("subscription"),
+    plan: z.string().nullable(),
+    interval: SubscriptionIntervalSchema.nullable(),
+    nextRenewal: z.string().nullable(),
+  }),
+  z.object({ kind: z.literal("food_delivery"), restaurant: z.string().nullable(), deliveredAt: z.string().nullable() }),
+  z.object({
+    kind: z.literal("travel"),
+    segments: z.array(TravelSegmentSchema),
+    confirmation: z.string().nullable(),
+  }),
+  z.object({ kind: z.literal("other") }),
+]);
+export type PurchaseDetails = z.infer<typeof PurchaseDetailsSchema>;
+
 /**
  * One order after matching/dedup (issue #8 output). This is the input to the rules engine (#13-#15)
  * and the shape the ledger UI renders.
@@ -99,6 +153,16 @@ export const NormalizedOrderSchema = z.object({
    * enough evidence to merge (#126). Flag for a later Review card; the order is counted as its own purchase.
    */
   possibleDuplicateOf: z.object({ orderId: z.string(), reason: z.string(), score: z.number() }).optional(),
+  /** Purchase kind (#127). Absent on data from before it existed: treat as "other". */
+  kind: PurchaseKindSchema.optional(),
+  /** Kind-specific facts; `details.kind` equals `kind`. Absent with `kind`. */
+  details: PurchaseDetailsSchema.optional(),
+  /**
+   * True for a package entry built from tracking emails alone (#127): no order confirmation was found, so there is no
+   * amount (total 0), the entry never produces findings and never counts toward owed totals. When the receipt arrives
+   * it merges in and this flag disappears.
+   */
+  packageOnly: z.boolean().optional(),
   /** Lowest extraction confidence among contributing emails. */
   confMin: z.number().min(0).max(1),
   needsReview: z.boolean(),

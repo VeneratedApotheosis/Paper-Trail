@@ -1,0 +1,14 @@
+From: "USPS" <USPSInformeddelivery@usps.com>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: Delivery attempted: we missed you
+Date: Wed, 14 Oct 2026 17:45:00 +0000
+Message-ID: <35-usps@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=shipped; keep=true; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+We attempted delivery of your package today but nobody was available.
+
+Tracking number: 9400111899223344556677
+We will try again tomorrow.

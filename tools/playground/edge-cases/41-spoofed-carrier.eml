@@ -1,0 +1,13 @@
+From: "UPS" <delivery@ups-parcel-notice.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: UPS: your package is on its way, confirm now
+Date: Mon, 19 Oct 2026 09:00:00 +0000
+Message-ID: <41-fake-ups@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=not_receipt; keep=true; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+A UPS package is on its way to you.
+Tracking number: 1Z999AA10123456785
+Click the link to reschedule delivery.

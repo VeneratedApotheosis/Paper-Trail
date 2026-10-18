@@ -38,7 +38,7 @@ export interface ClusterResult {
 }
 
 /** Evidence that merges any two candidates, strongest first. `items_amount` here is two confirmations, one without a number. */
-const STAGE_ONE_REASONS: readonly MergeReason[] = ["message_id", "fingerprint", "shared_ref", "items_amount"];
+const STAGE_ONE_REASONS: readonly MergeReason[] = ["message_id", "fingerprint", "shared_ref", "tracking_number", "items_amount"];
 
 export interface ClusterOptions {
   /** Veto on joining two candidates (e.g. only orders from different inboxes are merged across accounts). */
@@ -72,7 +72,9 @@ export function clusterCandidates(candidates: readonly DedupCandidate[], options
   // Only candidates sharing a merchant key can score; bucket by key so large runs stay cheap.
   const byMerchantKey = new Map<string, number[]>();
   candidates.forEach((candidate, index) => {
-    for (const key of candidate.merchantKeys) byMerchantKey.set(key, [...(byMerchantKey.get(key) ?? []), index]);
+    // A shared tracking number can join emails of different senders (#127), so it is a bucket of its own.
+    const keys = [...candidate.merchantKeys, ...(candidate.trackingNumbers ?? []).map((number) => `tracking:${number}`)];
+    for (const key of keys) byMerchantKey.set(key, [...(byMerchantKey.get(key) ?? []), index]);
   });
   const pairKeys = new Set<number>();
   for (const bucket of byMerchantKey.values()) {
@@ -115,28 +117,43 @@ export function clusterCandidates(candidates: readonly DedupCandidate[], options
   }
 
   const hasConfirmation = (root: number) => (members.get(root) ?? []).some((index) => candidates[index].kind === "confirmation");
+  const isBare = (index: number) => candidates[index].refs.length === 0 && candidates[index].items.length === 0 && candidates[index].amount === null;
   const ambiguous: PossibleDuplicate[] = [];
-  for (let node = 0; node < count; node += 1) {
-    if (candidates[node].kind !== "lifecycle") continue;
-    const root = find(node);
-    if (hasConfirmation(root) || (members.get(root)?.length ?? 0) > 1) continue;
-    const bestByCluster = new Map<number, { index: number; pair: PairScore }>();
-    for (const other of members.keys()) {
-      if (other === root || !hasConfirmation(other)) continue;
-      for (const index of members.get(other) ?? []) {
-        if (candidates[index].kind !== "confirmation") continue;
-        const pair = score(node, index);
-        if (pair.blocked !== null || pair.decision === "none") continue;
-        const current = bestByCluster.get(other);
-        if (!current || pair.score > current.pair.score) bestByCluster.set(other, { index, pair });
+  // Every lifecycle-only cluster (a lone email, or emails joined by a reference or tracking number #127) looks for the
+  // one order that its best-matching member clearly prefers.
+  const lifecycleRoots = [...members.keys()].filter((root) => !hasConfirmation(root)).sort((p, q) => p - q);
+  for (const startRoot of lifecycleRoots) {
+    const root = find(startRoot);
+    if (hasConfirmation(root)) continue;
+    const nodes = members.get(root) ?? [];
+    if (nodes.some((node) => candidates[node].kind !== "lifecycle")) continue;
+    const bestByCluster = new Map<number, { node: number; index: number; pair: PairScore }>();
+    for (const node of nodes) {
+      for (const other of members.keys()) {
+        if (other === root || !hasConfirmation(other)) continue;
+        for (const index of members.get(other) ?? []) {
+          if (candidates[index].kind !== "confirmation") continue;
+          if (options.allowPair && !options.allowPair(node, index)) continue;
+          const pair = score(node, index);
+          if (pair.blocked !== null || pair.decision === "none") continue;
+          const current = bestByCluster.get(other);
+          if (!current || pair.score > current.pair.score) bestByCluster.set(other, { node, index, pair });
+        }
       }
     }
     // A bare lifecycle email (no reference, items or amount to contradict) joins the merchant's only order in its window.
-    const bare = candidates[node].refs.length === 0 && candidates[node].items.length === 0 && candidates[node].amount === null;
-    if (bare) {
-      const open = [...members.keys()].filter((other) => other !== root && hasConfirmation(other) && (members.get(other) ?? []).some((index) => candidates[index].kind === "confirmation" && score(node, index).blocked === null));
-      if (open.length === 1) {
-        const target = (members.get(open[0]) ?? []).find((index) => candidates[index].kind === "confirmation" && score(node, index).blocked === null)!;
+    const bareNodes = nodes.filter(isBare);
+    if (bareNodes.length > 0) {
+      const open = new Map<number, { node: number; target: number }>();
+      for (const node of bareNodes) {
+        for (const other of members.keys()) {
+          if (other === find(node) || !hasConfirmation(other)) continue;
+          const target = (members.get(other) ?? []).find((index) => candidates[index].kind === "confirmation" && (options.allowPair?.(node, index) ?? true) && score(node, index).blocked === null);
+          if (target !== undefined && !open.has(other)) open.set(other, { node, target });
+        }
+      }
+      if (open.size === 1) {
+        const [{ node, target }] = [...open.values()];
         if (union(node, target, "only_order")) continue;
       }
     }
@@ -145,13 +162,12 @@ export function clusterCandidates(candidates: readonly DedupCandidate[], options
     if (!best) continue;
     const clear = !second || best.pair.score - second.pair.score >= AMBIGUITY_MARGIN;
     if (best.pair.decision === "merge" && clear && best.pair.mergeReason) {
-      union(node, best.index, best.pair.mergeReason);
+      union(best.node, best.index, best.pair.mergeReason);
     } else if (best.pair.score >= POSSIBLE_DUPLICATE_SCORE) {
       const reasons = [...best.pair.reasons, ...(second && !clear ? ["matches another order about as well"] : [])];
-      ambiguous.push({ node, other: best.index, score: best.pair.score, reasons });
+      ambiguous.push({ node: best.node, other: best.index, score: best.pair.score, reasons });
     }
   }
-
   const possible = new Map<number, PossibleDuplicate>();
   const consider = (item: PossibleDuplicate) => {
     const root = find(item.node);

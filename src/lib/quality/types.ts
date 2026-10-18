@@ -1,4 +1,4 @@
-import type { EmailClass, ExtractedFields, Finding, NormalizedOrder } from "@/lib/contracts";
+import type { EmailClass, ExtractedFields, Finding, NormalizedOrder, PurchaseKind } from "@/lib/contracts";
 import type { PipelineEmailOutcome, ReviewQueueItem } from "@/lib/pipeline/run";
 import type { MergeReason } from "@/lib/orders/dedup/score";
 import type { Draft } from "@/lib/types";
@@ -41,6 +41,10 @@ export interface SyncQualityReport {
   mergesByReason?: Partial<Record<MergeReason, number>>;
   /** Orders flagged as a possible duplicate of another (not merged). */
   possibleDuplicates?: number;
+  /** Shipping / tracking emails (#127): linked to a receipt vs left as package-only entries (no receipt found). */
+  lifecycle?: { linked: number; orphaned: number };
+  /** Orders by purchase kind (#127). */
+  kinds?: Partial<Record<PurchaseKind, number>>;
   findings: number;
   /** LLM requests that left the machine (cache hits are not counted). */
   llmCalls: number;

@@ -1,4 +1,5 @@
 import type { Classification, EmailClass, RawEmail, RedactedEmail } from "@/lib/contracts";
+import { carrierFromDomain, carrierFromName, isTrustedLogisticsDomain } from "./carriers";
 import { foldText, hasOrderRef, senderDisplayName, senderDomain } from "./text";
 
 /**
@@ -46,26 +47,26 @@ const CLASS_RULES: readonly ClassRule[] = [
   },
   {
     cls: "delivered",
-    subject: /(?<!(?:will|to|should|would|can|may) be )\bdelivered\b|(?<!sera )\bentregad[oa]\b/,
-    body: /\b(?:has been|was|were) delivered\b|(?<!be )\bdelivered (?:on|at|to)\b|\b(?:ha sido|fue) entregad[oa]\b/,
+    subject: /(?<!(?:will|to|should|would|can|may) be )\bdelivered\b|(?<!sera )\bentregad[oa]\b|\bdelivery (?:is )?complete(?:d)?\b|\bpicked up (?:from|at) (?:the )?(?:store|locker|pick-?up|branch)\b|已送達|已簽收|已签收|已取貨|已取件|已完成取貨|配達完成|簽收通知|取件完成/,
+    body: /\b(?:has been|was|were) delivered\b|(?<!be )\bdelivered (?:on|at|to)\b|\b(?:ha sido|fue) entregad[oa]\b|\bdelivery (?:is )?complete(?:d)?\b|\bpicked up (?:from|at) (?:the )?(?:store|locker|pick-?up|branch)\b|已送達|已簽收|已签收|已取貨|已取件|已完成取貨|配達完成|取件完成/,
   },
   {
     cls: "shipped",
     subject:
-      /\bshipped\b|\bshipping confirmation\b|\bshipment\b|\bon (?:its|the) way\b|\bout for delivery\b|\bin transit\b|\benviad[oa]\b|\ben camino\b/,
-    body: /\b(?:has|have|was|were) (?:been )?shipped\b|\bout for delivery\b|\btracking (?:number|#)\s*:|\bon (?:its|the) way\b|\b(?:ha sido|fue) enviad[oa]\b|\ben camino\b/,
+      /\bshipped\b|\bshipping confirmation\b|\bshipment\b|\bon (?:its|the) way\b|\bout for delivery\b|\bin transit\b|\benviad[oa]\b|\ben camino\b|\barriving (?:today|tomorrow)\b|\blabel created\b|\bdelivery (?:update|attempt(?:ed)?)\b|\battempted delivery\b|\bready (?:for|to) (?:be )?(?:pick ?up|collect(?:ion)?)\b|\bavailable for pick ?up\b|\bpicked up by (?:the )?(?:carrier|driver)\b|\btracking (?:update|number)\b|\bshipping update\b|已出貨|出貨通知|配送中|運送中|已到店|到店通知|可取貨|待取貨|取貨通知|已寄出|已發貨|已发货|派送中|配達中|貨態/,
+    body: /\b(?:has|have|was|were) (?:been )?shipped\b|\bout for delivery\b|\btracking (?:number|#|no\.?|id)\s*[:|]|\bon (?:its|the) way\b|\b(?:ha sido|fue) enviad[oa]\b|\ben camino\b|\barriving (?:today|tomorrow)\b|\blabel created\b|\bready (?:for|to) (?:be )?(?:pick ?up|collect(?:ion)?)\b|\bavailable for pick ?up\b|\barrived at (?:the )?(?:pick-?up|store|locker|facility)\b|已出貨|出貨通知|配送中|運送中|已到店|到店通知|可取貨|待取貨|取貨通知|已寄出|已發貨|已发货|派送中|配達中|物流單號|追蹤編號|貨態/,
   },
   {
     cls: "order",
     subject:
-      /\border (?:(?:is |has been )?confirmed|confirmation|received|placed|summary|details)\b|\bthanks? (?:you )?for (?:your )?(?:order|purchase|shopping)\b|\breceipt\b|\binvoice\b|\bpayment (?:received|confirmation|sent|receipt)\b|\bsubscription (?:renewed|renewal)\b|\bconfirmacion (?:de|del) (?:(?:tu|su) )?(?:pedido|compra)\b|\bpedido (?:confirmado|recibido)\b|\bgracias por tu (?:pedido|compra)\b|\brecibo\b|\bfactura\b/,
-    body: /\bthanks? (?:you )?for (?:your )?(?:order|purchase)\b|\border (?:confirmed|confirmation|summary)\b|\bwe(?:'ve| have) received your order\b|\border total\b|\bgracias por tu (?:pedido|compra)\b|\bresumen del pedido\b|\bpedido confirmado\b|\bpayment (?:received|confirmation)\b/,
+      /\border (?:(?:is |has been )?confirmed|confirmation|received|placed|summary|details)\b|\border\s*#?[a-z0-9-]*\d[a-z0-9-]*\s+(?:is |has been |was )?(?:confirmed|received|placed)\b|\bthanks? (?:you )?for (?:your )?(?:order|purchase|shopping)\b|\breceipt\b|\binvoice\b|\bpayment (?:received|confirmation|sent|receipt)\b|\bsubscription (?:renewed|renewal)\b|\bconfirmacion (?:de|del) (?:(?:tu|su) )?(?:pedido|compra)\b|\bpedido (?:confirmado|recibido)\b|\bgracias por tu (?:pedido|compra)\b|\brecibo\b|\bfactura\b|訂單(?:成立|確認|通知)|訂購(?:成功|確認|通知)|付款成功|感謝(?:您的)?(?:訂購|購買)|購物明細/,
+    body: /\bthanks? (?:you )?for (?:your )?(?:order|purchase)\b|\border (?:confirmed|confirmation|summary)\b|\bwe(?:'ve| have) received your order\b|\border total\b|\bgracias por tu (?:pedido|compra)\b|\bresumen del pedido\b|\bpedido confirmado\b|\bpayment (?:received|confirmation)\b|訂單(?:成立|確認)|感謝您的(?:訂購|購買)|付款成功/,
   },
 ];
 
 /** Real shipping evidence. Bare transit wording ("on its way", "en camino") is not enough on its own. */
 const STRONG_SHIPPING_EVIDENCE =
-  /\bshipped\b|\bshipping confirmation\b|\bshipment\b|\bout for delivery\b|\bin transit\b|\btracking (?:number|#|id|link)\b|\btrack (?:your|my) (?:package|shipment|order)\b|\bcarrier\s*:|\b(?:ups|usps|fedex|dhl)\b|\benviad[oa]\b|\bnumero de (?:seguimiento|rastreo)\b/;
+  /\bshipped\b|\bshipping confirmation\b|\bshipment\b|\bout for delivery\b|\bin transit\b|\btracking (?:number|#|id|link|update)\b|\btrack (?:your|my) (?:package|shipment|order)\b|\bcarrier\s*:|\b(?:ups|usps|fedex|dhl|t-?cat)\b|\benviad[oa]\b|\bnumero de (?:seguimiento|rastreo)\b|\barriving (?:today|tomorrow)\b|\blabel created\b|\bready (?:for|to) (?:be )?(?:pick ?up|collect)|\bavailable for pick ?up\b|\bdelivery (?:update|attempt)|已出貨|出貨通知|配送中|運送中|已到店|到店通知|可取貨|待取貨|取貨通知|已寄出|已發貨|已发货|派送中|配達中|物流單號|追蹤編號|貨態|黑貓|新竹物流|中華郵政|7-eleven|統一超商|全家/;
 
 /** Order-confirmation wording; with an order number and an order total or items list it outranks transit wording. */
 const ORDER_CONFIRMATION_WORDING =
@@ -223,9 +224,16 @@ function assessSuspicion(view: EmailView, foldedAll: string): Suspicion {
   if (spoofedBrand || (brands.length === 0 && /[a-z][013457][a-z]/.test(labels))) {
     score += 2;
     reasons.push(`look-alike sender domain ${domain}`);
-  } else if (brands.length > 0 && !brands.some((word) => lettersOnly.includes(word)) && !isCommercePlatform(domain)) {
+  } else if (brands.length > 0 && !brands.some((word) => lettersOnly.includes(word)) && !isCommercePlatform(domain) && !isTrustedLogisticsDomain(domain)) {
     score += 1;
     reasons.push(`sender domain ${domain} does not match "${senderDisplayName(view.from)}"`);
+  }
+
+  // A display name that claims a carrier ("UPS", "FedEx", "黑貓宅急便") on a domain that is not the carrier's is a classic fake tracking mail.
+  const claimed = carrierFromName(senderDisplayName(view.from));
+  if (claimed && claimed.role === "carrier" && carrierFromDomain(domain)?.id !== claimed.id) {
+    score += 1;
+    reasons.push(`claims to be ${claimed.name} but sent from ${domain}`);
   }
 
   if (SECURITY_HYPHEN_DOMAIN.test(labels)) {

@@ -10,7 +10,7 @@ export function foldText(value: string): string {
  * Run against folded (lowercase, accent-free) text.
  */
 export const ORDER_REF_PATTERN =
-  /\b(?:order|pedido|invoice|factura)\s*(?:#|no\b\.?|n\.?º|number|num\.|numero|id\b)?\s*[:#]?\s*#?(?=[a-z0-9-]*\d)[a-z0-9][a-z0-9-]{3,}/;
+  /\b(?:order|pedido|invoice|factura)\s*(?:#|no\b\.?|n\.?º|number|num\.|numero|id\b)?\s*[:#]?\s*#?(?=[a-z0-9-]*\d)[a-z0-9][a-z0-9-]{3,}|訂單(?:編號|號碼|號)?\s*[:：#]?\s*#?(?=[a-z0-9-]*\d)[a-z0-9][a-z0-9-]{3,}/;
 
 /** True when the folded text contains a labeled order reference. */
 export function hasOrderRef(foldedText: string): boolean {

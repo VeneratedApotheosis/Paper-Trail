@@ -19,13 +19,14 @@ describe("not about this purchase (one email)", () => {
     await publishUpload(twoEmails(), fakeLlm());
     const before = getState().orders[0];
     expect(before.messageIds.sort()).toEqual(["o1", "o1b"]);
-    expect(before.events.map((event) => [event.type, event.messageId])).toEqual([["shipped", "o1b"]]);
+    // Every confirmed order has a "placed" event from its confirmation (#127); the shipped event belongs to o1b.
+    expect(before.events.map((event) => [event.type, event.messageId]).sort()).toEqual([["placed", "o1"], ["shipped", "o1b"]]);
 
     const result = markEmailNotAboutOrder(before.id, "o1b", { now: NOW });
     expect(result).toMatchObject({ orderId: before.id, emailId: "o1b", removedOrder: false });
     const after = getState().orders[0];
     expect(after.messageIds).toEqual(["o1"]);
-    expect(after.events).toEqual([]);
+    expect(after.events.map((event) => event.type)).toEqual(["placed"]);
     expect(after.total).toBe(before.total);
     expect(labels.list(scope).map((label) => [label.emailId, label.class, label.source])).toEqual([["o1b", "not_receipt", "feedback"]]);
     expect(getSkippedEmails().map((entry) => [entry.emailId, entry.reason])).toEqual([["o1b", "marked_not_purchase"]]);
@@ -36,7 +37,7 @@ describe("not about this purchase (one email)", () => {
     const { result: resynced } = await publishUpload(twoEmails(), fakeLlm());
     expect(resynced.orders).toHaveLength(1);
     expect(resynced.orders[0].messageIds).toEqual(["o1"]);
-    expect(resynced.orders[0].events).toEqual([]);
+    expect(resynced.orders[0].events.map((event) => event.type)).toEqual(["placed"]);
   });
 
   it("undo restores the email's events, removes the label and puts the counters back", async () => {
@@ -47,7 +48,7 @@ describe("not about this purchase (one email)", () => {
     expect(result).toMatchObject({ emailIds: ["o1b"] });
     const after = getState();
     expect(after.orders[0].messageIds.sort()).toEqual(["o1", "o1b"]);
-    expect(after.orders[0].events.map((event) => event.messageId)).toEqual(["o1b"]);
+    expect(after.orders[0].events.map((event) => event.messageId).sort()).toEqual(["o1", "o1b"]);
     expect(after.stats).toEqual(before.stats);
     expect(labels.list(scope)).toEqual([]);
     expect(getSkippedEmails()).toEqual([]);
@@ -86,7 +87,7 @@ describe("not a purchase (whole order)", () => {
     restoreOrder(id, { now: NOW });
     const after = getState();
     expect(after.orders[0].messageIds.sort()).toEqual(["o1", "o1b"]);
-    expect(after.orders[0].events).toHaveLength(1);
+    expect(after.orders[0].events).toHaveLength(2);
     expect(after.findings).toEqual(before.findings);
     expect(after.stats).toEqual(before.stats);
     expect(labels.list(scope)).toEqual([]);

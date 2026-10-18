@@ -87,6 +87,8 @@ export function createSyncCollector(options: SyncCollectorOptions): SyncCollecto
           extractionFailures,
           matchedOrders: stats.orders,
           ...(stats.dedup ? { duplicatesCollapsed: stats.dedup.emailsCollapsed, mergesByReason: { ...stats.dedup.merges }, possibleDuplicates: stats.dedup.possibleDuplicates } : {}),
+          ...(stats.lifecycle ? { lifecycle: { ...stats.lifecycle } } : {}),
+          ...(stats.kinds ? { kinds: { ...stats.kinds } } : {}),
           findings: stats.findings,
           ...usage,
           bodySource: extra.bodySource ?? { plain: 0, html: 0 },

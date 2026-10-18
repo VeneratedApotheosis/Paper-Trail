@@ -41,6 +41,8 @@ export const DEDUP_WEIGHTS = {
   /** Date gap, lifecycle after order: <= 7 days, then inside the lifecycle window. */
   gapWeekLifecycle: 10,
   gapWindowLifecycle: 5,
+  /** A tracking number both sides print (#127): a package belongs to one purchase, whatever the sender or merchant spelling. */
+  sharedTracking: 90,
 } as const;
 
 /** At or above: merge. Below it but at or above POSSIBLE_DUPLICATE_SCORE: flag as a possible duplicate only. */
@@ -68,7 +70,8 @@ const PREDATE_TOLERANCE_DAYS = 1;
 const MIN_NAME_CONTAINMENT_CHARS = 8;
 const CENT_EPSILON = 0.005;
 
-export type MergeReason = "message_id" | "fingerprint" | "shared_ref" | "thread" | "items_amount" | "only_order";
+/** `tracking_number` (#127): a shipping / tracking email shares a tracking number with another email of the purchase. */
+export type MergeReason = "message_id" | "fingerprint" | "shared_ref" | "tracking_number" | "thread" | "items_amount" | "only_order";
 
 export interface DedupItem {
   /** Slug of the item name. */
@@ -96,6 +99,8 @@ export interface DedupCandidate {
   exactKeys: string[];
   /** `<account>:<threadId>`; null without a Gmail thread. */
   threadKey: string | null;
+  /** Normalized tracking numbers the email (or the order's shipments) carry (#127). */
+  trackingNumbers?: string[];
 }
 
 export interface PairScore {
@@ -139,6 +144,19 @@ function sharedExactKey(a: DedupCandidate, b: DedupCandidate): string | null {
   // A body fingerprint is only an exact copy when sent within a day (a monthly receipt has the same text every month).
   if (Math.abs(a.at - b.at) > DAY_MS) return null;
   return a.exactKeys.find((key) => b.exactKeys.includes(key)) ?? null;
+}
+
+function sharedTrackingNumber(a: DedupCandidate, b: DedupCandidate): string | null {
+  const theirs = b.trackingNumbers ?? [];
+  return (a.trackingNumbers ?? []).find((number) => theirs.includes(number)) ?? null;
+}
+
+/** Lifecycle classes whose tracking numbers describe the outbound package (return labels have their own numbers). */
+const TRACKING_CLASSES: readonly EmailClass[] = ["shipped", "delivered"];
+
+function trackingJoinable(a: DedupCandidate, b: DedupCandidate): boolean {
+  if (a.kind === "confirmation" && b.kind === "confirmation") return false;
+  return [a, b].every((candidate) => candidate.kind === "confirmation" || TRACKING_CLASSES.includes(candidate.emailClass));
 }
 
 function sameItem(a: DedupItem, b: DedupItem): boolean {
@@ -248,8 +266,21 @@ function scoreLifecycle(order: DedupCandidate, event: DedupCandidate): PairScore
   return result({ score, reasons });
 }
 
-/** Scores one pair. Symmetric: a confirmation is always the order side, whichever argument it is. */
+/**
+ * Scores one pair. Symmetric: a confirmation is always the order side, whichever argument it is. A shared tracking
+ * number (#127) joins shipping emails across senders (merchant, carrier, convenience store) before merchant identity is
+ * looked at. It outranks a differing reference (a shipment id is often printed where an order number belongs) and only
+ * yields to a currency conflict; two order confirmations never join on it.
+ */
 export function scorePair(a: DedupCandidate, b: DedupCandidate): PairScore {
+  const tracking = trackingJoinable(a, b) ? sharedTrackingNumber(a, b) : null;
+  if (tracking !== null) {
+    const exactKey = sharedExactKey(a, b);
+    if (exactKey) return result({ score: DEDUP_WEIGHTS.exactCopy, decision: "merge", mergeReason: mergeReasonOfKey(exactKey), reasons: ["same email"] });
+    if (sharedRef(a, b)) return result({ score: DEDUP_WEIGHTS.merchant + DEDUP_WEIGHTS.sharedRef, decision: "merge", mergeReason: "shared_ref", reasons: ["shared order number"] });
+    if (currencyConflict(a, b)) return blockedPair("different currencies");
+    return result({ score: DEDUP_WEIGHTS.sharedTracking, decision: "merge", mergeReason: "tracking_number", reasons: ["shared tracking number"] });
+  }
   if (!sameMerchant(a.merchantKeys, b.merchantKeys)) return blockedPair("different merchant");
   if (a.kind === "confirmation" && b.kind === "confirmation") return scoreConfirmations(a, b);
   if (a.kind === "lifecycle" && b.kind === "lifecycle") {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { EmailClassSchema } from "./email";
+import { PurchaseKindSchema, ShipmentStatusSchema, SubscriptionIntervalSchema } from "./purchase";
 
 /** ISO-4217 currency code. */
 export const CurrencySchema = z.string().regex(/^[A-Z]{3}$/);
@@ -24,6 +25,39 @@ export const ExtractedTotalsSchema = z.object({
   total: z.number().nullable().optional(),
 });
 export type ExtractedTotals = z.infer<typeof ExtractedTotalsSchema>;
+
+/**
+ * Package facts a shipping / tracking email states (#127). Not scored (no confidence or evidence entry). Tracking
+ * numbers are validated against the email text by the matcher before they are used; the tracking URL is never taken
+ * from the LLM (code builds it from carrier + number).
+ */
+export const MAX_TRACKING_NUMBERS = 10;
+export const ExtractedShipmentSchema = z.object({
+  carrier: z.string().nullable().optional(),
+  trackingNumbers: z.array(z.string().min(1).max(64)).max(MAX_TRACKING_NUMBERS).default([]),
+  /** What this email says about the package, e.g. "shipped", "out_for_delivery", "ready_for_pickup", "delivered". */
+  status: ShipmentStatusSchema.nullable().optional(),
+  /** ISO date/datetime of the expected delivery or pickup deadline. */
+  eta: z.string().nullable().optional(),
+  /** Pickup store / locker named by a pickup notification. */
+  pickupLocation: z.string().nullable().optional(),
+});
+export type ExtractedShipment = z.infer<typeof ExtractedShipmentSchema>;
+
+export const MAX_TRAVEL_SEGMENTS = 12;
+export const ExtractedTravelSchema = z.object({
+  segments: z.array(z.object({ label: z.string().min(1), start: z.string().nullable(), end: z.string().nullable() })).max(MAX_TRAVEL_SEGMENTS).default([]),
+  confirmation: z.string().nullable().optional(),
+});
+export type ExtractedTravel = z.infer<typeof ExtractedTravelSchema>;
+
+export const ExtractedSubscriptionSchema = z.object({
+  plan: z.string().nullable().optional(),
+  interval: SubscriptionIntervalSchema.nullable().optional(),
+  /** ISO date of the next renewal / charge. */
+  nextRenewal: z.string().nullable().optional(),
+});
+export type ExtractedSubscription = z.infer<typeof ExtractedSubscriptionSchema>;
 
 /** Fields the LLM extracts from one (redacted) email. All values are nullable: unknown is allowed, guessing is not. */
 export const OTHER_REFS_MAX = 10;
@@ -55,6 +89,21 @@ export const ExtractedFieldsSchema = z.object({
    * confidence or evidence entry. Never tracking numbers, phone numbers or amounts.
    */
   otherRefs: z.array(z.string().min(1).max(OTHER_REF_MAX_CHARS)).max(OTHER_REFS_MAX).optional(),
+  /**
+   * Purchase kind the model guesses (#127). Only a fallback: the matcher decides the kind from rules first (tracking
+   * evidence, recurring billing, merchant tables) and ignores this when its extraction confidence is low. Not scored.
+   */
+  kindGuess: PurchaseKindSchema.nullable().optional(),
+  /** Carrier, tracking numbers, package status, ETA and pickup store (shipping / tracking emails). Not scored. */
+  shipment: ExtractedShipmentSchema.nullable().optional(),
+  subscription: ExtractedSubscriptionSchema.nullable().optional(),
+  travel: ExtractedTravelSchema.nullable().optional(),
+  /** Restaurant behind a food-delivery order. */
+  restaurant: z.string().nullable().optional(),
+  /** Digital store / platform (App Store, Google Play, Steam, ...). */
+  platform: z.string().nullable().optional(),
+  /** Store location of an in-store purchase. */
+  storeLocation: z.string().nullable().optional(),
 });
 export type ExtractedFields = z.infer<typeof ExtractedFieldsSchema>;
 

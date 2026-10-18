@@ -5,7 +5,9 @@ import {
   type NormalizedLineItem,
   type NormalizedOrder,
   type OrderEvent,
+  type PurchaseDetails,
 } from "@/lib/contracts";
+import { mergeShipments } from "./shipments";
 
 /**
  * Merges orders that the matcher built separately but that are the same order (same id: merchant + order ref),
@@ -19,6 +21,9 @@ import {
  * - Totals, currency and placed-at come from the base only, so amounts are never mixed across copies.
  * - Orders with different ids (the same purchase matched by reference or email key, #126) are re-keyed to the base id; the
  *   other ids are kept in `aliasIds` so Review corrections saved under them still apply.
+ * - A package-only entry (#127: tracking emails, no receipt) never is the base while a real order is present; its
+ *   shipments and events join the order, the `packageOnly` flag goes away and the kind comes from the order, else
+ *   from the package. Shipments are unioned by tracking number (the most advanced status wins).
  * - `sources` and `messageIds` are unions; `confMin` is the lowest; the human review state is dropped (the store
  *   assigns a new revision when the merged order is published).
  */
@@ -46,9 +51,13 @@ export function mergeSameOrder(orders: readonly NormalizedOrder[]): NormalizedOr
     events: mergeEvents(rebased),
     messageIds: [...new Set(ranked.flatMap((order) => order.messageIds))],
     sources: [...new Set(ranked.flatMap((order) => order.sources ?? []))].sort(),
+    ...mergedKind(ranked),
     confMin,
-    needsReview: base.needsReview || confMin < REVIEW_CONFIDENCE_THRESHOLD,
+    needsReview: ranked.every((order) => order.packageOnly)
+      ? ranked.some((order) => order.needsReview)
+      : base.needsReview || confMin < REVIEW_CONFIDENCE_THRESHOLD,
   });
+  if (!ranked.every((order) => order.packageOnly)) delete merged.packageOnly;
   if (!possibleDuplicateOf) delete merged.possibleDuplicateOf;
   delete merged.review;
   return merged;
@@ -70,8 +79,22 @@ function rebaseOrder(order: NormalizedOrder, baseId: string): NormalizedOrder {
   };
 }
 
+/**
+ * Kind and details of merged orders: the base's kind unless it is "other" (or missing) and another copy knows better;
+ * shipments of every copy are kept whatever the kind (a package that arrived before its receipt was classified).
+ */
+function mergedKind(ranked: readonly NormalizedOrder[]): Pick<NormalizedOrder, "kind" | "details" | "packageOnly"> {
+  const known = ranked.find((order) => order.kind !== undefined && order.kind !== "other") ?? ranked[0];
+  const shipments = mergeShipments(ranked.map((order) => (order.details?.kind === "shipped" ? order.details.shipments : [])));
+  const kind = known.kind;
+  if (kind === undefined) return ranked.every((order) => order.packageOnly) ? { packageOnly: true } : {};
+  const details: PurchaseDetails | undefined = kind === "shipped" ? { kind, shipments } : known.details;
+  return { kind, ...(details ? { details } : {}), ...(ranked.every((order) => order.packageOnly) ? { packageOnly: true } : {}) };
+}
+
 function compareTrust(a: NormalizedOrder, b: NormalizedOrder): number {
   return (
+    Number(a.packageOnly === true) - Number(b.packageOnly === true) ||
     Number(a.needsReview) - Number(b.needsReview) ||
     b.events.length - a.events.length ||
     b.messageIds.length - a.messageIds.length ||

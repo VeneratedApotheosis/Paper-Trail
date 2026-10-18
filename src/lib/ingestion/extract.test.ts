@@ -348,8 +348,10 @@ describe("EXTRACTION_TOOL schema", () => {
     const expected = [...ExtractedFieldNameSchema.options].sort();
     expect(Object.keys(properties.confidence.properties).sort()).toEqual(expected);
     expect(Object.keys(properties.evidence.properties).sort()).toEqual(expected);
-    // otherRefs (#126) is an unscored field: in the fields schema and tool, but without confidence or evidence entries.
-    expect(Object.keys(properties.fields.properties).sort()).toEqual([...expected, "otherRefs"].sort());
-    expect(Object.keys(ExtractionSchema.shape.fields.shape).sort()).toEqual([...expected, "otherRefs"].sort());
+    // otherRefs (#126) and the kind details (#127) are unscored fields: in the fields schema and tool, but without
+    // confidence or evidence entries.
+    const unscored = ["otherRefs", "kindGuess", "shipment", "subscription", "travel", "restaurant", "platform", "storeLocation"];
+    expect(Object.keys(properties.fields.properties).sort()).toEqual([...expected, ...unscored].sort());
+    expect(Object.keys(ExtractionSchema.shape.fields.shape).sort()).toEqual([...expected, ...unscored].sort());
   });
 });

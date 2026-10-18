@@ -75,7 +75,10 @@ export const events = sqliteTable("event", {
     .references(() => orders.id),
   type: text("type", {
     enum: [
+      "placed",
       "shipped",
+      "out_for_delivery",
+      "ready_for_pickup",
       "delivered",
       "return_started",
       "return_dropped",

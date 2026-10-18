@@ -45,7 +45,10 @@ export interface OrderDetailViewProps {
 
 // Human labels for each event type (contracts: OrderEventTypeSchema).
 const EVENT_LABEL: Record<OrderEvent["type"], string> = {
+  placed: "Order placed",
   shipped: "Shipped",
+  out_for_delivery: "Out for delivery",
+  ready_for_pickup: "Ready for pickup",
   delivered: "Delivered",
   return_started: "Return started",
   return_dropped: "Return dropped off",

@@ -1,0 +1,14 @@
+From: "Tea House Taipei" <orders@teahouse.example>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: 您的訂單 TH-5521 已出貨
+Date: Thu, 15 Oct 2026 02:00:00 +0000
+Message-ID: <36-zh-shipped@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=shipped; keep=true; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+您好，您的訂單 TH-5521 已出貨。
+物流單號：G12345678901
+配送方式：7-ELEVEN 超商取貨
+感謝您的支持！

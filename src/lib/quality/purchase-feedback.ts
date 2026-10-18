@@ -70,8 +70,9 @@ const previousClassOf = (previous: readonly MarkedPurchase["previousEmails"][num
   };
 };
 
+/** The timeline event an email supplied. The "placed" event (#127) belongs to the confirmation, which supplies the amounts, so it does not count. */
 function eventOf(order: NormalizedOrder, emailId: string) {
-  return order.events.find((event) => event.messageId === emailId);
+  return order.events.find((event) => event.messageId === emailId && event.type !== "placed");
 }
 
 /** The "not a receipt" label of one email. Without saved text only the class override is stored (no text to score). */

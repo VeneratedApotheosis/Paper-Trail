@@ -1,4 +1,14 @@
-import { OTHER_REFS_MAX, OTHER_REF_MAX_CHARS, type ExtractedFieldName, type RedactedEmail } from "@/lib/contracts";
+import {
+  MAX_TRACKING_NUMBERS,
+  MAX_TRAVEL_SEGMENTS,
+  OTHER_REFS_MAX,
+  OTHER_REF_MAX_CHARS,
+  PurchaseKindSchema,
+  ShipmentStatusSchema,
+  SubscriptionIntervalSchema,
+  type ExtractedFieldName,
+  type RedactedEmail,
+} from "@/lib/contracts";
 import type { LlmTool } from "@/lib/llm";
 import { senderDomain } from "./text";
 
@@ -21,6 +31,10 @@ export const EXTRACTION_SYSTEM_PROMPT = [
   "- last4 is the 4 card digits only when the email shows them (e.g. 'ending in 4242'); otherwise null.",
   "- eventAmount is the refund, price adjustment, or store credit amount stated in refund/adjustment/credit emails.",
   "- otherRefs lists every other reference number printed in the email besides orderRef (invoice, confirmation, transaction, web order or document numbers), exactly as written; [] when there are none. Never include tracking numbers, phone numbers, amounts or the orderRef itself.",
+  "- shipment (shipping / tracking / pickup emails only; null otherwise): carrier as named in the email; trackingNumbers copied exactly as printed (also for a tracking number inside a tracking link), [] when none is printed - never an order number, never invented; status is what THIS email says about the package (shipped, out_for_delivery, ready_for_pickup when it arrived at a pickup point such as a convenience store or locker and waits for the shopper, delivered also when the shopper picked it up, returned); eta only as an ISO date/datetime the email states (delivery date or pickup deadline); pickupLocation is the pickup store or locker named by the email. Never write a tracking URL.",
+  "- kindGuess is your best guess of the purchase kind: shipped (physical goods sent to the shopper, incl. convenience-store pickup), in_store, digital (apps, games, downloads), subscription (recurring billing), food_delivery, travel, other. Use null when unsure.",
+  "- subscription (null unless the email is recurring billing): plan name, interval week/month/year as stated, nextRenewal as an ISO date only when stated. travel (null unless a trip): segments (flight, hotel or ride label with ISO start/end when stated) and the booking confirmation code. restaurant for food delivery, platform for digital stores (App Store, Google Play, Steam), storeLocation for in-store purchases; null when not stated.",
+  "- Emails may be in English or Traditional Chinese (已出貨, 配送中, 已到店, 可取貨, 已取貨, 已送達, 已簽收); read them the same way.",
   "- returnWindowDays, refundSlaDays, priceAdjustDays and policyQuote only when the email itself states the policy.",
   "- For every non-null field give confidence (0 to 1) and an evidence quote of at most 200 characters copied verbatim from the email.",
   `Always answer by calling the ${EXTRACTION_TOOL_NAME} tool.`,
@@ -72,6 +86,63 @@ const FIELD_PROPERTIES: Record<ExtractedFieldName, Record<string, unknown>> = {
   isStoreCredit: { type: "boolean", description: "True only when a refund was issued as store credit" },
 };
 
+/** Package facts of a shipping email (#127). Not scored. */
+const SHIPMENT_PROPERTY = {
+  type: ["object", "null"],
+  properties: {
+    carrier: nullableString,
+    trackingNumbers: {
+      type: "array",
+      items: { type: "string", minLength: 1, maxLength: 64 },
+      maxItems: MAX_TRACKING_NUMBERS,
+      description: "Tracking numbers exactly as printed; never order numbers",
+    },
+    status: { type: ["string", "null"], enum: [...ShipmentStatusSchema.options, null] },
+    eta: { ...nullableString, description: "ISO date/datetime of expected delivery or pickup deadline" },
+    pickupLocation: nullableString,
+  },
+  additionalProperties: false,
+};
+
+const SUBSCRIPTION_PROPERTY = {
+  type: ["object", "null"],
+  properties: {
+    plan: nullableString,
+    interval: { type: ["string", "null"], enum: [...SubscriptionIntervalSchema.options, null] },
+    nextRenewal: { ...nullableString, description: "ISO date" },
+  },
+  additionalProperties: false,
+};
+
+const TRAVEL_PROPERTY = {
+  type: ["object", "null"],
+  properties: {
+    segments: {
+      type: "array",
+      maxItems: MAX_TRAVEL_SEGMENTS,
+      items: {
+        type: "object",
+        properties: { label: { type: "string", minLength: 1 }, start: nullableString, end: nullableString },
+        required: ["label"],
+        additionalProperties: false,
+      },
+    },
+    confirmation: nullableString,
+  },
+  additionalProperties: false,
+};
+
+/** Kind and kind-specific details (#127): not scored fields (no confidence/evidence entry), like otherRefs. */
+const KIND_PROPERTIES = {
+  kindGuess: { type: ["string", "null"], enum: [...PurchaseKindSchema.options, null] },
+  shipment: SHIPMENT_PROPERTY,
+  subscription: SUBSCRIPTION_PROPERTY,
+  travel: TRAVEL_PROPERTY,
+  restaurant: nullableString,
+  platform: nullableString,
+  storeLocation: nullableString,
+};
+
 /** Not a scored field (no confidence/evidence entry), so it lives outside FIELD_PROPERTIES. */
 const OTHER_REFS_PROPERTY = {
   type: "array",
@@ -98,7 +169,7 @@ export const EXTRACTION_TOOL: LlmTool = {
     properties: {
       fields: {
         type: "object",
-        properties: { ...FIELD_PROPERTIES, otherRefs: OTHER_REFS_PROPERTY },
+        properties: { ...FIELD_PROPERTIES, otherRefs: OTHER_REFS_PROPERTY, ...KIND_PROPERTIES },
         required: ["merchant", "orderRef", "date", "currency", "lineItems", "totals"],
         additionalProperties: false,
       },

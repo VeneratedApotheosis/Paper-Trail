@@ -4,6 +4,7 @@ import {
   type EmailClass,
   type ExtractedFields,
   type Extraction,
+  type OrderEvent,
   type RawEmail,
 } from "@/lib/contracts";
 import { matchOrders, matchOrdersWithReasons, type MatchInput } from "./matcher";
@@ -59,6 +60,11 @@ function orderEmail(overrides: Partial<InputSpec> = {}): MatchInput {
   });
 }
 
+/** Events without the "placed" event every confirmed order starts with (#127). */
+function lifecycle(events: OrderEvent[]): OrderEvent[] {
+  return events.filter((event) => event.type !== "placed");
+}
+
 function only<T>(list: T[]): T {
   expect(list).toHaveLength(1);
   return list[0];
@@ -79,7 +85,7 @@ describe("matchOrders", () => {
     expect(order.placedAt).toBe("2026-09-01T10:00:00.000Z");
     expect(order.total).toBe(113);
     expect(order.last4).toBe("4242");
-    expect(order.events.map((event) => event.type)).toEqual(["shipped", "delivered"]);
+    expect(lifecycle(order.events).map((event) => event.type)).toEqual(["shipped", "delivered"]);
     expect(order.messageIds).toEqual(["nw-1001-order", "nw-1001-shipped", "nw-1001-delivered"]);
     expect(order.needsReview).toBe(false);
   });
@@ -94,7 +100,7 @@ describe("matchOrders", () => {
         fields: { merchant: "NORTHWIND OUTFITTERS", orderRef: "#nw-1001" },
       }),
     ]);
-    expect(only(orders).events).toHaveLength(1);
+    expect(lifecycle(only(orders).events)).toHaveLength(1);
   });
 
   it("merges a duplicate confirmation without double-counting line items", () => {
@@ -133,13 +139,13 @@ describe("matchOrders", () => {
         input({ id: "deliv-2", cls: "delivered", date: "2026-09-07T12:00:00Z", fields: { lineItems: [SOCKS] } }),
       ]),
     );
-    expect(order.events.map((event) => `${event.type}:${event.messageId}`)).toEqual([
+    expect(lifecycle(order.events).map((event) => `${event.type}:${event.messageId}`)).toEqual([
       "shipped:ship-1",
       "delivered:deliv-1",
       "shipped:ship-2",
       "delivered:deliv-2",
     ]);
-    expect(order.events[0].lineItemIds).toEqual([order.lineItems[0].id]);
+    expect(lifecycle(order.events)[0].lineItemIds).toEqual([order.lineItems[0].id]);
   });
 
   it("drops a repeated copy of the same lifecycle email", () => {
@@ -150,7 +156,7 @@ describe("matchOrders", () => {
         input({ id: "refund-b", cls: "refund", date: "2026-09-20T12:30:00Z", fields: { eventAmount: 113 } }),
       ]),
     );
-    expect(order.events).toHaveLength(1);
+    expect(lifecycle(order.events)).toHaveLength(1);
   });
 
   it("sorts events by event time when emails arrive out of order", () => {
@@ -162,8 +168,8 @@ describe("matchOrders", () => {
         input({ id: "delivered", cls: "delivered", date: "2026-09-05T12:00:00Z" }),
       ]),
     );
-    expect(order.events.map((event) => event.type)).toEqual(["delivered", "return_received", "refund_issued"]);
-    expect(order.events[2].amount).toBe(113);
+    expect(lifecycle(order.events).map((event) => event.type)).toEqual(["delivered", "return_received", "refund_issued"]);
+    expect(lifecycle(order.events)[2].amount).toBe(113);
     expect(order.placedAt).toBe("2026-09-01T10:00:00.000Z");
   });
 
@@ -174,7 +180,7 @@ describe("matchOrders", () => {
         input({ id: "delivered-late-email", cls: "delivered", date: "2026-09-08T12:00:00Z", fields: { date: "2026-09-05" } }),
       ]),
     );
-    expect(order.events[0].at).toBe("2026-09-05T00:00:00.000Z");
+    expect(lifecycle(order.events)[0].at).toBe("2026-09-05T00:00:00.000Z");
   });
 
   it("falls back to merchant + total + date proximity when the order ref is missing", () => {
@@ -246,7 +252,7 @@ describe("matchOrders", () => {
     const socks = order.lineItems.find((item) => item.sku === "NW-WS-2");
     expect(socks?.returnedQty).toBe(1);
     expect(order.lineItems.find((item) => item.sku === "NW-RJ-1")?.returnedQty).toBe(0);
-    expect(order.events.map((event) => event.lineItemIds)).toEqual([[socks?.id], [socks?.id]]);
+    expect(lifecycle(order.events).map((event) => event.lineItemIds)).toEqual([[socks?.id], [socks?.id]]);
   });
 
   it("maps a drop-off email to return_dropped and store credit refunds to store_credit", () => {
@@ -268,7 +274,7 @@ describe("matchOrders", () => {
         }),
       ]),
     );
-    expect(order.events.map((event) => [event.type, event.amount ?? null])).toEqual([
+    expect(lifecycle(order.events).map((event) => [event.type, event.amount ?? null])).toEqual([
       ["return_dropped", null],
       ["store_credit", 113],
     ]);
@@ -330,13 +336,19 @@ describe("matchOrders", () => {
     );
     expect(order.confMin).toBe(0.6);
     expect(order.needsReview).toBe(true);
-    expect(order.events[0].conf).toBe(0.6);
+    expect(lifecycle(order.events)[0].conf).toBe(0.6);
   });
 
   it("flags orders without a confirmation for review", () => {
-    const order = only(matchOrders([input({ id: "shipped", cls: "shipped", date: "2026-09-02T12:00:00Z", fields: { lineItems: [JACKET] } })]));
+    const order = only(matchOrders([input({ id: "return", cls: "return_started", date: "2026-09-02T12:00:00Z", fields: { lineItems: [JACKET] } })]));
     expect(order.needsReview).toBe(true);
     expect(order.total).toBe(80);
+  });
+
+  it("starts every confirmed order with a placed event at the order date (#127)", () => {
+    const order = only(matchOrders([orderEmail(), input({ id: "nw-1001-shipped", cls: "shipped", date: "2026-09-02T12:00:00Z" })]));
+    expect(order.events.map((event) => event.type)).toEqual(["placed", "shipped"]);
+    expect(order.events[0]).toMatchObject({ at: order.placedAt, messageId: "nw-1001-order", conf: 0.95 });
   });
 
   it("computes a missing total from line items, tax, shipping and discount", () => {
@@ -381,7 +393,7 @@ describe("matchOrdersWithReasons: odd amounts go to review (#93)", () => {
     const order = only(orders);
     expect(NormalizedOrderSchema.parse(order)).toEqual(order);
     expect(order).toMatchObject({ subtotal: null, total: 0, needsReview: true });
-    expect(order.events[0].amount).toBeUndefined();
+    expect(lifecycle(order.events)[0].amount).toBeUndefined();
     expect(reviewReasons.get(order.id)).toEqual([
       "subtotal is not a number",
       "total is not a number",
@@ -418,7 +430,7 @@ describe("matchOrders: extracted dates are parsed as UTC (#93)", () => {
     const order = only(
       matchOrders([orderEmail(), input({ id: "delivered", cls: "delivered", date: "2026-09-05T12:00:00Z", fields: { date: "2026-09-05T23:30:00" } })]),
     );
-    expect(order.events[0].at).toBe("2026-09-05T23:30:00.000Z");
+    expect(lifecycle(order.events)[0].at).toBe("2026-09-05T23:30:00.000Z");
   });
 
   it.each(["October 5, 2026", "10/05/2026", "2026-02-30", "2026-09-01T25:00:00", "yesterday"])(
@@ -429,7 +441,7 @@ describe("matchOrders: extracted dates are parsed as UTC (#93)", () => {
         input({ id: "refund", cls: "refund", date: "2026-09-20T12:00:00Z", fields: { eventAmount: 50, date } }),
       ]);
       const order = only(orders);
-      expect(order.events[0]).toMatchObject({ at: "2026-09-20T12:00:00.000Z", conf: 0.5 });
+      expect(lifecycle(order.events)[0]).toMatchObject({ at: "2026-09-20T12:00:00.000Z", conf: 0.5 });
       expect(order.confMin).toBe(0.5);
       expect(order.needsReview).toBe(true);
       expect(reviewReasons.get(order.id)).toEqual([`date ${JSON.stringify(date)} in email refund is not ISO 8601; used the email date`]);

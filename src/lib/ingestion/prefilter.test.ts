@@ -22,7 +22,7 @@ describe("GMAIL_RECEIPT_QUERY", () => {
     }
     expect(GMAIL_RECEIPT_QUERY).toContain("from:(orders OR receipts");
     expect(GMAIL_RECEIPT_QUERY).toBe(
-      'newer_than:90d (subject:(order OR receipt OR shipped OR delivered OR return OR refund OR "price adjustment" OR invoice OR pedido OR reembolso OR devolución) OR from:(orders OR receipts OR shipping OR returns OR refunds OR billing OR auto-confirm))',
+      'newer_than:90d (subject:(order OR receipt OR shipped OR delivered OR return OR refund OR "price adjustment" OR invoice OR pedido OR reembolso OR devolución OR shipment OR tracking OR package OR "out for delivery" OR arriving OR 出貨 OR 配送 OR 取貨 OR 到店 OR 送達 OR 簽收 OR 訂單) OR from:(orders OR receipts OR shipping OR returns OR refunds OR billing OR auto-confirm OR shipment-tracking OR ups OR fedex OR usps OR dhl OR shopee))',
     );
   });
 

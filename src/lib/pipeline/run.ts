@@ -4,13 +4,14 @@ import {
   type EmailClass,
   type Finding,
   type NormalizedOrder,
+  type PurchaseKind,
   type RawEmail,
   type RedactedEmail,
 } from "@/lib/contracts";
 import { SKIPPED_EXTRACTION_CLASSES, classify, isReceiptLike, prepareForLlm, type ExtractResult, type RedactionMode } from "@/lib/ingestion";
 import { ExactCopyRegistry, emailKeys, type CopyReason } from "@/lib/orders/dedup/exact";
 import type { MergeReason } from "@/lib/orders/dedup/score";
-import { matchOrdersWithReasons, type EmailCopy, type MatchInput } from "@/lib/orders/matcher";
+import { matchOrdersWithReasons, type EmailCopy, type MatchInput, type MatchLifecycleSummary } from "@/lib/orders/matcher";
 import type { PriceFeed } from "@/lib/prices/feed";
 import { defaultRules, runRulesIsolated } from "@/lib/rules";
 import type { AuditEntry } from "@/lib/types";
@@ -106,6 +107,20 @@ export interface PipelineStats {
   needsReview: number;
   /** Duplicate handling (#126); absent on results saved before it existed. */
   dedup?: PipelineDedupStats;
+  /** Shipping / tracking emails linked to a receipt vs left as package-only entries (#127); absent on older results. */
+  lifecycle?: MatchLifecycleSummary;
+  /** Orders by purchase kind (#127); absent on older results. */
+  kinds?: Partial<Record<PurchaseKind, number>>;
+}
+
+/** Orders per purchase kind; orders without a kind count as "other". */
+export function countKinds(orders: readonly NormalizedOrder[]): Partial<Record<PurchaseKind, number>> {
+  const kinds: Partial<Record<PurchaseKind, number>> = {};
+  for (const order of orders) {
+    const kind = order.kind ?? "other";
+    kinds[kind] = (kinds[kind] ?? 0) + 1;
+  }
+  return kinds;
 }
 
 /** What dedup did in one run: exact copies dropped before extraction plus the matcher's merges. */
@@ -378,6 +393,8 @@ export function createPipelineRun(deps: PipelineDeps, expectedEmails?: number): 
     const merges = { ...matched.dedup.merges };
     for (const [reason, count] of Object.entries(copyMerges) as Array<[CopyReason, number]>) merges[reason] = (merges[reason] ?? 0) + count;
     stats.dedup = { emailsCollapsed, merges, possibleDuplicates: matched.dedup.possibleDuplicates };
+    stats.lifecycle = matched.lifecycle;
+    stats.kinds = countKinds(orders);
     stats.orders = orders.length;
     stats.excludedOrders = allOrders.length - orders.length;
     stats.findings = findings.length;

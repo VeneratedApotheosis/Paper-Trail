@@ -1,0 +1,12 @@
+From: "7-ELEVEN 統一超商" <noreply@7-11.com.tw>
+To: Sam Rivera <sam.rivera@mail.example>
+Subject: 【7-ELEVEN】您的包裹已取貨
+Date: Sat, 17 Oct 2026 10:30:00 +0000
+Message-ID: <38-zh-picked@edge-cases.example>
+MIME-Version: 1.0
+X-PT-Expect: class=delivered; keep=true; redacts=none
+X-PT-Synthetic: true
+Content-Type: text/plain; charset=utf-8
+
+您的包裹已取貨，取貨編號：G12345678901。
+感謝使用超商取貨服務。

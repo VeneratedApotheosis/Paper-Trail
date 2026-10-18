@@ -54,6 +54,7 @@ export interface RulesRun {
 /**
  * Runs every rule over every order and returns validated, de-duplicated, sorted findings plus per-order failures.
  *
+ * - Package-only orders (`packageOnly`, #127) are skipped: no receipt, no amount, no findings.
  * - Orders with `needsReview = true` are skipped: their extracted fields are below the confidence threshold and
  *   unconfirmed, so any amount computed from them would be unverified (AGENTS.md rule 7). They stay in the
  *   needs-review queue and produce findings once a human confirms them and the order is re-run.
@@ -70,7 +71,8 @@ export function runRulesIsolated(
   const findingsById = new Map<string, Finding>();
   const failures: RuleFailure[] = [];
   for (const order of orders) {
-    if (order.needsReview) continue;
+    // A package entry (#127: tracking emails, no receipt) has no amount, so there is nothing to claim.
+    if (order.needsReview || order.packageOnly) continue;
     try {
       for (const finding of evaluateOrder(order, rules, ctx, findingsById)) findingsById.set(finding.id, finding);
     } catch (error) {

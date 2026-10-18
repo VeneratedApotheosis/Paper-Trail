@@ -63,3 +63,13 @@ Known classifier bugs are marked `it.fails` in the test (see `KNOWN_FAILURES` th
 | `32-customer-names.eml` | Recipient, greeting and customer labels | name redacted before extraction |
 
 Names from recipient display headers and explicit customer/greeting labels are tokenized in subject/body. Existing fixture headers list name redactions where applicable. International fixtures are synthetic examples, including the fictional customer Sam Rivera.
+
+| `33-tracking-out-for-delivery.eml` | Carrier email (UPS) with only a tracking number, no order number (#127) | shipped |
+| `34-tracking-arriving-today.eml` | "Arriving today" FedEx update | shipped |
+| `35-tracking-delivery-attempted.eml` | USPS "delivery attempted" | shipped |
+| `36-zh-shipped.eml` | Traditional Chinese merchant mail: 已出貨 with a 物流單號 | shipped |
+| `37-zh-store-arrival.eml` | 7-ELEVEN 到店通知 / 可取貨 (convenience-store pickup) | shipped |
+| `38-zh-picked-up.eml` | 7-ELEVEN 已取貨 | delivered |
+| `39-zh-tcat-delivering.eml` | 黑貓宅急便 配送中 | shipped |
+| `40-zh-signed.eml` | 黑貓宅急便 已簽收 | delivered |
+| `41-spoofed-carrier.eml` | Display name "UPS" on an unrelated domain, "click to reschedule" (fake tracking mail) | not_receipt (never a shipment) |

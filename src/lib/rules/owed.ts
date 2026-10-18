@@ -18,6 +18,8 @@ const OUTSTANDING_STATUSES: ReadonlySet<FindingStatus> = new Set(["open", "draft
  * and no human has confirmed it yet (#47 sets `review.confirmedAt`).
  */
 export function orderNeedsReview(order: NormalizedOrder): boolean {
+  // A package entry (#127) has no extracted amounts to doubt: only a conflict (the matcher's flag) needs a human.
+  if (order.packageOnly) return order.needsReview;
   return order.needsReview || (order.confMin < REVIEW_CONFIDENCE_THRESHOLD && !order.review?.confirmedAt);
 }
 

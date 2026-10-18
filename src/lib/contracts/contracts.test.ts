@@ -7,6 +7,10 @@ import {
   RawEmailSchema,
   SeedInboxSchema,
   FindingKindSchema,
+  PurchaseDetailsSchema,
+  PurchaseKindSchema,
+  ShipmentSchema,
+  ShipmentStatusSchema,
 } from "./index";
 import { events, findings } from "@/db/schema";
 
@@ -100,5 +104,36 @@ describe("contracts", () => {
   it("stays in sync with the DB enums", () => {
     expect(OrderEventTypeSchema.options).toEqual(events.type.enumValues);
     expect(FindingKindSchema.options).toEqual(findings.kind.enumValues);
+  });
+});
+
+describe("purchase kinds and shipments (#127)", () => {
+  it("covers every kind with matching details and rejects a mismatched shape", () => {
+    const details = [
+      { kind: "shipped", shipments: [] },
+      { kind: "in_store", location: null },
+      { kind: "digital", platform: "Steam" },
+      { kind: "subscription", plan: "Plus", interval: "month", nextRenewal: null },
+      { kind: "food_delivery", restaurant: null, deliveredAt: null },
+      { kind: "travel", segments: [{ label: "TPE-NRT", start: null, end: null }], confirmation: "ABC123" },
+      { kind: "other" },
+    ];
+    expect(details.map((item) => PurchaseDetailsSchema.parse(item).kind).sort()).toEqual([...PurchaseKindSchema.options].sort());
+    expect(PurchaseDetailsSchema.safeParse({ kind: "subscription", plan: null, interval: "decade", nextRenewal: null }).success).toBe(false);
+    expect(PurchaseDetailsSchema.safeParse({ kind: "shipped", location: null }).success).toBe(false);
+  });
+
+  it("has the pickup and out-for-delivery statuses and requires a tracking number", () => {
+    expect(ShipmentStatusSchema.options).toEqual(expect.arrayContaining(["out_for_delivery", "ready_for_pickup", "delivered"]));
+    const shipment = { carrier: null, trackingNumber: "1Z999AA10123456784", trackingUrl: null, status: "shipped", eta: null, shippedAt: null, deliveredAt: null, itemIds: [] };
+    expect(ShipmentSchema.parse(shipment).trackingNumber).toBe("1Z999AA10123456784");
+    expect(ShipmentSchema.safeParse({ ...shipment, trackingNumber: "" }).success).toBe(false);
+    expect(ShipmentSchema.safeParse({ ...shipment, trackingUrl: "not a url" }).success).toBe(false);
+  });
+
+  it("knows the placed / out_for_delivery / ready_for_pickup events and keeps kind optional on old orders", () => {
+    expect(OrderEventTypeSchema.options).toEqual(expect.arrayContaining(["placed", "out_for_delivery", "ready_for_pickup"]));
+    expect(NormalizedOrderSchema.shape.kind.isOptional()).toBe(true);
+    expect(NormalizedOrderSchema.shape.details.isOptional()).toBe(true);
   });
 });
