@@ -34,10 +34,10 @@ function NoticeState({ notice }: { notice: Notice }) {
       return (
         <EmptyState title={`Confirmed ${notice.merchant}`}>
           {notice.owedFindings > 0
-            ? `It left the review queue, and ${plural(notice.owedFindings, "finding")} on it now ${
+            ? `This purchase is confirmed, and ${plural(notice.owedFindings, "finding")} on it now ${
                 notice.owedFindings === 1 ? "counts" : "count"
               } toward what you're owed (${notice.owedTotal} in total).`
-            : "It left the review queue. No money-back findings apply to it right now."}{" "}
+            : "This purchase is confirmed. No money is owed on it right now."}{" "}
           The confirmation is logged to your audit trail.
         </EmptyState>
       );
@@ -87,7 +87,7 @@ export default function ReviewPage() {
     return (
       <AppShell demo={false}>
         <ErrorState
-          title="Couldn't load your review queue"
+          title="Couldn't load purchases to check"
           what={ledger.error}
           fix="Check that the app server is running, then try again."
           actions={

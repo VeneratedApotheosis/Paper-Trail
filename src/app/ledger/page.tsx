@@ -34,7 +34,7 @@ export default function LedgerPage() {
     return (
       <AppShell demo={false}>
         <ErrorState
-          title="Couldn't load your ledger"
+          title="Couldn't load your purchases"
           what={ledger.error}
           fix="Check that the app server is running, then try again."
           actions={

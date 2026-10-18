@@ -57,7 +57,7 @@ export default function Home() {
     return (
       <AppShell>
         <ErrorState
-          title={loadDemo.error ? "Couldn't load the demo data" : "Couldn't load your ledger"}
+          title={loadDemo.error ? "Couldn't load the demo data" : "Couldn't load what you're owed"}
           what={error}
           fix="Check that the app server is running, then try again."
           actions={
