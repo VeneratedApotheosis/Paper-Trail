@@ -9,7 +9,7 @@ import type { ReviewQueueItem } from "@/lib/pipeline/run";
 import { orderNeedsReview } from "@/lib/rules/owed";
 import { makeEvent, makeOrder } from "@/lib/rules/test-helpers";
 import { getOrder, getState, resetStore, setPipelineResult } from "@/lib/store";
-import type { ReviewMutationResponse } from "./reviewApi";
+import type { ReviewMutationResponse } from "@/lib/api/types";
 import {
   applyEdits,
   bufferEdit,

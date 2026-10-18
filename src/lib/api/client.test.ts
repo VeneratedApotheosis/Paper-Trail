@@ -14,6 +14,8 @@ import {
   markSkippedAsReceipt,
   markEmailNotAboutOrder,
   markNotPurchase,
+  postReviewConfirm,
+  postReviewEdit,
   regenerateClaim,
   restoreOrder,
   safeDecode,
@@ -100,6 +102,25 @@ describe("account client", () => {
     await disconnectGmail();
     expect(requestedPaths()).toEqual(["/api/account", "/api/auth/disconnect"]);
     expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: "POST" });
+  });
+});
+
+describe("review client", () => {
+  it("posts edits and confirmations with the order revision to the encoded order path", async () => {
+    await postReviewEdit(encodeURIComponent(ORDER_ID), "rev-1", { field: "total", value: 42.5 });
+    await postReviewConfirm(ORDER_ID, "rev-2");
+    const order = encodeIdSegment(ORDER_ID);
+    expect(requestedPaths()).toEqual([`/api/review/${order}/edit`, `/api/review/${order}/confirm`]);
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ revision: "rev-1", edit: { field: "total", value: 42.5 } }),
+    });
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: "POST", body: JSON.stringify({ revision: "rev-2", confirmed: true }) });
+  });
+
+  it("throws an ApiError with the 409 of a stale revision", async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ error: "Stale revision" }, { status: 409 }));
+    await expect(postReviewConfirm(ORDER_ID, "old")).rejects.toMatchObject({ name: "ApiError", status: 409, message: "Stale revision" });
   });
 });
 

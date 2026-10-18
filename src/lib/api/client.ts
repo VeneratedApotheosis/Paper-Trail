@@ -33,6 +33,8 @@ import type {
   QualityReportsResponse,
   ResetDemoResponse,
   RestoreOrderResponse,
+  ReviewEditRequest,
+  ReviewMutationResponse,
   SessionStatus,
   SkippedEmailsResponse,
   UploadResponse,
@@ -285,6 +287,19 @@ export function markEmailNotAboutOrder(orderId: string, emailId: string): Promis
 /** POST /api/orders/:id/restore: undoes `markNotPurchase` / `markEmailNotAboutOrder` while the server still holds the order (404 after a restart). */
 export function restoreOrder(orderId: string): Promise<RestoreOrderResponse> {
   return request(`/api/orders/${encodeIdSegment(orderId)}/restore`, { method: "POST" });
+}
+
+/**
+ * POST /api/review/:id/edit (docs/review-api.md): saves one Review correction. 409 when `revision` is stale (refetch the
+ * order and retry). The response carries the corrected order, its recomputed findings, the new revision and summary.
+ */
+export function postReviewEdit(orderId: string, revision: string, edit: ReviewEditRequest["edit"]): Promise<ReviewMutationResponse> {
+  return request(`/api/review/${encodeIdSegment(orderId)}/edit`, sendJson("POST", { revision, edit } satisfies ReviewEditRequest));
+}
+
+/** POST /api/review/:id/confirm: the user confirms the order as read, so it counts toward the owed total. 409 on a stale `revision`. */
+export function postReviewConfirm(orderId: string, revision: string): Promise<ReviewMutationResponse> {
+  return request(`/api/review/${encodeIdSegment(orderId)}/confirm`, sendJson("POST", { revision, confirmed: true }));
 }
 
 /** GET /api/quality/eval: gate precision/recall and field accuracy on the saved labels (cache only, no model calls). */

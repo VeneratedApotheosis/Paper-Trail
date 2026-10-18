@@ -2,6 +2,7 @@ import type { ClaimDraft } from "@/lib/claims";
 import type { Finding, NormalizedOrder } from "@/lib/contracts";
 import type { PipelineStats, ReviewQueueItem } from "@/lib/pipeline/run";
 import type { RedactionMode } from "@/lib/ingestion/prepare";
+import type { ReviewEdit } from "@/lib/review/schema";
 import type { GmailAccountPreview, GmailAccountSync, SyncAccountsResult } from "@/lib/gmail/accounts";
 import type { GmailSyncProgress } from "@/lib/gmail/progress";
 import type { previewGmail } from "@/lib/gmail/service";
@@ -257,6 +258,21 @@ export type MarkNotPurchaseResponse = NotPurchaseResult & { summary: LedgerSumma
 export type MarkNotAboutOrderResponse = NotAboutOrderResult & { summary: LedgerSummary };
 /** POST /api/orders/:id/restore: undo of either. */
 export type RestoreOrderResponse = RestoreOrderResult & { summary: LedgerSummary };
+
+/** Body of POST /api/review/:id/edit (docs/review-api.md). `revision` is the order's current revision. */
+export interface ReviewEditRequest {
+  revision: string;
+  edit: ReviewEdit;
+}
+
+/** Body of POST /api/review/:id/edit and /confirm. `revision` replaces the order's previous revision. */
+export interface ReviewMutationResponse {
+  ok: true;
+  order: NormalizedOrder;
+  findings: Finding[];
+  revision: string;
+  summary: LedgerSummary;
+}
 
 /** GET /api/quality/eval: scores against the saved labels (cache only, never calls a model). */
 export type QualityEvalResponse = RealEvalReport & { model: string };

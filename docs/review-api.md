@@ -10,6 +10,8 @@ All routes select the same authenticated account store as the ledger API. Anonym
 
 The two POST routes return `{ ok: true, order, findings, revision, summary }`. `summary` is the existing backend ledger summary (rounded to cents). Use `encodeURIComponent(order.id)` in URLs.
 
+Client: `postReviewEdit(orderId, revision, edit)` and `postReviewConfirm(orderId, revision)` in `src/lib/api/client.ts` (`ReviewMutationResponse` in `src/lib/api/types.ts`); both throw `ApiError`.
+
 `revision` is an opaque UUID from `order.review.revision`; never calculate it client-side. Every replacement sync/demo load and every edit issues a new revision. A stale request receives 409 and must reload current data rather than automatically retry an old confirmation. Repeating confirmation for the same confirmed revision is idempotent and does not add another audit entry.
 
 Request schemas and the `ReviewEdit` type live in `src/lib/review/schema.ts` (Zod, no server imports), independent of frontend components.

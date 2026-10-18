@@ -8,10 +8,10 @@ import { EmptyState, ErrorState, OrderDetailSkeleton } from "@/components/states
 import { Button } from "@/components/ui/Button";
 import { ReviewView } from "@/components/views/ReviewView";
 import { invalidate, useLedger, useMarkNotPurchase, useRestoreOrder } from "@/hooks";
+import { postReviewConfirm, postReviewEdit } from "@/lib/api/client";
 import type { NormalizedOrder } from "@/lib/contracts";
 import { formatMoney } from "@/lib/format";
 import { countsTowardOwed, orderNeedsReview } from "@/lib/rules/owed";
-import { postReviewConfirm, postReviewEdit } from "./reviewApi";
 import { applyEdits, bufferEdit, itemsWithoutOrder, saveEditsThenConfirm } from "./reviewFlow";
 
 // Thin wrapper for "/review" (issue #65): the queue is GET /api/ledger's orders that need review (the same filter as

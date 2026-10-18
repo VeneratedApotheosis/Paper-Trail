@@ -3,7 +3,7 @@ import type { NormalizedOrder } from "@/lib/contracts";
 import { ApiError } from "@/lib/api/client";
 import type { ReviewQueueItem } from "@/lib/api/types";
 import { ReviewEditSchema, type ReviewEdit } from "@/lib/review/schema";
-import type { ReviewMutationResponse } from "./reviewApi";
+import type { ReviewMutationResponse } from "@/lib/api/types";
 
 /**
  * Review flow for /review (#65). ReviewCard fires one OrderFieldEdit per keystroke, but every saved edit rotates the
