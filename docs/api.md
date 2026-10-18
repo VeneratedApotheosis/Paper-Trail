@@ -37,7 +37,7 @@ Notes:
 - `reviewQueue` items are `{ emailId, stage: "classify" | "extract" | "match" | "rules", reason, orderId? }` (`match`: e.g. odd/negative totals or an unreadable email date; `rules`: a rule failed for that one order, which gets no findings while every other order still does): uncertain
   classifications that were not extracted, failed / invalid / low-confidence extractions, and orders that need review.
 - Excluded merchants are hidden from every response (ledger, orders, findings, review queue) until re-included.
-- Delete-all purges orders, findings, drafts, review queue, extraction cache, exclusions and the audit log, keeping
+- Delete-all purges orders, findings, drafts, review queue, extraction cache, exclusions, saved review corrections and the audit log, keeping
   one `delete` audit record. OAuth revocation is a hook (`setRevokeOAuthHook` in `src/lib/store`) that #3 registers;
   until then `revokedToken` is `false`.
 - Audit `llm_call` entries carry model, `redactedTokenCount` (= number of PII tokens redaction replaced in that email)
@@ -115,8 +115,8 @@ disconnected on its own.
   confirmed copy), rules rerun only for merged orders, all other findings are kept as produced. Syncing account A
   therefore replaces only A's contribution; B's orders stay. Finding statuses and claim drafts carry over by finding id
   as in #77 / #79. A demo load, upload or clear replaces the whole ledger and forgets the per-account results. Limit:
-  an order without an order reference is not recognized across inboxes. Hand corrections in the review flow last
-  until the next sync of any account (as before for a re-sync).
+  an order without an order reference is not recognized across inboxes. Review corrections are durable (#124, below).
+- **Durable Review corrections (#124):** every Review edit, confirmation and every resolved / dismissed finding is also saved as an override in table `review_override` of the local database (`DATABASE_URL`; scope = profile id; created on the first write). The anonymous scope keeps them in memory only. After every publish of a non-demo ledger (Gmail per-account merge, upload, feedback) `applyOverrides` (`src/lib/review/overrides.ts`) re-applies them BEFORE the rules run: edited fields win over the fresh extraction, rules recompute the changed orders (so findings and `owedTotal` follow), confirmed orders stay confirmed (an edit withdraws the confirmation), resolved / dismissed findings keep their status. Overrides whose order is absent stay stored and are reported. Orders expose `review.correctedFields` (the edited `ReviewEdit.field` names; `orderCorrectedByUser(order)` in `src/lib/view.ts`) for the `Corrected by you` chip. Each sync that applied (or is holding) corrections writes one `approval` audit row (`Applied N of your Review corrections to this sync`). Disconnecting an account keeps them; delete-all removes them; a demo load neither applies nor records them.
 - **Preview / sync:** `GET /api/gmail/preview[?accountId=]` and `POST /api/gmail/sync { confirmed: true, accountId? }`
   act on one account, or by default on **every** account, one after another. Responses keep their top-level fields
   (summed over the accounts that worked) and add `accounts`: preview entries are

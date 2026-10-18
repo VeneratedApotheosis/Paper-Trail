@@ -91,6 +91,8 @@ export const NormalizedOrderSchema = z.object({
   review: z.object({
     revision: z.string().uuid(),
     confirmedAt: z.string().datetime({ offset: true }).optional(),
+    /** Fields the user corrected in Review (ReviewEdit.field names, #124); present on orders showing Corrected by you. */
+    correctedFields: z.array(z.string()).optional(),
   }).optional(),
 });
 export type NormalizedOrder = z.infer<typeof NormalizedOrderSchema>;

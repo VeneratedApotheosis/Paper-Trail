@@ -3,9 +3,11 @@ import { NormalizedOrderSchema, type FindingStatus, type NormalizedOrder } from 
 import { seedPriceFeed } from "@/lib/demo/seed";
 import { defaultRules, runRules } from "@/lib/rules";
 import { isExcludedMerchant } from "@/lib/pipeline/run";
-import { appendAudit, getExcludedMerchants, getOrder, getState, saveReviewedOrder } from "@/lib/store";
+import { appendAudit, currentStoreScope, getExcludedMerchants, getOrder, getState, saveReviewedOrder } from "@/lib/store";
 import { recordReviewLabel } from "@/lib/quality/feedback";
 import { orderNeedsReview } from "@/lib/view";
+import { recordOverride, type OverrideRecord } from "./override-store";
+import { applyReviewEdit, correctedFieldNames, isValidReviewedOrder } from "./overrides";
 import type { ReviewEdit } from "./schema";
 
 // Pending edits intentionally emit no findings. Keep only their prior statuses,
@@ -34,25 +36,26 @@ function currentOrder(id: string, revision: string) {
   return order;
 }
 function applyEdit(order: NormalizedOrder, edit: ReviewEdit): NormalizedOrder {
-  switch (edit.field) {
-    case "merchantName": return { ...order, merchant: { ...order.merchant, name: edit.value } };
-    case "orderRef": return { ...order, orderRef: edit.value };
-    case "placedAt": return { ...order, placedAt: edit.value };
-    case "currency": return { ...order, currency: edit.value };
-    case "total": case "subtotal": case "tax": case "shipping": case "discount":
-      return { ...order, [edit.field]: edit.value };
-    case "lineItemName": case "lineItemQty": case "lineItemUnitPrice": {
-      if (!order.lineItems.some(item => item.id === edit.lineItemId)) throw new ReviewError(404, "Line item not found.");
-      const field = { lineItemName: "name", lineItemQty: "qty", lineItemUnitPrice: "unitPrice" }[edit.field];
-      return { ...order, lineItems: order.lineItems.map(item => item.id === edit.lineItemId ? { ...item, [field]: edit.value } : item) };
-    }
+  const edited = applyReviewEdit(order, edit);
+  if (!edited) throw new ReviewError(404, "Line item not found.");
+  return edited;
+}
+/** #124: the correction or confirmation survives later syncs, uploads and restarts of this profile. */
+function saveDurableOverride(order: NormalizedOrder, action: "edit" | "confirm", at: Date, edit?: ReviewEdit) {
+  const emailId = order.messageIds[0];
+  const record: OverrideRecord | undefined = action === "edit" && edit
+    ? { kind: "edit", orderId: order.id, edit, ...(emailId ? { emailId } : {}), at: at.toISOString() }
+    : action === "confirm" && order.review?.confirmedAt
+      ? { kind: "confirm", orderId: order.id, confirmedAt: order.review.confirmedAt, ...(emailId ? { emailId } : {}), at: at.toISOString() }
+      : undefined;
+  if (record && !recordOverride(currentStoreScope(), record)) {
+    appendAudit({ at: at.toISOString(), type: "approval",
+      detail: `Review ${action} for order ${order.id} was applied now, but could not be saved for later syncs` });
   }
 }
 function commitReview(original: NormalizedOrder, order: NormalizedOrder, action: "edit" | "confirm", at: Date, field?: string, edit?: ReviewEdit) {
   const parsed = NormalizedOrderSchema.safeParse(order);
-  const amounts = [order.total, order.subtotal, order.tax, order.shipping, order.discount];
-  if (!parsed.success || amounts.some(amount => amount !== null && (!Number.isFinite(amount) || amount < 0)) ||
-      order.lineItems.some(item => item.returnedQty > item.qty || !Number.isFinite(item.unitPrice))) {
+  if (!parsed.success || !isValidReviewedOrder(order)) {
     throw new ReviewError(422, "Corrected order is invalid; check quantities and amounts.");
   }
   if (isExcludedMerchant(order, getExcludedMerchants())) throw new ReviewError(409, "This merchant is excluded.");
@@ -68,6 +71,7 @@ function commitReview(original: NormalizedOrder, order: NormalizedOrder, action:
   }).map(finding => ({ ...finding, status: previousStatuses.get(finding.id) ?? finding.status }));
   saveReviewedOrder(parsed.data, findings);
   recordReviewLabel(parsed.data, action, edit); // #117: corrections become labeled examples (best effort, never throws)
+  if (state.mode !== "demo") saveDurableOverride(parsed.data, action, at, edit); // #124: demo edits are not kept across loads
   pendingStatuses.delete(original);
   if (action === "edit") pendingStatuses.set(parsed.data, previousStatuses);
   appendAudit({ at: at.toISOString(), type: "approval",
@@ -77,7 +81,8 @@ function commitReview(original: NormalizedOrder, order: NormalizedOrder, action:
 }
 export function editReviewedOrder(id: string, revision: string, edit: ReviewEdit, at: Date = new Date()) {
   const original = currentOrder(id, revision);
-  const order = { ...applyEdit(original, edit), needsReview: true, review: { revision: randomUUID() } };
+  const order = { ...applyEdit(original, edit), needsReview: true,
+    review: { revision: randomUUID(), correctedFields: correctedFieldNames([...(original.review?.correctedFields ?? []), edit.field]) } };
   return commitReview(original, order, "edit", at, edit.field, edit);
 }
 export function confirmReviewedOrder(id: string, revision: string, at: Date = new Date()) {
@@ -90,7 +95,8 @@ export function confirmReviewedOrder(id: string, revision: string, at: Date = ne
   }
   const original = currentOrder(id, revision);
   const order = { ...original, needsReview: false,
-    review: { revision: randomUUID(), confirmedAt: at.toISOString() } };
+    review: { revision: randomUUID(), confirmedAt: at.toISOString(),
+      ...(original.review?.correctedFields ? { correctedFields: original.review.correctedFields } : {}) } };
   const result = commitReview(original, order, "confirm", at);
   confirmReceipts.set(result.order, revision);
   return result;

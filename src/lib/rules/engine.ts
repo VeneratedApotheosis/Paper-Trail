@@ -128,7 +128,8 @@ function validateFinding(finding: Finding, rule: Rule): Finding {
   return parsed.data;
 }
 
-function compareFindings(a: Finding, b: Finding): number {
+/** Display order of findings: soonest due first (no due date last), then largest amount, then id. */
+export function compareFindings(a: Finding, b: Finding): number {
   if (a.dueAt !== b.dueAt) {
     if (a.dueAt === null) return 1;
     if (b.dueAt === null) return -1;

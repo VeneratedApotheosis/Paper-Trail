@@ -8,6 +8,8 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // Tests never write the real ./papertrail.sqlite (labels, review corrections): the default database is in memory.
+    env: { DATABASE_URL: ":memory:" },
     include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.{ts,tsx}", "tools/**/*.test.{ts,tsx}"],
   },
 });

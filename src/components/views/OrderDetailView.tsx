@@ -8,7 +8,7 @@ import { orderSources, type SourceAccount } from "@/components/sourceAccounts";
 import { Chip } from "@/components/ui/Chip";
 import { StatusChip } from "@/components/StatusChip";
 import { formatDate, formatMoney } from "@/lib/format";
-import { deriveOrderStatus, merchantName, orderNeedsReview } from "@/lib/view";
+import { deriveOrderStatus, merchantName, orderCorrectedByUser, orderNeedsReview } from "@/lib/view";
 
 // Props-only detail view for one order. All data arrives as props (typed via
 // @/lib/contracts) and the only action is the onBack callback, so the page
@@ -78,6 +78,7 @@ export function OrderDetailView({
             <div className="flex flex-wrap items-center gap-2">
               <StatusChip status={deriveOrderStatus(order)} />
               {needsReview ? <Chip tone="review">Needs a quick check</Chip> : null}
+              {orderCorrectedByUser(order) ? <Chip tone="saved">Corrected by you</Chip> : null}
               <SourceBadge sources={sources} full />
             </div>
             <h1 className="mt-3 font-serif text-3xl text-ink">{merchantName(order)}</h1>

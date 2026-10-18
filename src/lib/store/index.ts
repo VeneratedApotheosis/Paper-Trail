@@ -3,6 +3,8 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import type { Finding, FindingStatus, NormalizedOrder } from "@/lib/contracts";
 import { createMemoryCache, type ExtractionCache } from "@/lib/ingestion";
 import { deleteScopeLabels } from "@/lib/quality/labels";
+import { deleteScopeOverrides, listOverrides, recordOverride, removeFindingOverride, resetOverrideStores } from "@/lib/review/override-store";
+import { applyOverrides } from "@/lib/review/overrides";
 import { emptyQualityData, type QualityData } from "@/lib/quality/types";
 import { mergeAccountResults, type AccountPipelineResult } from "@/lib/pipeline/accounts";
 import {
@@ -141,6 +143,7 @@ function withCurrentFields(store: StoreData): StoreData {
 /** Drops all store data, including the audit log and the OAuth hook. Tests only. */
 export function resetStore(): void {
   replaceData(emptyData());
+  resetOverrideStores();
 }
 
 function visibleOrders(store: StoreData): NormalizedOrder[] {
@@ -193,18 +196,33 @@ export function getFindingsForOrder(orderId: string): Finding[] {
 export function setPipelineResult(mode: Exclude<StoreMode, "empty">, asOf: string, result: PipelineResult): void {
   const store = data();
   store.accountResults = new Map(); // a demo / upload ledger replaces every Gmail account's results
-  applyPipelineResult(store, mode, asOf, result);
+  applyPipelineResult(store, mode, asOf, result, true);
 }
 
-function applyPipelineResult(store: StoreData, mode: Exclude<StoreMode, "empty">, asOf: string, result: PipelineResult): void {
-  const previousStatus = new Map(store.findings.map((finding) => [finding.id, finding.status]));
+/**
+ * Publishes a pipeline result into the store. Unless this is a demo ledger, the profile's durable Review corrections
+ * (#124) are applied first, so rules, finding statuses and the owed total see the corrected values. `announce` adds one
+ * audit summary row when corrections were applied or are waiting for orders that are not in this ledger.
+ */
+function applyPipelineResult(store: StoreData, mode: Exclude<StoreMode, "empty">, asOf: string, incoming: PipelineResult, announce: boolean): void {
+  let result = incoming;
+  const overrides = mode === "demo" ? [] : listOverrides(currentStoreScope());
+  if (overrides.length > 0) {
+    const outcome = applyOverrides(incoming, overrides, { now: new Date(asOf) });
+    result = outcome.result;
+    const { applied, orphaned } = outcome.report;
+    if (announce && (applied > 0 || orphaned > 0)) {
+      appendAuditTo(store, { at: asOf, type: "approval", detail: `Applied ${applied} of your Review corrections to this sync` +
+        (orphaned > 0 ? `; ${orphaned} saved ${orphaned === 1 ? "correction waits" : "corrections wait"} for orders not in this ledger` : "") });
+    }
+  }  const previousStatus = new Map(store.findings.map((finding) => [finding.id, finding.status]));
   const previousFindings = new Map(store.findings.map(finding => [finding.id, finding]));
   store.mode = mode;
   store.asOf = asOf;
   // New snapshots invalidate stale review forms, including after a repeat sync.
   // Orders that came through unchanged (same object) keep their revision, so a feedback edit does not stale other forms.
   const unchanged = new Set(store.orders);
-  store.orders = result.orders.map(order => unchanged.has(order) ? order : ({ ...order, review: { revision: randomUUID() } }));
+  store.orders = result.orders.map(order => unchanged.has(order) ? order : ({ ...order, review: { ...order.review, revision: randomUUID() } }));
   store.findings = result.findings.map((finding) => {
     const status = previousStatus.get(finding.id);
     return status === undefined || status === finding.status ? finding : { ...finding, status };
@@ -233,7 +251,7 @@ export function setAccountPipelineResult(accountId: string, asOf: string, result
   const store = data();
   store.accountResults.set(accountId, { accountId, asOf, result, syncedAt });
   const merged = mergeAccountResults([...store.accountResults.values()], new Date(asOf));
-  applyPipelineResult(store, "gmail", merged.asOf, merged.result);
+  applyPipelineResult(store, "gmail", merged.asOf, merged.result, true);
   store.lastSyncAt = [...store.accountResults.values()].map((entry) => entry.syncedAt).sort().at(-1) ?? syncedAt;
 }
 
@@ -250,7 +268,7 @@ export function updateLedgerResult(accountId: string | undefined, update: (resul
     stats: store.stats ?? { emails: 0, prefilteredOut: 0, classes: {}, extracted: 0, skipped: 0,
       extractionOrigins: { llm: 0, cache: 0, gold: 0 }, orders: 0, excludedOrders: 0, findings: 0, needsReview: 0 },
   };
-  applyPipelineResult(store, store.mode, store.asOf, update(current));
+  applyPipelineResult(store, store.mode, store.asOf, update(current), false);
   const part = accountId === undefined ? undefined : store.accountResults.get(accountId);
   if (part) store.accountResults.set(part.accountId, { ...part, result: update(part.result) });
 }
@@ -349,7 +367,19 @@ export function setFindingStatus(id: string, status: FindingStatus): Finding | u
     updated = { ...finding, status };
     return updated;
   });
+  if (updated && store.mode !== "demo") recordFindingDecision(updated);
   return updated;
+}
+
+/**
+ * Resolved and dismissed are the user's own decisions about money, so they outlive the in-memory ledger (#124): the next
+ * sync, even after a restart, keeps them. Open and drafted withdraw an earlier decision. Demo ledgers are never persisted.
+ */
+function recordFindingDecision(finding: Finding): void {
+  const scope = currentStoreScope();
+  if (finding.status === "resolved" || finding.status === "dismissed") {
+    recordOverride(scope, { kind: "finding", findingId: finding.id, status: finding.status, at: new Date().toISOString() });
+  } else removeFindingOverride(scope, finding.id);
 }
 
 export function appendAudit(event: PipelineAuditEvent): AuditEntry {
@@ -388,7 +418,7 @@ export function setRevokeOAuthHook(hook: RevokeOAuthHook | null): void {
 }
 
 /**
- * Purges all user data: ledger, drafts, review queue, extraction cache, exclusions and the audit log, keeping
+ * Purges all user data: ledger, drafts, review queue, extraction cache, exclusions, saved review corrections and the audit log, keeping
  * only the single "delete" audit record. Uses a per-request revoker when supplied, otherwise the registered hook.
  */
 export async function deleteAll(
@@ -415,6 +445,7 @@ export async function deleteAll(
   };
   const at = clock().toISOString();
   const deletedLabels = deleteScopeLabels(currentStoreScope());
+  const deletedOverrides = deleteScopeOverrides(currentStoreScope());
   const fresh = emptyData();
   fresh.revokeOAuth = store.revokeOAuth;
   fresh.generation = store.generation + 1;
@@ -422,7 +453,7 @@ export async function deleteAll(
   appendAudit({
     at,
     type: "delete",
-    detail: `Deleted everything: ${purged.orders} orders, ${purged.findings} findings, ${purged.drafts} drafts, ${purged.reviewItems} review items, ${purged.audit} audit entries, extraction cache, merchant exclusions${deletedLabels > 0 ? `, ${deletedLabels} quality labels` : ""}; ${revokeNote}`,
+    detail: `Deleted everything: ${purged.orders} orders, ${purged.findings} findings, ${purged.drafts} drafts, ${purged.reviewItems} review items, ${purged.audit} audit entries, extraction cache, merchant exclusions${deletedLabels > 0 ? `, ${deletedLabels} quality labels` : ""}${deletedOverrides > 0 ? `, ${deletedOverrides} saved review corrections` : ""}; ${revokeNote}`,
   });
   return { deleted: true, ok: true, at, revokedToken, purged };
 }

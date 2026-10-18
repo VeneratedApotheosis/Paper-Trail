@@ -38,6 +38,11 @@ export function orderNeedsReview(order: NormalizedOrder): boolean {
   return rulesOrderNeedsReview(order);
 }
 
+// True when the user corrected at least one field of this order in Review (#124); the correction is kept across syncs.
+export function orderCorrectedByUser(order: NormalizedOrder): boolean {
+  return (order.review?.correctedFields?.length ?? 0) > 0;
+}
+
 // Is this finding eligible for the headline owed total? Open or drafted ("claim
 // sent") findings on orders that don't need review (AGENTS.md hard rule #7, #77).
 export function findingCountsTowardOwed(
