@@ -67,7 +67,15 @@ const SAMPLE_FINDINGS: { merchant: string; finding: Finding }[] = [
 
 const SAMPLE_TOTAL = SAMPLE_FINDINGS.reduce((sum, { finding }) => sum + finding.amountAtStake, 0);
 
-export function LandingHero({ onOpenApp }: { onOpenApp: () => void }) {
+export function LandingHero({
+  onOpenApp,
+  onConnectGmail,
+  onTryDemo,
+}: {
+  onOpenApp: () => void;
+  onConnectGmail?: () => void;
+  onTryDemo?: () => void;
+}) {
   const groups = groupByKind(SAMPLE_FINDINGS, "USD");
 
   return (
@@ -87,10 +95,17 @@ export function LandingHero({ onOpenApp }: { onOpenApp: () => void }) {
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
-              onClick={onOpenApp}
+              onClick={onTryDemo ?? onOpenApp}
               className="neu-accent inline-flex min-h-[44px] items-center justify-center rounded-lg px-6 text-sm font-bold sm:w-auto"
             >
-              Open the app
+              Try the demo
+            </button>
+            <button
+              type="button"
+              onClick={onConnectGmail ?? onOpenApp}
+              className="neu-raised-sm inline-flex min-h-[44px] items-center justify-center rounded-lg px-6 text-sm font-bold text-teal-deep sm:w-auto"
+            >
+              Log in
             </button>
             <a
               href="#how-it-works"
