@@ -23,7 +23,7 @@ export function LandingView({ onOpenApp, onConnectGmail, onTryDemo }: LandingVie
     <div className="min-h-screen bg-paper">
       <LandingNav />
       <main>
-        <LandingHero onOpenApp={onOpenApp} />
+        <LandingHero onOpenApp={onOpenApp} onConnectGmail={onConnectGmail} onTryDemo={onTryDemo} />
         <HowItWorksSection />
         <FindingsShowcase onOpenApp={onOpenApp} />
         <TrustHighlights />
