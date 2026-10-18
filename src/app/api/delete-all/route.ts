@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { DeleteAllResponse } from "@/lib/api/types";
 import { deleteAll } from "@/lib/store";
 import { authConfig, SESSION_COOKIE, TRANSACTION_COOKIE } from "@/lib/auth/config";
-import { sessionUser } from "@/lib/auth/service";
+import { clearAuthCookies, resolveSessionUser } from "@/lib/auth/session";
 import { authStore } from "@/lib/auth/store";
 import { revokeUserAuthorization } from "@/lib/auth/revoke";
 
@@ -26,9 +26,16 @@ async function handlePOST(request: Request): Promise<Response> {
     catch {
       return NextResponse.json({ error: "Authentication is not configured; deletion was not performed." }, { status: 503, headers });
     }
-    userId = sessionUser(cookie, config);
-    if (!userId || !authStore().find(userId)) {
-      return NextResponse.json({ error: "Reconnect Gmail before deleting connected account data." }, { status: 401, headers });
+    // #84: a valid sealed identity with an existing account row may delete even if its Gmail grant expired
+    // or was revoked (tokenEnc cleared). Tampered / expired / deleted identities are rejected and their
+    // cookies cleared, so a stale cookie can't block the anonymous demo afterwards.
+    userId = resolveSessionUser(request, { requireToken: false });
+    if (!userId) {
+      const rejected = NextResponse.json(
+        { error: "Your session is no longer valid. Reconnect Gmail to delete connected account data." },
+        { status: 401, headers },
+      );
+      return clearAuthCookies(rejected, request);
     }
   }
   // Anonymous demo deletion must never invoke a global revoker belonging to an
@@ -44,4 +51,4 @@ async function handlePOST(request: Request): Promise<Response> {
   return response;
 }
 
-export const POST = withAccountStore(handlePOST);
+export const POST = withAccountStore(handlePOST, { requireToken: false });
