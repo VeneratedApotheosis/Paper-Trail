@@ -19,7 +19,7 @@ export function OwedBreakdown({ groups, currency }: { groups: KindGroup[]; curre
   return (
     <div className="space-y-3">
       <div role="img" aria-label={`Breakdown: ${summary}`} className="neu-inset rounded-full p-[3px]">
-        <div className="flex h-2.5 gap-0.5 overflow-hidden rounded-full">
+        <div className="anim-grow flex h-2.5 gap-0.5 overflow-hidden rounded-full">
           {groups.map((g) => (
             <span key={g.kind} className={`${SEGMENT[g.kind]} min-w-1`} style={{ flexGrow: Math.max(g.total, 1) }} />
           ))}

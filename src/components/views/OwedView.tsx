@@ -187,7 +187,7 @@ export function OwedView({
                     ))}
                   </div>
                 ) : null}
-                <div className="space-y-4">
+                <div className="anim-stagger space-y-4">
                   {visibleItems.map(({ finding, merchant, sources }) => (
                     <FindingCard
                       key={finding.id}
