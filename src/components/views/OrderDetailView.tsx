@@ -13,6 +13,10 @@ import { deriveOrderStatus, merchantName, orderNeedsReview } from "@/lib/view";
 export interface OrderDetailViewProps {
   order: NormalizedOrder;
   findings: Finding[];
+  // Label for findings backed by the simulated price feed (hard rule 8).
+  // Optional + defaulted so the existing page wrapper keeps compiling until
+  // ui-wiring passes the real label.
+  simulatedLabel?: string;
   onBack: () => void;
 }
 
@@ -38,7 +42,12 @@ const FINDING_LABEL: Record<FindingKind, string> = {
   rewards_gap: "Rewards missed",
 };
 
-export function OrderDetailView({ order, findings, onBack }: OrderDetailViewProps) {
+export function OrderDetailView({
+  order,
+  findings,
+  simulatedLabel = "Simulated price feed",
+  onBack,
+}: OrderDetailViewProps) {
   const needsReview = orderNeedsReview(order);
   const { currency } = order;
   const events = [...order.events].sort(
@@ -139,7 +148,10 @@ export function OrderDetailView({ order, findings, onBack }: OrderDetailViewProp
             {findings.map((finding) => (
               <li key={finding.id}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-medium text-ink">{FINDING_LABEL[finding.kind]}</span>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-ink">{FINDING_LABEL[finding.kind]}</span>
+                    {finding.simulated ? <Chip tone="neutral">{simulatedLabel}</Chip> : null}
+                  </span>
                   <span className="font-serif tabular-nums text-money">
                     {formatMoney(finding.amountAtStake, finding.currency)}
                   </span>

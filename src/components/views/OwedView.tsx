@@ -1,6 +1,6 @@
 "use client";
 
-import type { Finding } from "@/lib/contracts";
+import type { Finding, FindingStatus } from "@/lib/contracts";
 import type { OwedSummary } from "@/lib/types";
 import { AppShell } from "@/components/AppShell";
 import { HeroCard } from "@/components/HeroCard";
@@ -22,24 +22,36 @@ export interface OwedViewProps {
   summary: OwedSummary;
   owedItems: OwedFindingItem[];
   maybeItems: OwedFindingItem[];
+  // Drafted findings: the user approved a claim, so it still counts toward the
+  // total until they mark it resolved or dismissed (#77).
+  claimSentItems?: OwedFindingItem[];
   simulatedLabel: string;
   onOpenClaim: (findingId: string) => void;
   onOpenReview: () => void;
   onBrowseLedger: () => void;
   onLoadDemo?: () => void;
+  // When supplied, claim-sent rows expose "Mark resolved" / "Dismiss".
+  onSetStatus?: (findingId: string, status: FindingStatus) => void;
 }
 
 export function OwedView({
   summary,
   owedItems,
   maybeItems,
+  claimSentItems = [],
   simulatedLabel,
   onOpenClaim,
   onOpenReview,
   onBrowseLedger,
   onLoadDemo,
+  onSetStatus,
 }: OwedViewProps) {
-  const isEmpty = summary.owedTotal === 0 && owedItems.length === 0 && maybeItems.length === 0;
+  const claimSentTotal = summary.claimSentTotal ?? 0;
+  const isEmpty =
+    summary.owedTotal === 0 &&
+    owedItems.length === 0 &&
+    maybeItems.length === 0 &&
+    claimSentItems.length === 0;
 
   if (isEmpty) {
     return (
@@ -86,6 +98,13 @@ export function OwedView({
           onReview={onOpenReview}
         />
 
+        {claimSentTotal > 0 ? (
+          <p className="-mt-4 text-center text-sm text-ink-muted">
+            Includes {formatMoney(claimSentTotal, summary.currency)} you&apos;ve already claimed,
+            counted until it&apos;s resolved.
+          </p>
+        ) : null}
+
         {owedItems.length > 0 ? (
           <section id="findings" aria-label="Open findings" className="space-y-4">
             <h2 className="font-serif text-2xl text-ink">Findings</h2>
@@ -98,6 +117,49 @@ export function OwedView({
                 onDraftClaim={() => onOpenClaim(finding.id)}
               />
             ))}
+          </section>
+        ) : null}
+
+        {claimSentItems.length > 0 ? (
+          <section aria-label="Claims you've sent" className="space-y-4">
+            <h2 className="font-serif text-2xl text-ink">Claims sent</h2>
+            <ul className="space-y-3">
+              {claimSentItems.map(({ finding, merchant }) => (
+                <li
+                  key={finding.id}
+                  className="neu-raised-sm flex flex-wrap items-center justify-between gap-3 rounded-sm px-4 py-3"
+                >
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm text-ink">{merchant}</span>
+                    {finding.simulated ? <Chip tone="neutral">{simulatedLabel}</Chip> : null}
+                    <Chip tone="saved">Claim sent</Chip>
+                  </span>
+                  <span className="flex flex-wrap items-center gap-3">
+                    <span className="font-serif tabular-nums text-money">
+                      {formatMoney(finding.amountAtStake, finding.currency)}
+                    </span>
+                    {onSetStatus ? (
+                      <span className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onSetStatus(finding.id, "resolved")}
+                          className="rounded-sm px-3 py-1 text-label font-bold text-teal-deep transition-shadow hover:shadow-inset-sm"
+                        >
+                          Mark resolved
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onSetStatus(finding.id, "dismissed")}
+                          className="rounded-sm px-3 py-1 text-label font-bold text-ink-muted transition-shadow hover:shadow-inset-sm"
+                        >
+                          Dismiss
+                        </button>
+                      </span>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </section>
         ) : null}
 

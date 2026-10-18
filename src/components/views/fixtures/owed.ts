@@ -7,8 +7,10 @@ const noop = () => {};
 export const owedViewFixture: OwedViewProps = {
   summary: {
     currency: "USD",
-    owedTotal: 187,
-    findingCount: 2,
+    owedTotal: 251,
+    findingCount: 3,
+    claimSentCount: 1,
+    claimSentTotal: 64,
     excludedCount: 1,
     excludedTotal: 50,
   },
@@ -50,6 +52,26 @@ export const owedViewFixture: OwedViewProps = {
       },
     },
   ],
+  claimSentItems: [
+    {
+      merchant: "Juniper Home",
+      finding: {
+        id: "refund_short:o4",
+        kind: "refund_short",
+        orderId: "o4",
+        amountAtStake: 64,
+        currency: "USD",
+        dueAt: null,
+        severity: "medium",
+        status: "drafted",
+        ruleVersion: "R4@1",
+        summary: "Refund was $64 short of the returned amount; claim approved and sent.",
+        evidence: [{ messageId: "m4", quote: "Refund issued: $120.00 for a $184.00 return." }],
+        explain: { expectedRefund: 184, actualRefund: 120 },
+        simulated: false,
+      },
+    },
+  ],
   maybeItems: [
     {
       merchant: "Atlas Outdoor",
@@ -75,4 +97,5 @@ export const owedViewFixture: OwedViewProps = {
   onOpenReview: noop,
   onBrowseLedger: noop,
   onLoadDemo: noop,
+  onSetStatus: noop,
 };

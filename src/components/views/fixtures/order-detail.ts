@@ -75,6 +75,28 @@ export const orderDetailViewFixture: OrderDetailViewProps = {
       explain: { refundSlaDays: 10, policySource: "email_text", confidence: 0.9 },
       simulated: false,
     },
+    {
+      id: "price_drop:ord_sample",
+      kind: "price_drop",
+      orderId: "ord_sample",
+      lineItemId: "li_2",
+      amountAtStake: 12.0,
+      currency: "USD",
+      dueAt: "2026-03-06T12:00:00.000Z",
+      severity: "low",
+      status: "open",
+      ruleVersion: "R3@1",
+      summary: "The wool-blend beanie is $12.00 cheaper now, within the adjustment window.",
+      evidence: [
+        {
+          messageId: "msg_rv_1",
+          quote: "Price adjustments honored within 14 days of purchase.",
+        },
+      ],
+      explain: { priceAdjustDays: 14, priceSource: "mock" },
+      simulated: true,
+    },
   ],
+  simulatedLabel: "Simulated price feed",
   onBack: noop,
 };
