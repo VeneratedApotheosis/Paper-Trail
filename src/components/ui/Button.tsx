@@ -4,7 +4,7 @@ import Link from "next/link";
 type Variant = "primary" | "secondary" | "ghost";
 
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-bold transition-[box-shadow,transform] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-bold min-h-[44px] transition-[box-shadow,transform] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50";
 
 // Neumorphic variants: primary is the teal gradient; secondary is a soft raised
 // chip; ghost presses in on hover.

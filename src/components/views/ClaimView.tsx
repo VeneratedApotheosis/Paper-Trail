@@ -103,7 +103,7 @@ export function ClaimView({
       <section className="neu-raised mt-8 rounded-xl p-6 md:p-8">
         <div className="flex items-baseline justify-between gap-4">
           <p className="eyebrow">To</p>
-          <label className="flex-1 text-sm text-ink-muted">Recipient<input aria-label="Recipient" disabled={pending} value={recipient} onChange={e => setRecipient(e.target.value)} className="neu-inset mt-2 w-full rounded-lg bg-transparent px-3 py-2" /></label>
+          <label className="flex-1 text-sm text-ink-muted">Recipient<input aria-label="Recipient" disabled={pending} value={recipient} onChange={e => setRecipient(e.target.value)} className="neu-inset mt-2 min-h-[44px] w-full rounded-lg bg-transparent px-3 py-2" /></label>
         </div>
 
         <hr className="mt-4 border-0 border-t border-rule/70" />

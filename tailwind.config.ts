@@ -17,18 +17,20 @@ const config: Config = {
         },
         ink: {
           DEFAULT: "#1e2633",
-          muted: "#586273",
-          faint: "#8a93a3",
+          muted: "#4a5466", // AA on paper, raised and inset (>= 5.4:1)
+          faint: "#586273", // AA on paper and raised (4.7:1); hierarchy comes from size and weight, not paleness
         },
         rule: "#c3ccd9",
         // One accent: a lighter, saturated teal (gradient stops live in CSS).
         teal: {
           DEFAULT: "#15a0ab",
           bright: "#22c3cd",
-          deep: "#0e7079",
+          deep: "#0b646c", // text and links: AA on every surface (>= 4.7:1)
         },
         // Money / "owed" values: a deep, confident teal set in the serif.
         money: "#0a545b",
+        // Delete-everything red, darkened to pass AA as text on paper (see docs/design-system.md).
+        danger: "#9a4337",
         // Soft-shadow endpoints (for arbitrary rgba use).
         shadowdark: "#b2bccb",
         shadowlight: "#f3f7fc",

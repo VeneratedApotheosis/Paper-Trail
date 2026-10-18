@@ -49,7 +49,7 @@ export function InfoTip({
         aria-expanded={open}
         aria-describedby={tipId}
         onClick={() => setOpen((value) => !value)}
-        className={`inline-flex h-5 w-5 items-center justify-center rounded-full font-serif text-xs font-bold normal-case tracking-normal text-teal-deep transition-shadow ${
+        className={`relative inline-flex h-5 w-5 items-center justify-center rounded-full before:absolute before:-inset-3 before:content-[''] font-serif text-xs font-bold normal-case tracking-normal text-teal-deep transition-shadow ${
           open ? "neu-inset" : "neu-raised-sm"
         }`}
       >

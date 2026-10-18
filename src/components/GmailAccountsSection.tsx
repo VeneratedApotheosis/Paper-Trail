@@ -50,7 +50,7 @@ const STATUS_COPY: Record<AccountRowStatus, { chip: string; tone: ChipTone; text
   },
 };
 
-const destructiveText = "!text-[#b0574c]";
+const destructiveText = "!text-danger";
 
 export function GmailAccountsSection({
   accounts,

@@ -81,7 +81,7 @@ export function AppShellView({
     <div className="min-h-screen md:flex">
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col px-5 py-8 shadow-[inset_-10px_0_24px_rgba(176,188,206,0.35)] md:flex">
-        <Link href="/" className="px-2 font-serif text-xl font-semibold text-ink">
+        <Link href="/" className="inline-flex min-h-[44px] items-center px-2 font-serif text-xl font-semibold text-ink">
           PaperTrail
         </Link>
         <nav className="mt-9 flex flex-col gap-2">
@@ -131,7 +131,7 @@ export function AppShellView({
             sync ? "" : "md:hidden"
           }`}
         >
-          <Link href="/" className="font-serif text-lg font-semibold text-ink md:hidden">
+          <Link href="/" className="inline-flex min-h-[44px] items-center font-serif text-lg font-semibold text-ink md:hidden">
             PaperTrail
           </Link>
           <div className="flex items-center gap-3">
@@ -162,7 +162,7 @@ export function AppShellView({
                 onMouseEnter={() => onNavIntent?.(item.href)}
                 onFocus={() => onNavIntent?.(item.href)}
                 onTouchStart={() => onNavIntent?.(item.href)}
-                className={`rounded-sm px-2.5 py-2 text-xs font-bold transition-shadow ${
+                className={`flex min-h-[44px] items-center justify-center rounded-sm px-2.5 text-xs font-bold transition-shadow ${
                   active ? "neu-inset text-teal-deep" : "text-ink-muted"
                 }`}
               >

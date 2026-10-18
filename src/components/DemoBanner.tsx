@@ -23,7 +23,7 @@ export function DemoBanner({
         <button
           type="button"
           onClick={onLeaveDemo}
-          className="rounded-sm px-3 py-1 text-label font-bold text-teal-deep transition-shadow hover:shadow-inset-sm"
+          className="inline-flex min-h-[44px] items-center rounded-sm px-3 py-1 text-label font-bold text-teal-deep transition-shadow hover:shadow-inset-sm md:min-h-[32px]"
         >
           Leave demo
         </button>

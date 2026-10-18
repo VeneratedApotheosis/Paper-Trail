@@ -187,7 +187,7 @@ export function ShellSyncControl({ sync }: { sync: AppShellSync }) {
         aria-haspopup={state === "ready" ? "dialog" : undefined}
         aria-expanded={state === "ready" ? Boolean(confirm) : undefined}
         title={lastSyncLabel}
-        className={`inline-flex min-w-[10.5rem] items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition-[box-shadow,transform] active:scale-[0.99] disabled:cursor-not-allowed ${
+        className={`inline-flex min-w-[10.5rem] items-center justify-center gap-2 whitespace-nowrap min-h-[44px] rounded-lg px-4 py-2 text-sm font-bold transition-[box-shadow,transform] active:scale-[0.99] disabled:cursor-not-allowed ${
           state === "running" ? "" : "disabled:opacity-60"
         } ${surface}`}
       >

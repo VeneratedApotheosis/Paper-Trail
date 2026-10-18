@@ -181,7 +181,7 @@ function FilterPill({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`rounded-sm px-4 py-1.5 text-sm font-bold transition-shadow ${
+      className={`inline-flex min-h-[44px] items-center rounded-sm px-4 py-1.5 text-sm font-bold transition-shadow md:min-h-[36px] ${
         active ? "neu-accent" : "neu-raised-sm text-ink-muted hover:text-ink"
       }`}
     >

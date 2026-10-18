@@ -15,7 +15,7 @@ import { formatDate } from "@/lib/format";
 // slate palette has no red token, so the muted terracotta is an arbitrary value
 // used only to signal the one destructive control without a traffic-light fill.
 const destructive =
-  "inline-flex items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-bold neu-raised-sm text-[#b0574c] transition-[box-shadow,transform] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-bold neu-raised-sm text-danger transition-[box-shadow,transform] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50";
 
 // --- Per-merchant exclude ----------------------------------------------------
 // Lets the user exclude a merchant from future scanning. The excluded set and
@@ -52,14 +52,14 @@ export function MerchantExcludePanel({
                 {name}
                 {isExcluded ? <Chip tone="neutral">Excluded</Chip> : null}
               </span>
-              <label className="flex cursor-pointer items-center gap-2 font-sans text-sm text-ink-muted">
+              <label className="flex min-h-[44px] cursor-pointer items-center gap-2 font-sans text-sm text-ink-muted">
                 <span className="hidden sm:inline">Exclude from scanning</span>
                 <input
                   disabled={pending}
                   type="checkbox"
                   checked={isExcluded}
                   onChange={() => onToggleMerchant(key, !isExcluded)}
-                  className="h-4 w-4 accent-teal"
+                  className="h-6 w-6 accent-teal-deep"
                   aria-label={`Exclude ${name} from scanning`}
                 />
               </label>
@@ -126,7 +126,7 @@ export function DeleteAllPanel({ onDeleteAll, deleteReceipt, pending = false, er
     ];
     return (
       <div className="neu-inset rounded-xl p-6">
-        <p className="eyebrow text-[#b0574c]">Deletion receipt</p>
+        <p className="eyebrow text-danger">Deletion receipt</p>
         <p className="mt-3 font-sans text-base text-ink">
           Stored data was erased. {deleteReceipt.revokedToken ? "Gmail access was revoked." : "No successful Google revocation was reported. Local credentials were removed."}
         </p>
@@ -160,7 +160,7 @@ export function DeleteAllPanel({ onDeleteAll, deleteReceipt, pending = false, er
       ) : (
         <div className="mt-5">
           <label htmlFor="delete-confirm" className="block font-sans text-sm text-ink">
-            Type <span className="font-bold text-[#b0574c]">{CONFIRM_WORD}</span> to confirm.
+            Type <span className="font-bold text-danger">{CONFIRM_WORD}</span> to confirm.
           </label>
           <input
             disabled={pending}

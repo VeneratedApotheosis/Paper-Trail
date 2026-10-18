@@ -66,7 +66,7 @@ export function OrderDetailView({
       <button
         type="button"
         onClick={onBack}
-        className="text-sm font-medium text-ink-muted hover:text-ink"
+        className="inline-flex min-h-[44px] items-center text-sm font-medium text-ink-muted hover:text-ink"
       >
         ← Purchases
       </button>

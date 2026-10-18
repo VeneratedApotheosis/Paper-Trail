@@ -69,7 +69,7 @@ export function FindingCard({
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
           aria-controls={panelId}
-          className="rounded-sm px-3 py-2 text-sm font-bold text-teal-deep transition-shadow hover:shadow-inset-sm"
+          className="inline-flex min-h-[44px] items-center rounded-sm px-3 py-2 text-sm font-bold text-teal-deep transition-shadow hover:shadow-inset-sm md:min-h-[36px]"
         >
           {expanded ? "Hide why" : "Why?"}
         </button>

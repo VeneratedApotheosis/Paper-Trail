@@ -160,7 +160,7 @@ export function SearchSelect({
             openList();
           }
         }}
-        className={`flex w-full items-center justify-between gap-3 rounded-sm px-4 py-2 text-left text-sm font-bold text-ink transition-shadow sm:w-72 ${
+        className={`flex w-full items-center justify-between gap-3 min-h-[44px] rounded-sm px-4 py-2 text-left text-sm font-bold text-ink transition-shadow sm:w-72 ${
           open ? "neu-inset" : "neu-raised-sm"
         }`}
       >
@@ -202,7 +202,7 @@ export function SearchSelect({
               setActiveIndex(0);
             }}
             onKeyDown={onSearchKeyDown}
-            className="neu-inset w-full rounded-sm bg-transparent px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus-visible:outline-offset-0"
+            className="neu-inset min-h-[44px] w-full rounded-sm bg-transparent px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus-visible:outline-offset-0"
           />
           <ul
             ref={listRef}

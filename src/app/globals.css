@@ -9,7 +9,10 @@
     --ink: #1e2633;
     --teal: #15a0ab;
     --teal-bright: #22c3cd;
-    --teal-deep: #0e7079;
+    --teal-deep: #0b646c;
+    --ink-muted: #4a5466;
+    --teal-action-start: #0c7e8c; /* white on this is 4.8:1 */
+    --teal-action-end: #0a6169; /* white on this is 6.4:1 */
     --money: #0a545b;
     --shadow-dark: rgba(176, 188, 206, 0.7);
     --shadow-light: rgba(248, 251, 255, 0.92);
@@ -27,7 +30,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--teal);
+    outline: 2px solid var(--teal-deep);
     outline-offset: 2px;
     border-radius: 4px;
   }
@@ -67,9 +70,9 @@
       inset -4px -4px 10px var(--shadow-light);
   }
 
-  /* Teal gradient used on primary actions and the active nav marker. */
+  /* Primary actions. Deep teal so white text passes WCAG AA (4.8:1 or better). */
   .neu-accent {
-    background: linear-gradient(135deg, var(--teal-bright), var(--teal));
+    background: linear-gradient(135deg, var(--teal-action-start), var(--teal-action-end));
     color: #ffffff;
     box-shadow:
       8px 8px 20px var(--shadow-dark),
@@ -82,7 +85,6 @@
     letter-spacing: 0.1em;
     text-transform: uppercase;
     font-weight: 700;
-    color: var(--ink);
-    opacity: 0.55;
+    color: var(--ink-muted);
   }
 }

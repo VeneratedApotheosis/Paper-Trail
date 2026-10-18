@@ -77,7 +77,7 @@ const GMAIL_COPY: Record<AccountGmailStatus, { chip: string; tone: ChipTone; tex
   },
 };
 
-const destructiveText = "!text-[#b0574c]";
+const destructiveText = "!text-danger";
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
