@@ -136,3 +136,13 @@ export interface ClaimApproveResponse {
   mailtoUrl: string;
   clipboardText: string;
 }
+
+/**
+ * GET /api/auth/session (Chelsea's route): Gmail connection status. Served with 401 when not connected and 503 when
+ * auth is unavailable; `connected: false` is normal in demo mode and is not an error.
+ */
+export interface SessionStatus {
+  connected: boolean;
+  error?: string;
+  reconnectUrl?: string;
+}

@@ -98,7 +98,7 @@ The client in `src/lib/api/client.ts` returns the same shapes as `@/lib/mock/dat
 | `getFinding(id)` | `(await getFinding(id)).finding` (+ `.order`) |
 | `auditLog` | `await getAudit()` |
 | `DEMO_LABEL`, `SIMULATED_PRICE_LABEL` | `labels.demo`, `labels.simulatedPrice` from `getLedger()` |
-| (none) | `loadDemo()`, `resetDemo()`, `uploadFiles(files)`, `getPrefilter()`, `deleteAll()`, `excludeMerchant(name)`, `includeMerchant(name)`, `setFindingStatus(id, status)` |
+| (none) | `loadDemo()`, `resetDemo()`, `uploadFiles(files)`, `getPrefilter()`, `deleteAll()`, `excludeMerchant(name)`, `includeMerchant(name)`, `setFindingStatus(id, status)`, `getSessionStatus()` |
 
 ```ts
 // before
@@ -146,3 +146,44 @@ Notes:
 
 Client (`src/lib/api/client.ts`): `getClaim(findingId)`, `regenerateClaim(findingId, { profileName?, supportEmail?,
 rephrase? })`, `saveClaim(findingId, { subject, body, recipient })`, `approveClaim(findingId)`.
+
+## Server helpers and hooks for pages (issue #48)
+
+Page wrappers never call `fetch` on the JSON routes themselves and never import `@/lib/store`. Pick one:
+
+**Server component `page.tsx`** -> `src/lib/api/server.ts` (Node only; never import it from `"use client"` files or
+middleware). Each helper returns the same body as its route, read from the same account store:
+
+| Helper | Same as | Missing item |
+|---|---|---|
+| `getLedgerForRequest(): Promise<LedgerResponse>` | `GET /api/ledger` | |
+| `getOrderForRequest(id): Promise<OrderResponse \| null>` | `GET /api/orders/:id` | `null` |
+| `getFindingForRequest(id): Promise<FindingResponse \| null>` | `GET /api/findings/:id` | `null` |
+| `getAuditForRequest(): Promise<AuditResponse>` | `GET /api/audit` | |
+| `getClaimForRequest(findingId): Promise<OpenedClaim>` | `GET /api/claims/:findingId` (stores a fresh template draft) | `{ ok: false, reason: "not_found", message }`; draftClaim failures (e.g. `"unsupported_kind"` for rewards_gap, route 422) use the same shape. Success: `{ ok: true, claim: ClaimResponse }` |
+
+Scope: the helpers read the session cookie through `cookies()` with `getSession()` (`src/lib/auth/session.ts`). A
+session (Gmail connected or not) reads that account's store, so a signed-in user never sees the anonymous demo. No
+cookie, or a stale / invalid / expired cookie or a deleted account, reads the anonymous demo/upload store. Auth config
+or DB failures throw (fail closed). The JSON routes (`withAccountStore`) answer a stale cookie with 401 instead.
+
+**Client component** -> `@/hooks` (`src/hooks/**`), built on `@/lib/api/client`:
+- Reads return `{ data, error, loading, refetch }`: `useLedger()`, `useOrder(id)`, `useFinding(id)`, `useAudit()`
+  (entries newest first), `useClaim(findingId)`, `useSession()` (`SessionStatus` from `GET /api/auth/session`;
+  `connected: false` is normal in demo mode).
+- Mutations return `{ run, pending, error }`; `run(...)` resolves to the response or `null` on failure:
+  `useLoadDemo()`, `useSetFindingStatus()`, `useSaveClaim()`, `useApproveClaim()`, or `useAction(anyClientFn)`.
+  Call `refetch()` on the affected reads after a successful `run`.
+
+Ids: pass `params.id` as is. Next 15 hands it over still percent-encoded and real ids contain `:`; the helpers and
+the client decode once with `safeDecode` (exported from `@/lib/api/client`) before encoding, so ids are never
+double-encoded.
+
+```tsx
+// server component: src/app/ledger/[id]/page.tsx
+const data = await getOrderForRequest((await params).id);
+if (!data) notFound();
+return <OrderDetail order={data.order} findings={data.findings} />; // a client wrapper passes onBack to the view
+// client component
+const { data, error, loading, refetch } = useLedger();
+```

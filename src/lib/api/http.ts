@@ -25,11 +25,5 @@ export async function readJsonBody<T>(request: Request, schema: z.ZodType<T>): P
   return { ok: true, data: parsed.data };
 }
 
-/** Route param ids may arrive percent-encoded (order ids contain ':'). */
-export function decodeId(id: string): string {
-  try {
-    return decodeURIComponent(id);
-  } catch {
-    return id;
-  }
-}
+/** Route param ids may arrive percent-encoded (order ids contain ':'). Same function as `safeDecode` in ./ids. */
+export { safeDecode as decodeId } from "./ids";

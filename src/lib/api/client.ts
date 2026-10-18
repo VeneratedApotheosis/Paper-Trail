@@ -18,12 +18,18 @@ import type {
   PipelineRunResponse,
   PrefilterResponse,
   ResetDemoResponse,
+  SessionStatus,
   UploadResponse,
 } from "./types";
+import { encodeIdSegment } from "./ids";
+
+export { safeDecode } from "./ids";
 
 /**
  * Typed browser client for the PaperTrail JSON API (docs/api.md). The UI imports this instead of
  * `@/lib/mock/data`; every function returns the contract shapes and throws ApiError on a non-2xx response.
+ * Id arguments may be raw or already percent-encoded (e.g. a Next `params.id`): they are decoded once with
+ * `safeDecode`, then encoded, so `/api/orders/order%3A...` is never double-encoded into a 404.
  */
 
 export class ApiError extends Error {
@@ -52,16 +58,23 @@ function sendJson(method: "POST" | "PUT" | "DELETE", body: unknown): RequestInit
   return { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
 }
 
+/** Gmail connection status; never throws on 401/503 (those bodies still carry `connected: false`). */
+export async function getSessionStatus(): Promise<SessionStatus> {
+  const response = await fetch("/api/auth/session", { cache: "no-store" });
+  const json = (await response.json().catch(() => null)) as SessionStatus | null;
+  return json ?? { connected: false };
+}
+
 export function getLedger(): Promise<LedgerResponse> {
   return request("/api/ledger");
 }
 
 export function getOrder(id: string): Promise<OrderResponse> {
-  return request(`/api/orders/${encodeURIComponent(id)}`);
+  return request(`/api/orders/${encodeIdSegment(id)}`);
 }
 
 export function getFinding(id: string): Promise<FindingResponse> {
-  return request(`/api/findings/${encodeURIComponent(id)}`);
+  return request(`/api/findings/${encodeIdSegment(id)}`);
 }
 
 /**
@@ -69,7 +82,7 @@ export function getFinding(id: string): Promise<FindingResponse> {
  * summary. Open and drafted ("claim sent") findings count toward owed; `drafted` is set by `approveClaim`.
  */
 export function setFindingStatus(id: string, status: FindingStatusUpdate): Promise<FindingStatusResponse> {
-  return request(`/api/findings/${encodeURIComponent(id)}/status`, sendJson("POST", { status } satisfies FindingStatusRequest));
+  return request(`/api/findings/${encodeIdSegment(id)}/status`, sendJson("POST", { status } satisfies FindingStatusRequest));
 }
 
 export function loadDemo(): Promise<PipelineRunResponse> {
@@ -110,7 +123,7 @@ export function includeMerchant(merchant: string): Promise<MerchantExcludeRespon
 }
 
 function claimPath(findingId: string): string {
-  return `/api/claims/${encodeURIComponent(findingId)}`;
+  return `/api/claims/${encodeIdSegment(findingId)}`;
 }
 
 /** Stored claim draft for a finding, generated from the template on first open. */
