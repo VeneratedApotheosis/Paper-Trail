@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { PipelineStats } from "@/lib/pipeline/run";
-import type { GmailPreviewResponse, GmailSyncResponse } from "./gmailApi";
+import type { GmailSyncResponse } from "./gmailApi";
 import {
   gmailErrorCopy,
-  gmailPreviewText,
-  gmailProgressText,
+  gmailProgress,
   gmailSyncOutcome,
+  importErrorCopy,
+  sessionErrorCopy,
+  tokenExpiredCopy,
   uploadOutcome,
 } from "./syncOutcome";
 
@@ -38,22 +40,14 @@ function syncResponse(overrides: Partial<GmailSyncResponse> = {}): GmailSyncResp
   };
 }
 
-const preview: GmailPreviewResponse = {
-  query: "newer_than:90d subject:receipt",
-  estimatedMessages: 120,
-  messagesToFetch: 50,
-  countIsEstimate: true,
-  windowDays: 90,
-  maxMessages: 50,
-};
-
 describe("uploadOutcome", () => {
   it("opens the ledger when the upload produced orders or needs-review items", () => {
     const files = [{ name: "a.eml" }];
-    expect(uploadOutcome({ stats: stats({ orders: 1 }), files, parseErrors: [] })).toEqual({ kind: "open_ledger" });
-    expect(uploadOutcome({ stats: stats({ needsReview: 2 }), files, parseErrors: [] })).toEqual({
+    expect(uploadOutcome({ stats: stats({ orders: 1, findings: 2 }), files, parseErrors: [] })).toEqual({
       kind: "open_ledger",
+      result: { scanned: 2, files: 1, parseErrors: 0, orders: 1, needsReview: 0, findings: 2 },
     });
+    expect(uploadOutcome({ stats: stats({ needsReview: 2 }), files, parseErrors: [] }).kind).toBe("open_ledger");
   });
 
   it("reports the real email, file, and parse-error counts when nothing looked like a purchase", () => {
@@ -64,66 +58,66 @@ describe("uploadOutcome", () => {
     });
     expect(outcome).toEqual({
       kind: "no_receipts",
-      detail: "Read 3 emails from 2 files (1 could not be parsed), but none looked like a purchase.",
+      result: { scanned: 3, files: 2, parseErrors: 1, orders: 0, needsReview: 0, findings: 0 },
     });
   });
 });
 
 describe("gmailSyncOutcome", () => {
   it("opens the ledger when the sync produced orders or needs-review items", () => {
-    expect(gmailSyncOutcome(syncResponse({ stats: stats({ orders: 4 }) }), 50)).toEqual({ kind: "open_ledger" });
-    expect(gmailSyncOutcome(syncResponse({ stats: stats({ needsReview: 1 }) }), 50)).toEqual({
+    expect(gmailSyncOutcome(syncResponse({ stats: stats({ orders: 4, findings: 1 }) }), 50)).toEqual({
       kind: "open_ledger",
+      result: { scanned: 12, parseErrors: 0, capped: false, maxMessages: 50, orders: 4, needsReview: 0, findings: 1 },
     });
+    expect(gmailSyncOutcome(syncResponse({ stats: stats({ needsReview: 1 }) }), 50).kind).toBe("open_ledger");
   });
 
-  it("shows the fetched count and the cap from the preview when nothing looked like a purchase", () => {
-    expect(gmailSyncOutcome(syncResponse({ fetched: 1 }), 50)).toEqual({
-      kind: "no_receipts",
-      detail: "Fetched 1 message, but none looked like a purchase.",
-    });
+  it("passes the fetched count, capped flag, and the cap from the preview when nothing looked like a purchase", () => {
     expect(gmailSyncOutcome(syncResponse({ fetched: 50, capped: true }), 50)).toEqual({
       kind: "no_receipts",
-      detail: "Fetched 50 messages (stopped at the 50-message limit), but none looked like a purchase.",
+      result: { scanned: 50, parseErrors: 0, capped: true, maxMessages: 50, orders: 0, needsReview: 0, findings: 0 },
     });
+    expect(gmailSyncOutcome(syncResponse({ fetched: 1 }), null).result).not.toHaveProperty("maxMessages");
   });
 });
 
-describe("gmailPreviewText", () => {
-  it("renders the route's estimate, fetch count, maxMessages, window, and exact query", () => {
-    const text = gmailPreviewText(preview);
-    expect(text).toContain("Gmail estimates about 120 matching messages from the last 90 days.");
-    expect(text).toContain("This sync fetches 50 messages (at most 50 per run).");
-    expect(text).toContain("Exact Gmail search: newer_than:90d subject:receipt");
-    expect(text).not.toContain("300");
-  });
-
-  it("drops the estimate wording when the count is exact", () => {
-    expect(gmailPreviewText({ ...preview, countIsEstimate: false })).toContain("Gmail found 120 matching messages");
-  });
-});
-
-describe("gmailProgressText", () => {
-  it("shows only real counts for in-flight stages", () => {
-    expect(gmailProgressText({ stage: "listing", fetched: 0, total: null, skipped: 0 })).toBe(
-      "Listing matching messages in Gmail…",
-    );
-    expect(gmailProgressText({ stage: "fetching", fetched: 7, total: 40, skipped: 1 })).toBe(
-      "Fetched 7 of 40 messages, 1 skipped…",
-    );
-    expect(gmailProgressText({ stage: "fetching", fetched: 3, total: null, skipped: 0 })).toBe(
-      "Fetched 3 messages…",
-    );
-    expect(gmailProgressText({ stage: "processing", fetched: 40, total: 40, skipped: 0 })).toBe(
-      "Redacting, classifying and extracting 40 fetched messages…",
-    );
-  });
-
-  it("says only 'Syncing…' for no status or a stage left over from an earlier run", () => {
-    expect(gmailProgressText(null)).toBe("Syncing…");
-    for (const stage of ["idle", "complete", "failed"] as const) {
-      expect(gmailProgressText({ stage, fetched: 50, total: 50, skipped: 0 })).toBe("Syncing…");
+describe("gmailProgress", () => {
+  it("passes only real counts for in-flight stages", () => {
+    for (const progress of [
+      { stage: "listing", fetched: 0, total: null, skipped: 0 },
+      { stage: "fetching", fetched: 7, total: 40, skipped: 1 },
+      { stage: "fetching", fetched: 3, total: null, skipped: 0 },
+      { stage: "processing", fetched: 40, total: 40, skipped: 0 },
+    ] as const) {
+      expect(gmailProgress(progress)).toEqual(progress);
     }
+  });
+
+  it("returns null (plain 'syncing') for no status or a stage left over from an earlier run", () => {
+    expect(gmailProgress(null)).toBeNull();
+    for (const stage of ["idle", "complete", "failed"] as const) {
+      expect(gmailProgress({ stage, fetched: 50, total: 50, skipped: 0 })).toBeNull();
+    }
+  });
+});
+
+describe("importErrorCopy", () => {
+  it("names what failed and keeps the API's message", () => {
+    expect(importErrorCopy("upload", "No .eml or .mbox files were uploaded.")).toEqual({
+      kind: "failed",
+      title: "Couldn't import those files",
+      what: "No .eml or .mbox files were uploaded.",
+      fix: "Choose .eml or .mbox files, 5 MB in total at most.",
+    });
+    expect(importErrorCopy("demo", null)).toMatchObject({ title: "Couldn't load the demo data" });
+    expect(importErrorCopy("preview", "x")).toMatchObject({ title: "Couldn't load the sync preview", what: "x" });
+  });
+});
+
+describe("session copy", () => {
+  it("maps an expired grant to reconnect and a failed session check to failed", () => {
+    expect(tokenExpiredCopy.kind).toBe("reconnect");
+    expect(sessionErrorCopy("offline")).toMatchObject({ kind: "failed", what: "offline" });
   });
 });
 
@@ -137,6 +131,13 @@ describe("gmailErrorCopy", () => {
   it("maps 409 to already running without claiming the ledger changed", () => {
     const copy = gmailErrorCopy({ status: 409, code: "sync_already_running", error: null }, "sync");
     expect(copy.kind).toBe("already_running");
+  });
+
+  it("maps a 409 from delete-all during the sync to failed without claiming the prior ledger is kept", () => {
+    const error = "Your data was deleted while Gmail was syncing; nothing was saved. Start the sync again if you want it.";
+    const copy = gmailErrorCopy({ status: 409, code: null, error }, "sync");
+    expect(copy).toMatchObject({ kind: "failed", what: error });
+    expect(copy.what).not.toContain("unchanged");
   });
 
   it("maps 504 sync_timeout to timeout and says the prior ledger is kept", () => {

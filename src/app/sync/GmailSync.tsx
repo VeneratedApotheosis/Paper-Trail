@@ -2,18 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AppShell } from "@/components/AppShell";
-import { EmptyState, ErrorState, HeroSkeleton, TokenExpired } from "@/components/states";
-import { Button, LinkButton } from "@/components/ui/Button";
+import { SyncView, type SyncErrorInfo, type SyncResultInfo } from "@/components/views/SyncView";
 import { useAsync } from "@/hooks";
 import { getGmailPreview, getGmailSyncStatus, syncGmail, type GmailSyncStatus } from "./gmailApi";
-import {
-  gmailErrorCopy,
-  gmailPreviewText,
-  gmailProgressText,
-  gmailSyncOutcome,
-  type SyncErrorCopy,
-} from "./syncOutcome";
+import { gmailErrorCopy, gmailProgress, gmailSyncOutcome } from "./syncOutcome";
 
 // /sync with a connected Gmail account (#73): GET /api/gmail/preview, then POST /api/gmail/sync {confirmed:true} only
 // after the user clicks Start. The POST runs the whole sync in one request; while it is pending the page polls
@@ -24,9 +16,9 @@ const STATUS_POLL_MS = 1000;
 type Screen =
   | { name: "preview" }
   | { name: "syncing" }
-  | { name: "opening" }
-  | { name: "no_receipts"; detail: string }
-  | { name: "failed"; error: SyncErrorCopy };
+  | { name: "opening"; result: SyncResultInfo }
+  | { name: "no_receipts"; result: SyncResultInfo }
+  | { name: "failed"; error: SyncErrorInfo };
 
 export function GmailSync() {
   const router = useRouter();
@@ -50,8 +42,7 @@ export function GmailSync() {
     };
   }, [syncing]);
 
-  const maxMessages = preview.data?.ok ? preview.data.data.maxMessages : null;
-  const query = preview.data?.ok ? preview.data.data.query : undefined;
+  const previewData = preview.data?.ok ? preview.data.data : null;
 
   async function startSync() {
     if (inFlight.current) return;
@@ -64,12 +55,12 @@ export function GmailSync() {
         setScreen({ name: "failed", error: gmailErrorCopy(result.failure, "sync") });
         return;
       }
-      const outcome = gmailSyncOutcome(result.data, maxMessages);
+      const outcome = gmailSyncOutcome(result.data, previewData?.maxMessages ?? null);
       if (outcome.kind === "open_ledger") {
-        setScreen({ name: "opening" });
+        setScreen({ name: "opening", result: outcome.result });
         router.push("/");
       } else {
-        setScreen({ name: "no_receipts", detail: outcome.detail });
+        setScreen({ name: "no_receipts", result: outcome.result });
       }
     } finally {
       inFlight.current = false;
@@ -81,71 +72,31 @@ export function GmailSync() {
     preview.refetch();
   }
 
-  function errorScreen(error: SyncErrorCopy) {
-    if (error.kind === "reconnect") return <TokenExpired />;
-    const actions =
-      error.kind === "access_denied" ? (
-        <LinkButton href="/connect">Reconnect Gmail</LinkButton>
-      ) : error.kind === "already_running" ? (
-        <>
-          <Button type="button" onClick={() => router.push("/")}>
-            Open what you&apos;re owed
-          </Button>
-          <Button type="button" variant="secondary" onClick={backToPreview}>
-            Back to sync
-          </Button>
-        </>
-      ) : (
-        <Button type="button" onClick={backToPreview}>
-          Try again
-        </Button>
-      );
-    return <ErrorState title={error.title} what={error.what} fix={error.fix} actions={actions} />;
-  }
-
-  function content() {
-    if (screen.name === "syncing") {
-      return (
-        <EmptyState title="Syncing your Gmail receipts">
-          {gmailProgressText(status)} Read only. This can take a few minutes; keep this tab open.
-        </EmptyState>
-      );
-    }
-    if (screen.name === "opening") return <EmptyState title="Opening what you're owed…" />;
-    if (screen.name === "failed") return errorScreen(screen.error);
-    if (screen.name === "no_receipts") {
-      return (
-        <EmptyState
-          title="No receipts found in this inbox"
-          query={query}
-          actions={
-            <Button type="button" variant="secondary" onClick={backToPreview}>
-              Back to sync
-            </Button>
-          }
-        >
-          {screen.detail}
-        </EmptyState>
-      );
-    }
-    if (preview.loading) return <HeroSkeleton />;
+  function phaseProps() {
+    if (screen.name === "syncing") return { phase: "syncing", progress: gmailProgress(status) } as const;
+    if (screen.name === "opening") return { phase: "opening", result: screen.result } as const;
+    if (screen.name === "no_receipts") return { phase: "no_receipts", result: screen.result } as const;
+    if (screen.name === "failed") return { phase: "error", error: screen.error } as const;
+    if (preview.loading) return { phase: "loading" } as const;
     if (preview.error || !preview.data) {
-      return errorScreen(gmailErrorCopy({ status: 0, code: null, error: preview.error }, "preview"));
+      return {
+        phase: "error",
+        error: gmailErrorCopy({ status: 0, code: null, error: preview.error }, "preview"),
+      } as const;
     }
-    if (!preview.data.ok) return errorScreen(gmailErrorCopy(preview.data.failure, "preview"));
-    return (
-      <EmptyState
-        title="Check your inbox for new receipts"
-        actions={
-          <Button type="button" onClick={startSync}>
-            Start sync
-          </Button>
-        }
-      >
-        {gmailPreviewText(preview.data.data)}
-      </EmptyState>
-    );
+    if (!preview.data.ok) return { phase: "error", error: gmailErrorCopy(preview.data.failure, "preview") } as const;
+    return { phase: "preview" } as const;
   }
 
-  return <AppShell demo={false}>{content()}</AppShell>;
+  return (
+    <SyncView
+      mode="gmail"
+      preview={previewData}
+      {...phaseProps()}
+      onStart={() => void startSync()}
+      onRetry={backToPreview}
+      onOpenLedger={() => router.push("/")}
+      onReconnect={() => router.push("/connect")}
+    />
+  );
 }

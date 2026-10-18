@@ -1,19 +1,22 @@
+import type { SyncErrorInfo, SyncProgressInfo, SyncResultInfo } from "@/components/views/SyncView";
 import type { PipelineStats } from "@/lib/pipeline/run";
-import type { GmailFailure, GmailPreviewResponse, GmailSyncResponse, GmailSyncStatus } from "./gmailApi";
+import type { GmailFailure, GmailSyncResponse, GmailSyncStatus } from "./gmailApi";
 
-// Pure response -> screen mapping for /sync (#73). Every number shown comes from a real response (prefilter, Gmail
-// preview/status/sync, upload); nothing is simulated.
+// Pure response -> SyncView props mapping for /sync (#73, #104). Every number shown comes from a real response
+// (prefilter, Gmail preview/status/sync, upload); nothing is simulated.
 
 /** Where a finished run goes: anything the ledger will show (orders or needs-review items) opens "/". */
-export type RunOutcome = { kind: "open_ledger" } | { kind: "no_receipts"; detail: string };
-
-export function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+export interface RunOutcome {
+  kind: "open_ledger" | "no_receipts";
+  result: SyncResultInfo;
 }
 
-function runOutcome(stats: PipelineStats, detail: string): RunOutcome {
-  if (stats.orders > 0 || stats.needsReview > 0) return { kind: "open_ledger" };
-  return { kind: "no_receipts", detail };
+function runOutcome(stats: PipelineStats, result: SyncResultInfo): RunOutcome {
+  return { kind: stats.orders > 0 || stats.needsReview > 0 ? "open_ledger" : "no_receipts", result };
+}
+
+function ledgerCounts(stats: PipelineStats): Pick<SyncResultInfo, "orders" | "needsReview" | "findings"> {
+  return { orders: stats.orders, needsReview: stats.needsReview, findings: stats.findings };
 }
 
 /** POST /api/upload succeeded. Upload replaces the ledger, so an empty result is shown, not hidden. */
@@ -22,71 +25,76 @@ export function uploadOutcome(response: {
   files: Array<{ name: string }>;
   parseErrors: unknown[];
 }): RunOutcome {
-  const unparsed = response.parseErrors.length;
-  const detail =
-    `Read ${plural(response.stats.emails, "email")} from ${plural(response.files.length, "file")}` +
-    `${unparsed > 0 ? ` (${unparsed} could not be parsed)` : ""}, but none looked like a purchase.`;
-  return runOutcome(response.stats, detail);
+  return runOutcome(response.stats, {
+    scanned: response.stats.emails,
+    files: response.files.length,
+    parseErrors: response.parseErrors.length,
+    ...ledgerCounts(response.stats),
+  });
 }
 
 /** POST /api/gmail/sync succeeded. `capped` is true only when more messages matched than the batch fetches. */
 export function gmailSyncOutcome(response: GmailSyncResponse, maxMessages: number | null): RunOutcome {
-  const cap = response.capped ? ` (stopped at the ${maxMessages ?? response.fetched}-message limit)` : "";
-  const detail = `Fetched ${plural(response.fetched, "message")}${cap}, but none looked like a purchase.`;
-  return runOutcome(response.stats, detail);
-}
-
-/** Preview copy for a connected Gmail account, from GET /api/gmail/preview. */
-export function gmailPreviewText(preview: GmailPreviewResponse): string {
-  const matching = preview.countIsEstimate
-    ? `Gmail estimates about ${plural(preview.estimatedMessages, "matching message")}`
-    : `Gmail found ${plural(preview.estimatedMessages, "matching message")}`;
-  return (
-    `${matching} from the last ${preview.windowDays} days. This sync fetches ` +
-    `${plural(preview.messagesToFetch, "message")} (at most ${preview.maxMessages} per run). ` +
-    `Read only: nothing is sent, moved, or deleted. Exact Gmail search: ${preview.query}`
-  );
+  return runOutcome(response.stats, {
+    scanned: response.fetched,
+    parseErrors: response.parseErrors.length,
+    capped: response.capped,
+    ...(maxMessages !== null ? { maxMessages } : {}),
+    ...ledgerCounts(response.stats),
+  });
 }
 
 /**
- * Pending text while POST /api/gmail/sync runs, from GET /api/gmail/sync/status. Only an in-flight stage is shown:
+ * Live progress while POST /api/gmail/sync runs, from GET /api/gmail/sync/status. Only an in-flight stage is shown:
  * idle/complete/failed can be left over from an earlier run (status is kept 15 minutes), so they say nothing about
- * this one. Processing has no count (the route reports none).
+ * this one and map to null (the view then shows a plain "syncing" state).
  */
-export function gmailProgressText(status: GmailSyncStatus | null): string {
-  const skipped = status && status.skipped > 0 ? `, ${status.skipped} skipped` : "";
-  switch (status?.stage) {
-    case "listing":
-      return "Listing matching messages in Gmail…";
-    case "fetching":
-      return status.total === null
-        ? `Fetched ${plural(status.fetched, "message")}${skipped}…`
-        : `Fetched ${status.fetched} of ${plural(status.total, "message")}${skipped}…`;
-    case "processing":
-      return `Redacting, classifying and extracting ${plural(status.fetched, "fetched message")}${skipped}…`;
-    default:
-      return "Syncing…";
+export function gmailProgress(status: GmailSyncStatus | null): SyncProgressInfo | null {
+  if (!status) return null;
+  const { stage, fetched, total, skipped } = status;
+  if (stage === "listing" || stage === "fetching" || stage === "processing") return { stage, fetched, total, skipped };
+  return null;
+}
+
+/** A failed import, demo load, or prefilter preview while Gmail is not connected; `message` is the API's error text. */
+export function importErrorCopy(during: "upload" | "demo" | "preview", message: string | null): SyncErrorInfo {
+  const what = message ?? "The request did not complete.";
+  if (during === "upload") {
+    return {
+      kind: "failed",
+      title: "Couldn't import those files",
+      what,
+      fix: "Choose .eml or .mbox files, 5 MB in total at most.",
+    };
   }
+  return {
+    kind: "failed",
+    title: during === "demo" ? "Couldn't load the demo data" : "Couldn't load the sync preview",
+    what,
+    fix: "Check that the app server is running, then try again.",
+  };
 }
 
-export type SyncErrorKind =
-  | "reconnect"
-  | "already_running"
-  | "timeout"
-  | "rate_limited"
-  | "access_denied"
-  | "unreachable"
-  | "failed";
-
-export interface SyncErrorCopy {
-  kind: SyncErrorKind;
-  title: string;
-  what: string;
-  fix: string;
+/** The Gmail session check (GET /api/auth/session) failed, so /sync can't tell which flow to show. */
+export function sessionErrorCopy(message: string | null): SyncErrorInfo {
+  return {
+    kind: "failed",
+    title: "Couldn't check your Gmail connection",
+    what: message ?? "The session check did not complete.",
+    fix: "Check that the app server is running, then try again.",
+  };
 }
+
+/** The stored Gmail grant expired (session reports token_expired before any Gmail call). */
+export const tokenExpiredCopy: SyncErrorInfo = {
+  kind: "reconnect",
+  title: "Your Gmail connection expired",
+  what: "Google expires read-only access for unverified apps after 7 days. Your data is still here.",
+  fix: "Reconnect Gmail so PaperTrail can read new receipts again.",
+};
 
 /** A failed Gmail call (preview or sync). The sync route publishes nothing on failure, so the prior ledger is kept. */
-export function gmailErrorCopy(failure: GmailFailure, during: "preview" | "sync"): SyncErrorCopy {
+export function gmailErrorCopy(failure: GmailFailure, during: "preview" | "sync"): SyncErrorInfo {
   const kept = during === "sync" ? " Your previous ledger is unchanged." : "";
   if (failure.status === 401 || failure.code === "token_expired") {
     return {
@@ -96,12 +104,21 @@ export function gmailErrorCopy(failure: GmailFailure, during: "preview" | "sync"
       fix: "Reconnect Gmail, then start the sync again.",
     };
   }
-  if (failure.status === 409 || failure.code === "sync_already_running") {
+  if (failure.code === "sync_already_running") {
     return {
       kind: "already_running",
       title: "A Gmail sync is already running",
       what: "Another sync for this account is still in progress, so this one did not start.",
       fix: "Wait for it to finish, then open what you're owed.",
+    };
+  }
+  if (failure.status === 409) {
+    // Delete-all ran while the sync was working (#93): nothing was saved, and the previous ledger is gone too.
+    return {
+      kind: "failed",
+      title: "Gmail sync did not complete",
+      what: failure.error ?? "Your data was deleted while Gmail was syncing; nothing was saved.",
+      fix: "Start the sync again if you want it.",
     };
   }
   if (failure.status === 504 || failure.code === "sync_timeout") {

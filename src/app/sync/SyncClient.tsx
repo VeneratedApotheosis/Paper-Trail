@@ -1,50 +1,36 @@
 "use client";
 
-// Interim: SyncView renders simulated data; switch back to SyncView once it takes real preview/progress/result props (#101).
-// Until then /sync composes only the shared state components (EmptyState, ErrorState, TokenExpired, Button) with real
-// API data, so no simulated count, stage, or rate-limit backoff is ever shown.
-
-import { AppShell } from "@/components/AppShell";
-import { ErrorState, HeroSkeleton, TokenExpired } from "@/components/states";
-import { Button } from "@/components/ui/Button";
+import { useRouter } from "next/navigation";
+import { SyncView, type SyncErrorInfo, type SyncMode } from "@/components/views/SyncView";
 import { useSession } from "@/hooks";
 import { AnonymousSync } from "./AnonymousSync";
 import { GmailSync } from "./GmailSync";
+import { sessionErrorCopy, tokenExpiredCopy } from "./syncOutcome";
 
 /** Picks the /sync flow from the Gmail session: connected -> Gmail sync, expired -> reconnect, otherwise import/demo. */
 export function SyncClient() {
   const session = useSession();
+  const router = useRouter();
 
-  if (session.loading) {
+  // Before a flow is picked nothing can start, so Start and Try again both re-check the session.
+  function sessionState(mode: SyncMode, error: SyncErrorInfo | null) {
     return (
-      <AppShell>
-        <HeroSkeleton />
-      </AppShell>
+      <SyncView
+        mode={mode}
+        preview={null}
+        phase={error ? "error" : "loading"}
+        error={error}
+        onStart={session.refetch}
+        onRetry={session.refetch}
+        onOpenLedger={() => router.push("/")}
+        onReconnect={() => router.push("/connect")}
+      />
     );
   }
-  if (session.error || !session.data) {
-    return (
-      <AppShell>
-        <ErrorState
-          title="Couldn't check your Gmail connection"
-          what={session.error}
-          fix="Check that the app server is running, then try again."
-          actions={
-            <Button type="button" onClick={session.refetch}>
-              Try again
-            </Button>
-          }
-        />
-      </AppShell>
-    );
-  }
+
+  if (session.loading) return sessionState("import", null);
+  if (session.error || !session.data) return sessionState("import", sessionErrorCopy(session.error));
   if (session.data.connected) return <GmailSync />;
-  if (session.data.error === "token_expired") {
-    return (
-      <AppShell demo={false}>
-        <TokenExpired />
-      </AppShell>
-    );
-  }
+  if (session.data.error === "token_expired") return sessionState("gmail", tokenExpiredCopy);
   return <AnonymousSync />;
 }
