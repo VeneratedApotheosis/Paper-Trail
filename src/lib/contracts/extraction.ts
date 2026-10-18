@@ -26,6 +26,9 @@ export const ExtractedTotalsSchema = z.object({
 export type ExtractedTotals = z.infer<typeof ExtractedTotalsSchema>;
 
 /** Fields the LLM extracts from one (redacted) email. All values are nullable: unknown is allowed, guessing is not. */
+export const OTHER_REFS_MAX = 10;
+export const OTHER_REF_MAX_CHARS = 64;
+
 export const ExtractedFieldsSchema = z.object({
   merchant: z.string().nullable(),
   merchantDomain: z.string().nullable().optional(),
@@ -46,6 +49,12 @@ export const ExtractedFieldsSchema = z.object({
   policyQuote: EvidenceSchema.nullable().optional(),
   /** Refund was issued as store credit instead of to the original tender. */
   isStoreCredit: z.boolean().optional(),
+  /**
+   * Every other reference number the email prints besides `orderRef` (invoice, confirmation, transaction, web order,
+   * ...), as written (#126). Emails that share any reference belong to one purchase. Not a scored field: it has no
+   * confidence or evidence entry. Never tracking numbers, phone numbers or amounts.
+   */
+  otherRefs: z.array(z.string().min(1).max(OTHER_REF_MAX_CHARS)).max(OTHER_REFS_MAX).optional(),
 });
 export type ExtractedFields = z.infer<typeof ExtractedFieldsSchema>;
 

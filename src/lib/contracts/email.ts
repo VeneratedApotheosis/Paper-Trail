@@ -8,6 +8,12 @@ export const RawEmailSchema = z.object({
   /** Gmail message id, or a stable synthetic id for seed/demo data. */
   id: z.string().min(1),
   threadId: z.string().optional(),
+  /**
+   * RFC 5322 `Message-ID` header without the angle brackets (#126). The same across forwards of one delivery, the same
+   * message in two linked inboxes and resends of the identical message, so it identifies exact copies. Unset when the
+   * source has none (seed data).
+   */
+  messageId: z.string().min(1).optional(),
   /** Full From header, e.g. `"Northwind Outfitters" <orders@northwind.example>`. */
   from: z.string().min(1),
   to: z.string().optional(),

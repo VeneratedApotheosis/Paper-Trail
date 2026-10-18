@@ -84,6 +84,21 @@ export const NormalizedOrderSchema = z.object({
    * order seen in two inboxes is one order with both ids (#114). Absent for demo data and uploads.
    */
   sources: z.array(z.string()).optional(),
+  /**
+   * Ids this order had (or would have had) before duplicates were merged into it (#126). Review corrections saved under
+   * such an id still apply to this order. Absent when nothing was merged under another id.
+   */
+  aliasIds: z.array(z.string()).optional(),
+  /**
+   * Fingerprints of the emails behind this order: `mid:<Message-ID>` and `fp:<body hash>` (#126). Orders from different
+   * inboxes that share one are the same purchase. Not shown to users.
+   */
+  emailKeys: z.array(z.string()).optional(),
+  /**
+   * The dedup score put this order in the middle band against an earlier order: possibly the same purchase, but not
+   * enough evidence to merge (#126). Flag for a later Review card; the order is counted as its own purchase.
+   */
+  possibleDuplicateOf: z.object({ orderId: z.string(), reason: z.string(), score: z.number() }).optional(),
   /** Lowest extraction confidence among contributing emails. */
   confMin: z.number().min(0).max(1),
   needsReview: z.boolean(),

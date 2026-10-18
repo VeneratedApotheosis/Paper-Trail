@@ -2,6 +2,8 @@ import type { ZodError } from "zod";
 import {
   EvidenceSchema,
   ExtractedFieldNameSchema,
+  OTHER_REFS_MAX,
+  OTHER_REF_MAX_CHARS,
   ExtractionSchema,
   type Classification,
   type EmailClass,
@@ -77,6 +79,16 @@ function truncateEvidence(evidence: unknown): unknown {
   return Object.fromEntries(Object.entries(evidence).map(([field, quote]) => [field, truncate(quote)]));
 }
 
+/** Keeps `otherRefs` usable: trims, drops non-strings and empties, de-duplicates, clips long entries and caps the list. */
+function cleanOtherRefs(fields: unknown): unknown {
+  if (!isRecord(fields) || !Array.isArray(fields.otherRefs)) return fields;
+  const cleaned = fields.otherRefs
+    .filter((ref): ref is string => typeof ref === "string")
+    .map((ref) => ref.trim().slice(0, OTHER_REF_MAX_CHARS))
+    .filter((ref) => ref !== "");
+  return { ...fields, otherRefs: [...new Set(cleaned)].slice(0, OTHER_REFS_MAX) };
+}
+
 function truncatePolicyQuote(fields: unknown): unknown {
   if (!isRecord(fields) || !("policyQuote" in fields)) return fields;
   return { ...fields, policyQuote: truncate(fields.policyQuote) };
@@ -120,7 +132,7 @@ function validateToolInput(
   const parsed = ExtractionSchema.safeParse({
     emailId: email.id,
     class: classification.class,
-    fields: truncatePolicyQuote(toolInput.fields),
+    fields: cleanOtherRefs(truncatePolicyQuote(toolInput.fields)),
     confidence: toolInput.confidence,
     evidence: truncateEvidence(toolInput.evidence),
     confMin: 0,

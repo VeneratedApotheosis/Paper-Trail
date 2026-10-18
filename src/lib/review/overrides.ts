@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NormalizedOrderSchema, type Finding, type NormalizedOrder } from "@/lib/contracts";
 import type { PipelineResult, ReviewQueueItem } from "@/lib/pipeline/run";
-import { compareFindings, defaultRules, runRulesIsolated } from "@/lib/rules";
+import { compareFindings, defaultRules, findingId, runRulesIsolated } from "@/lib/rules";
 import type { OverrideRecord } from "./override-store";
 import type { ReviewEdit } from "./schema";
 
@@ -35,6 +35,44 @@ export function correctedFieldNames(fields: readonly string[]): string[] {
   return [...new Set(fields)].sort();
 }
 
+/**
+ * Re-keys records saved under an order id that dedup later merged away (`aliasIds`, #126) to the order that absorbed it,
+ * including the line item and finding ids derived from the old order id. Records of ids that still exist are untouched;
+ * an order's own records come after the re-keyed ones, so they win. Nothing is stored: every sync re-derives this.
+ */
+function rekeyAliasedRecords(result: PipelineResult, overrides: readonly OverrideRecord[]): OverrideRecord[] {
+  const orderIds = new Set(result.orders.map(order => order.id));
+  const target = new Map<string, NormalizedOrder>();
+  const findingTarget = new Map<string, string>();
+  for (const order of result.orders) {
+    for (const alias of order.aliasIds ?? []) if (!orderIds.has(alias)) target.set(alias, order);
+  }
+  if (target.size === 0) return [...overrides];
+  for (const finding of result.findings) {
+    const order = result.orders.find(candidate => candidate.id === finding.orderId);
+    for (const alias of order?.aliasIds ?? []) {
+      const lineItemId = finding.lineItemId?.replace(`${finding.orderId}:li:`, `${alias}:li:`);
+      findingTarget.set(findingId(finding.kind, alias, lineItemId), finding.id);
+    }
+  }
+  const aliased: OverrideRecord[] = [];
+  const own: OverrideRecord[] = [];
+  for (const record of overrides) {
+    if (record.kind === "finding") {
+      const to = findingTarget.get(record.findingId);
+      (to ? aliased : own).push(to ? { ...record, findingId: to } : record);
+      continue;
+    }
+    const order = target.get(record.orderId);
+    if (!order) { own.push(record); continue; }
+    if (record.kind === "edit" && "lineItemId" in record.edit) {
+      const lineItemId = record.edit.lineItemId.replace(`${record.orderId}:li:`, `${order.id}:li:`);
+      aliased.push({ ...record, orderId: order.id, edit: { ...record.edit, lineItemId } });
+    } else aliased.push({ ...record, orderId: order.id });
+  }
+  return [...aliased, ...own];
+}
+
 export interface OverrideReport {
   /** Records applied to orders and findings whose values changed in this call (0 when everything was already applied). */
   applied: number;
@@ -58,6 +96,7 @@ export function applyOverrides(
   ctx: { now: Date },
 ): { result: PipelineResult; report: OverrideReport } {
   if (overrides.length === 0) return { result, report: { applied: 0, orphaned: 0 } };
+  overrides = rekeyAliasedRecords(result, overrides);
   const edits = new Map<string, Array<Extract<OverrideRecord, { kind: "edit" }>>>();
   const confirms = new Map<string, Extract<OverrideRecord, { kind: "confirm" }>>();
   const findingStatuses = new Map<string, Extract<OverrideRecord, { kind: "finding" }>["status"]>();

@@ -61,7 +61,8 @@ export function decodeGmailMessageDetailed(input: unknown): DecodedGmailMessage 
   const internal = Number(message.internalDate);
   const received = message.internalDate && Number.isFinite(internal) ? new Date(internal) : new Date(headers.get("date") ?? "");
   if (!Number.isFinite(received.getTime())) throw new GmailDecodeError();
-  const result = RawEmailSchema.safeParse({ id: message.id, threadId: message.threadId,
+  const messageId = headers.get("message-id")?.trim().replace(/^<|>$/g, "");
+  const result = RawEmailSchema.safeParse({ id: message.id, threadId: message.threadId, ...(messageId ? { messageId } : {}),
     from: headers.get("from"), to: headers.get("to"), subject: headers.get("subject") ?? "",
     date: received.toISOString(), text, labels: message.labelIds });
   if (!result.success) throw new GmailDecodeError();

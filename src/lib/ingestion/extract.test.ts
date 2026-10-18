@@ -194,6 +194,27 @@ describe("extract: validation", () => {
   });
 });
 
+describe("extract: otherRefs (#126)", () => {
+  it("accepts every other reference number, cleaned: trimmed, de-duplicated, empties and non-strings dropped, capped", async () => {
+    const messy = ["  INV-77 ", "INV-77", "", 5, "WEB-1", ...Array.from({ length: 20 }, (_, index) => `REF-${index}`), "X".repeat(100)];
+    const llm = scriptedLlm({ ...VALID_TOOL_INPUT, fields: { ...VALID_TOOL_INPUT.fields, otherRefs: messy } });
+    const result = await extract(EMAIL, ORDER, { llm });
+    if (!result.ok) throw new Error("expected a valid extraction");
+    const refs = result.extraction.fields.otherRefs ?? [];
+    expect(refs.slice(0, 3)).toEqual(["INV-77", "WEB-1", "REF-0"]);
+    expect(refs).toHaveLength(10);
+    expect(new Set(refs).size).toBe(10);
+  });
+
+  it("is optional: an extraction without otherRefs still validates, and the prompt asks for it", async () => {
+    const llm = scriptedLlm(VALID_TOOL_INPUT);
+    const result = await extract(EMAIL, ORDER, { llm });
+    expect(result.ok && result.extraction.fields.otherRefs).toBeFalsy();
+    expect(llm.requests[0].system).toContain("otherRefs");
+    expect(JSON.stringify(llm.requests[0].tool)).toContain("otherRefs");
+  });
+});
+
 describe("extract: skipped classes", () => {
   it.each<EmailClass>(["marketing", "not_receipt"])("never calls the LLM for %s", async (cls) => {
     const llm = scriptedLlm();
@@ -325,9 +346,10 @@ describe("EXTRACTION_TOOL schema", () => {
   it("mirrors every ExtractedFields field in fields, confidence and evidence", () => {
     const properties = EXTRACTION_TOOL.input_schema.properties as Record<string, { properties: Record<string, unknown> }>;
     const expected = [...ExtractedFieldNameSchema.options].sort();
-    expect(Object.keys(properties.fields.properties).sort()).toEqual(expected);
     expect(Object.keys(properties.confidence.properties).sort()).toEqual(expected);
     expect(Object.keys(properties.evidence.properties).sort()).toEqual(expected);
-    expect(Object.keys(ExtractionSchema.shape.fields.shape).sort()).toEqual(expected);
+    // otherRefs (#126) is an unscored field: in the fields schema and tool, but without confidence or evidence entries.
+    expect(Object.keys(properties.fields.properties).sort()).toEqual([...expected, "otherRefs"].sort());
+    expect(Object.keys(ExtractionSchema.shape.fields.shape).sort()).toEqual([...expected, "otherRefs"].sort());
   });
 });

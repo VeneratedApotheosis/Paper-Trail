@@ -133,7 +133,8 @@ const COMMERCE_PLATFORM_DOMAINS = [
   "revelsystems.com", "heartland.us", "upserve.com", "grubhub.com", "ritual.co",
 ];
 
-function isCommercePlatform(domain: string): boolean {
+/** True for a commerce / POS platform domain (or a subdomain of one); also used by order dedup to read the shop from the name. */
+export function isCommercePlatform(domain: string): boolean {
   return COMMERCE_PLATFORM_DOMAINS.some((platform) => domain === platform || domain.endsWith(`.${platform}`));
 }
 

@@ -8,7 +8,9 @@ import {
   type RedactedEmail,
 } from "@/lib/contracts";
 import { SKIPPED_EXTRACTION_CLASSES, classify, isReceiptLike, prepareForLlm, type ExtractResult, type RedactionMode } from "@/lib/ingestion";
-import { matchOrdersWithReasons, type MatchInput } from "@/lib/orders/matcher";
+import { ExactCopyRegistry, emailKeys, type CopyReason } from "@/lib/orders/dedup/exact";
+import type { MergeReason } from "@/lib/orders/dedup/score";
+import { matchOrdersWithReasons, type EmailCopy, type MatchInput } from "@/lib/orders/matcher";
 import type { PriceFeed } from "@/lib/prices/feed";
 import { defaultRules, runRulesIsolated } from "@/lib/rules";
 import type { AuditEntry } from "@/lib/types";
@@ -61,7 +63,8 @@ export interface PipelineDeps {
 }
 
 /** How one email ended up in a run; see PipelineDeps.observer. */
-export type PipelineEmailOutcome = "prefiltered" | "skipped" | "extracted" | "extraction_failed";
+/** `collapsed`: an exact copy of an earlier email in the run (#126), so it was not extracted again. */
+export type PipelineEmailOutcome = "prefiltered" | "skipped" | "extracted" | "extraction_failed" | "collapsed";
 
 export interface PipelineEmailObservation {
   /** Redacted copy: `to` and `from` are still the raw headers, callers must not keep them as they are. */
@@ -101,6 +104,18 @@ export interface PipelineStats {
   excludedOrders: number;
   findings: number;
   needsReview: number;
+  /** Duplicate handling (#126); absent on results saved before it existed. */
+  dedup?: PipelineDedupStats;
+}
+
+/** What dedup did in one run: exact copies dropped before extraction plus the matcher's merges. */
+export interface PipelineDedupStats {
+  /** Emails collapsed into an earlier identical email before extraction (no LLM call spent on them). */
+  emailsCollapsed: number;
+  /** Joins by the evidence that made them (copies count as `message_id` / `fingerprint`). */
+  merges: Partial<Record<MergeReason, number>>;
+  /** Orders flagged `possibleDuplicateOf` (not merged). */
+  possibleDuplicates: number;
 }
 
 export interface PipelineResult {
@@ -129,6 +144,7 @@ export function isExcludedMerchant(order: NormalizedOrder, excluded: ReadonlySet
 
 function observedOutcome(outcome: EmailOutcome): PipelineEmailOutcome {
   if (outcome.prefilteredOut) return "prefiltered";
+  if (outcome.copyReason) return "collapsed";
   if (outcome.extracted) return "extracted";
   return outcome.skipped ? "skipped" : "extraction_failed";
 }
@@ -160,6 +176,10 @@ interface EmailOutcome {
   extracted: boolean;
   review: ReviewQueueItem[];
   matchInput?: MatchInput;
+  /** Set when this email is an exact copy of an earlier one (#126 A); it is never extracted. */
+  copyReason?: CopyReason;
+  /** Exact copies collapsed into this email; they join its order as provenance. */
+  copies: EmailCopy[];
 }
 
 /** A pipeline run fed one email at a time, so extraction can start while later emails are still being fetched. */
@@ -191,6 +211,7 @@ export function createPipelineRun(deps: PipelineDeps, expectedEmails?: number): 
   });
 
   const outcomes: EmailOutcome[] = [];
+  const copyRegistry = new ExactCopyRegistry();
   const extractions: Promise<void>[] = [];
   const waiting: Array<() => void> = [];
   let inFlight = 0;
@@ -247,12 +268,12 @@ export function createPipelineRun(deps: PipelineDeps, expectedEmails?: number): 
       return;
     }
     // The matcher sees the redacted email, so nothing derived from it can carry unredacted PII.
-    outcome.matchInput = { email: redacted, extraction };
+    outcome.matchInput = { email: redacted, extraction, emailKeys: emailKeys(raw) };
   }
 
   function add(raw: RawEmail): Promise<void> {
     if (finished) throw new Error("Pipeline run already finished");
-    const outcome: EmailOutcome = { prefilteredOut: false, skipped: false, extracted: false, review: [] };
+    const outcome: EmailOutcome = { prefilteredOut: false, skipped: false, extracted: false, review: [], copies: [] };
     outcomes.push(outcome);
     const override = deps.classOverride?.(raw.id);
     if (!override && deps.applyPrefilter && !isReceiptLike(raw).keep) {
@@ -281,6 +302,16 @@ export function createPipelineRun(deps: PipelineDeps, expectedEmails?: number): 
       return Promise.resolve();
     }
 
+    // Exact copies (same Message-ID, or the same body seen through another inbox) never reach the LLM: the copy's
+    // Gmail id and account are kept on the surviving email's order.
+    const copy = copyRegistry.find(raw, classification.class);
+    if (copy) {
+      outcome.copyReason = copy.reason;
+      outcomes[copy.index].copies.push({ id: raw.id, ...(raw.sourceAccount ? { sourceAccount: raw.sourceAccount } : {}), reason: copy.reason, keys: emailKeys(raw) });
+      return Promise.resolve();
+    }
+    copyRegistry.add(outcomes.length - 1, raw, classification.class);
+
     const started = acquireSlot();
     extractions.push(started.then(() => extractEmail(outcome, raw, redacted, classification)).finally(releaseSlot));
     return started;
@@ -303,6 +334,8 @@ export function createPipelineRun(deps: PipelineDeps, expectedEmails?: number): 
       needsReview: 0,
     };
     const matchInputs: MatchInput[] = [];
+    let emailsCollapsed = 0;
+    const copyMerges: PipelineDedupStats["merges"] = {};
     for (const outcome of outcomes) {
       if (outcome.prefilteredOut) stats.prefilteredOut += 1;
       if (outcome.classification) stats.classes[outcome.classification] = (stats.classes[outcome.classification] ?? 0) + 1;
@@ -310,7 +343,11 @@ export function createPipelineRun(deps: PipelineDeps, expectedEmails?: number): 
       if (outcome.extracted) stats.extracted += 1;
       if (outcome.origin) stats.extractionOrigins[outcome.origin] += 1;
       reviewQueue.push(...outcome.review);
-      if (outcome.matchInput) matchInputs.push(outcome.matchInput);
+      if (outcome.matchInput) matchInputs.push(outcome.copies.length > 0 ? { ...outcome.matchInput, copies: outcome.copies } : outcome.matchInput);
+      if (outcome.copyReason) {
+        emailsCollapsed += 1;
+        copyMerges[outcome.copyReason] = (copyMerges[outcome.copyReason] ?? 0) + 1;
+      }
       if (deps.observer && outcome.observed) deps.observer({ ...outcome.observed, outcome: observedOutcome(outcome) });
     }
 
@@ -338,6 +375,9 @@ export function createPipelineRun(deps: PipelineDeps, expectedEmails?: number): 
       });
     }
 
+    const merges = { ...matched.dedup.merges };
+    for (const [reason, count] of Object.entries(copyMerges) as Array<[CopyReason, number]>) merges[reason] = (merges[reason] ?? 0) + count;
+    stats.dedup = { emailsCollapsed, merges, possibleDuplicates: matched.dedup.possibleDuplicates };
     stats.orders = orders.length;
     stats.excludedOrders = allOrders.length - orders.length;
     stats.findings = findings.length;

@@ -182,6 +182,7 @@ export function parseEmlDetailed(source: string): { email: RawEmail; bodySource:
   const to = message.headers.get("to");
   const email = RawEmailSchema.parse({
     id,
+    ...(messageId ? { messageId: stripAngles(messageId) } : {}),
     from,
     ...(to ? { to: decodeEncodedWords(to) } : {}),
     subject: decodeEncodedWords(message.headers.get("subject") ?? ""),

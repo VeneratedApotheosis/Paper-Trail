@@ -84,6 +84,7 @@ export function createSyncCollector(options: SyncCollectorOptions): SyncCollecto
           lowConfidence,
           extractionFailures,
           matchedOrders: stats.orders,
+          ...(stats.dedup ? { duplicatesCollapsed: stats.dedup.emailsCollapsed, mergesByReason: { ...stats.dedup.merges }, possibleDuplicates: stats.dedup.possibleDuplicates } : {}),
           findings: stats.findings,
           ...usage,
           bodySource: extra.bodySource ?? { plain: 0, html: 0 },

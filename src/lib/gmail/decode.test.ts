@@ -9,6 +9,13 @@ export function gmailMessage(id = "m1", text = "Thanks for your order. Order tot
   } };
 }
 describe("Gmail MIME decoder", () => {
+  it("keeps the Message-ID header (without angle brackets) for duplicate detection (#126)", () => {
+    const message = gmailMessage();
+    message.payload.headers.push({ name: "Message-ID", value: " <CAF=abc123@mail.example.com> " });
+    expect(decodeGmailMessage(message).messageId).toBe("CAF=abc123@mail.example.com");
+    expect(decodeGmailMessage(gmailMessage()).messageId).toBeUndefined();
+  });
+
   it("decodes UTF-8 base64url and uses Gmail internalDate", () => {
     const message = gmailMessage("m1", "Pedido: café 🌧️");
     expect(decodeGmailMessage(message)).toMatchObject({ id: "m1", threadId: "thread1", text: "Pedido: café 🌧️", from: "orders@synthetic.example" });

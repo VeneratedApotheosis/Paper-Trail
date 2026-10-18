@@ -1,4 +1,4 @@
-import type { ExtractedFieldName, RedactedEmail } from "@/lib/contracts";
+import { OTHER_REFS_MAX, OTHER_REF_MAX_CHARS, type ExtractedFieldName, type RedactedEmail } from "@/lib/contracts";
 import type { LlmTool } from "@/lib/llm";
 import { senderDomain } from "./text";
 
@@ -20,6 +20,7 @@ export const EXTRACTION_SYSTEM_PROMPT = [
   "- customerName must be null. Customer names are private; never infer or reconstruct them from tokens.",
   "- last4 is the 4 card digits only when the email shows them (e.g. 'ending in 4242'); otherwise null.",
   "- eventAmount is the refund, price adjustment, or store credit amount stated in refund/adjustment/credit emails.",
+  "- otherRefs lists every other reference number printed in the email besides orderRef (invoice, confirmation, transaction, web order or document numbers), exactly as written; [] when there are none. Never include tracking numbers, phone numbers, amounts or the orderRef itself.",
   "- returnWindowDays, refundSlaDays, priceAdjustDays and policyQuote only when the email itself states the policy.",
   "- For every non-null field give confidence (0 to 1) and an evidence quote of at most 200 characters copied verbatim from the email.",
   `Always answer by calling the ${EXTRACTION_TOOL_NAME} tool.`,
@@ -71,6 +72,14 @@ const FIELD_PROPERTIES: Record<ExtractedFieldName, Record<string, unknown>> = {
   isStoreCredit: { type: "boolean", description: "True only when a refund was issued as store credit" },
 };
 
+/** Not a scored field (no confidence/evidence entry), so it lives outside FIELD_PROPERTIES. */
+const OTHER_REFS_PROPERTY = {
+  type: "array",
+  items: { type: "string", minLength: 1, maxLength: OTHER_REF_MAX_CHARS },
+  maxItems: OTHER_REFS_MAX,
+  description: "Other reference numbers in the email (invoice, confirmation, transaction, web order), as written",
+};
+
 const FIELD_NAMES = Object.keys(FIELD_PROPERTIES) as ExtractedFieldName[];
 
 function perFieldObject(valueSchema: Record<string, unknown>): Record<string, unknown> {
@@ -89,7 +98,7 @@ export const EXTRACTION_TOOL: LlmTool = {
     properties: {
       fields: {
         type: "object",
-        properties: FIELD_PROPERTIES,
+        properties: { ...FIELD_PROPERTIES, otherRefs: OTHER_REFS_PROPERTY },
         required: ["merchant", "orderRef", "date", "currency", "lineItems", "totals"],
         additionalProperties: false,
       },

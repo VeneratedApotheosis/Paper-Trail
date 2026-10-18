@@ -18,6 +18,15 @@ async function collect(emails = [order("o1", "NW-1"), order("o2", "NW-2"), NEWSL
 }
 
 describe("sync quality collector", () => {
+  it("reports duplicate handling: emails collapsed before extraction and merges by reason (#126)", async () => {
+    const copy = { messageId: "<same@northwind.example>" };
+    const { collected } = await collect([order("o1", "NW-1", copy), order("o2", "NW-1", copy), order("o3", "NW-2")]);
+    expect(collected.report).toMatchObject({
+      extracted: 2, matchedOrders: 2, llmCalls: 2, duplicatesCollapsed: 1, mergesByReason: { message_id: 1 }, possibleDuplicates: 0,
+    });
+    expect(collected.texts.find((text) => text.emailId === "o2")?.outcome).toBe("collapsed");
+  });
+
   it("counts what the pipeline did and the LLM usage of the run", async () => {
     const { collected, result } = await collect();
     expect(collected.report).toMatchObject({

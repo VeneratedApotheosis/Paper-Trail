@@ -12,16 +12,47 @@ import {
   type RawEmail,
 } from "@/lib/contracts";
 import { roundCents } from "@/lib/rules/money";
+import { clusterCandidates } from "./dedup/cluster";
+import { emailKeys, type CopyReason } from "./dedup/exact";
+import { merchantKeys } from "./dedup/merchant";
+import { canonicalRef, canonicalRefs, refsFromSubject } from "./dedup/refs";
+import type { DedupCandidate, MergeReason } from "./dedup/score";
+
+/** An exact copy of a matched email that was collapsed before extraction (#126 A); kept as provenance. */
+export interface EmailCopy {
+  id: string;
+  sourceAccount?: string;
+  reason: CopyReason;
+  /** `mid:` / `fp:` keys of the copy. */
+  keys: string[];
+}
 
 /** One classified + extracted email, the matcher's input unit. */
 export interface MatchInput {
   email: RawEmail;
   extraction: Extraction;
+  /** Exact copies the pipeline collapsed into this email. Their ids and accounts join the order's provenance. */
+  copies?: EmailCopy[];
+  /** `mid:` / `fp:` keys of the original (unredacted) email; derived from `email` when absent. */
+  emailKeys?: string[];
 }
 
 export interface MatchOptions {
-  /** Max distance between a ref-less email's date and an existing order's placedAt for the fallback match. */
+  /** Legacy grouping only: max distance between a ref-less email's date and an existing order's placedAt. */
   fallbackMaxDays?: number;
+  /**
+   * Group like before #126 (merchant NAME slug + order ref slug, then a ref-less amount/3-day fallback). Kept so the
+   * dedup test set can report "before" numbers; the app never sets it.
+   */
+  legacyGrouping?: boolean;
+}
+
+/** What dedup did in one matcher run (#126), for the quality report. */
+export interface MatchDedupSummary {
+  /** Clusters joined, by the evidence that joined them. */
+  merges: Partial<Record<MergeReason, number>>;
+  /** Orders flagged `possibleDuplicateOf`. */
+  possibleDuplicates: number;
 }
 
 export interface MatchResult {
@@ -32,6 +63,7 @@ export interface MatchResult {
    * currency have no entry.
    */
   reviewReasons: Map<string, string[]>;
+  dedup: MatchDedupSummary;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -44,10 +76,16 @@ const FINAL_SALE_PATTERN = /final sale|non-returnable|cannot be returned/i;
 const DROP_OFF_PATTERN = /\bdropped off\b/i;
 
 interface OrderGroup {
+  /** Final order id; stable for a group that was never merged under a different id. */
+  id: string;
+  /** Slug of the extracted merchant name; used when no email names the merchant. */
   merchantKey: string;
-  /** Normalized order ref, null for groups built by the fallback match. */
-  refKey: string | null;
   inputs: MatchInput[];
+  /** Older ids of orders merged into this one (see NormalizedOrder.aliasIds). */
+  aliasIds: string[];
+  /** Why a hand check is needed even though matching succeeded, e.g. a refund above the order total. */
+  warnings: string[];
+  possibleDuplicateOf?: NonNullable<NormalizedOrder["possibleDuplicateOf"]>;
 }
 
 /**
@@ -68,13 +106,38 @@ export function matchOrders(inputs: readonly MatchInput[], opts: MatchOptions = 
 
 /** matchOrders plus the matcher's review reasons per order id. */
 export function matchOrdersWithReasons(inputs: readonly MatchInput[], opts: MatchOptions = {}): MatchResult {
-  const fallbackMaxDays = opts.fallbackMaxDays ?? DEFAULT_FALLBACK_MAX_DAYS;
   const relevant = [...inputs]
     .filter((input) => !IGNORED_CLASSES.includes(input.extraction.class))
     .sort(compareInputs);
-  const merchantKeyOf = buildMerchantKeyResolver(relevant);
+  const legacyKeyOf = buildMerchantKeyResolver(relevant);
+  const { groups, dedup } = opts.legacyGrouping
+    ? { groups: legacyGroups(relevant, legacyKeyOf, opts.fallbackMaxDays ?? DEFAULT_FALLBACK_MAX_DAYS), dedup: { merges: {}, possibleDuplicates: 0 } }
+    : dedupGroups(relevant, legacyKeyOf);
 
-  const groups = new Map<string, OrderGroup>();
+  const built = groups.map((group) => buildOrder(group));
+  const reviewReasons = new Map<string, string[]>();
+  for (const { order, reasons } of built) {
+    if (reasons.length > 0) reviewReasons.set(order.id, reasons);
+  }
+  const orders = built
+    .map(({ order }) => order)
+    .sort((a, b) => a.placedAt.localeCompare(b.placedAt) || a.id.localeCompare(b.id));
+  return { orders, reviewReasons, dedup };
+}
+
+/** Id of the order an email would have formed on its own before #126 (merchant name slug + ref slug, else email id). */
+function legacyOrderId(input: MatchInput, merchantKey: string): string {
+  const refKey = normalizeRef(input.extraction.fields.orderRef);
+  return refKey ? `order:${merchantKey}:${refKey}` : `order:${merchantKey}:${slugify(input.email.id)}`;
+}
+
+/** The pre-#126 grouping: merchant name slug + order ref slug, then a ref-less amount/date fallback. */
+function legacyGroups(
+  relevant: readonly MatchInput[],
+  merchantKeyOf: (input: MatchInput) => string,
+  fallbackMaxDays: number,
+): OrderGroup[] {
+  const groups = new Map<string, OrderGroup & { refKey: string | null }>();
   const refless: MatchInput[] = [];
   for (const input of relevant) {
     const refKey = normalizeRef(input.extraction.fields.orderRef);
@@ -84,30 +147,97 @@ export function matchOrdersWithReasons(inputs: readonly MatchInput[], opts: Matc
     }
     const merchantKey = merchantKeyOf(input);
     const key = `${merchantKey}|${refKey}`;
-    const group = groups.get(key) ?? { merchantKey, refKey, inputs: [] };
+    const group = groups.get(key) ?? { id: `order:${merchantKey}:${refKey}`, merchantKey, refKey, inputs: [], aliasIds: [], warnings: [] };
     group.inputs.push(input);
     groups.set(key, group);
   }
-
   for (const input of refless) {
     const merchantKey = merchantKeyOf(input);
     const match = findFallbackGroup([...groups.values()], merchantKey, input, fallbackMaxDays);
     if (match) {
       match.inputs.push(input);
     } else {
-      groups.set(`${merchantKey}|email:${input.email.id}`, { merchantKey, refKey: null, inputs: [input] });
+      groups.set(`${merchantKey}|email:${input.email.id}`, {
+        id: legacyOrderId(input, merchantKey), merchantKey, refKey: null, inputs: [input], aliasIds: [], warnings: [],
+      });
     }
   }
+  return [...groups.values()];
+}
 
-  const built = [...groups.values()].map((group) => buildOrder(group));
-  const reviewReasons = new Map<string, string[]>();
-  for (const { order, reasons } of built) {
-    if (reasons.length > 0) reviewReasons.set(order.id, reasons);
+function isStrongKeyOf(key: string): boolean {
+  return key.startsWith("mid:");
+}
+
+/** `mid:` / `fp:` keys of an input and of its collapsed copies. */
+function inputKeys(input: MatchInput): string[] {
+  const own = input.emailKeys ?? emailKeys(input.email);
+  return [...new Set([...own, ...(input.copies ?? []).flatMap((copy) => copy.keys)])];
+}
+
+function candidateOf(input: MatchInput): DedupCandidate {
+  const { email, extraction } = input;
+  const fields = extraction.fields;
+  const confirmation = extraction.class === "order";
+  const keys = merchantKeys({ from: email.from, subject: email.subject, merchant: fields.merchant, merchantDomain: fields.merchantDomain });
+  const total = finiteOrNull(fields.totals.total);
+  return {
+    merchantKeys: keys.length > 0 ? keys : ["unknown"],
+    refs: [...new Set([...canonicalRefs(fields.orderRef, fields.otherRefs), ...refsFromSubject(email.subject)])],
+    primaryRef: canonicalRef(fields.orderRef),
+    kind: confirmation ? "confirmation" : "lifecycle",
+    emailClass: extraction.class,
+    currency: fields.currency,
+    amount: confirmation ? total : finiteOrNull(fields.eventAmount) ?? total,
+    at: Date.parse(resolveEventAt(input)),
+    items: fields.lineItems.map((item) => ({ key: slugify(item.name), sku: item.sku ?? null, unitPrice: item.unitPrice, qty: item.qty })),
+    exactKeys: inputKeys(input).filter(isStrongKeyOf),
+    threadKey: email.threadId ? `${email.sourceAccount ?? ""}:${email.threadId}` : null,
+  };
+}
+
+/**
+ * Scored dedup grouping (#126). Ids stay what the earliest ref-bearing email would have had before, so Review
+ * corrections keep applying; ids of orders merged away are kept as `aliasIds`.
+ */
+function dedupGroups(
+  relevant: readonly MatchInput[],
+  legacyKeyOf: (input: MatchInput) => string,
+): { groups: OrderGroup[]; dedup: MatchDedupSummary } {
+  const clustering = clusterCandidates(relevant.map(candidateOf));
+  const clusterOf = new Map<number, number>();
+  clustering.clusters.forEach((cluster, clusterIndex) => cluster.forEach((node) => clusterOf.set(node, clusterIndex)));
+
+  const usedIds = new Map<string, number>();
+  const groups: OrderGroup[] = clustering.clusters.map((cluster) => {
+    const inputs = cluster.map((node) => relevant[node]);
+    const idInput = inputs.find((input) => normalizeRef(input.extraction.fields.orderRef) !== null) ?? inputs[0];
+    const merchantKey = legacyKeyOf(idInput);
+    const baseId = legacyOrderId(idInput, merchantKey);
+    const seen = (usedIds.get(baseId) ?? 0) + 1;
+    usedIds.set(baseId, seen);
+    const id = seen === 1 ? baseId : `${baseId}:${seen}`;
+    const aliasIds = [...new Set(inputs.map((input) => legacyOrderId(input, legacyKeyOf(input))))].filter((alias) => alias !== id).sort();
+    const warnings = cluster.flatMap((node) =>
+      (clustering.warnings.get(node) ?? []).map((warning) => `${warning} (email ${relevant[node].email.id})`),
+    );
+    return { id, merchantKey, inputs, aliasIds, warnings };
+  });
+
+  let possibleDuplicates = 0;
+  for (const possible of clustering.possibleDuplicates) {
+    const from = clusterOf.get(possible.node)!;
+    const to = clusterOf.get(possible.other)!;
+    // The cluster that starts later is the possible copy of the earlier one.
+    const [later, earlier] = clustering.clusters[from][0] >= clustering.clusters[to][0] ? [from, to] : [to, from];
+    const current = groups[later].possibleDuplicateOf;
+    if (current && current.score >= possible.score) continue;
+    if (!current) possibleDuplicates += 1;
+    groups[later].possibleDuplicateOf = { orderId: groups[earlier].id, reason: possible.reasons.join(", "), score: possible.score };
   }
-  const orders = built
-    .map(({ order }) => order)
-    .sort((a, b) => a.placedAt.localeCompare(b.placedAt) || a.id.localeCompare(b.id));
-  return { orders, reviewReasons };
+  const merges: Partial<Record<MergeReason, number>> = {};
+  for (const merge of clustering.merges) merges[merge.reason] = (merges[merge.reason] ?? 0) + 1;
+  return { groups, dedup: { merges, possibleDuplicates } };
 }
 
 function compareInputs(a: MatchInput, b: MatchInput): number {
@@ -115,7 +245,7 @@ function compareInputs(a: MatchInput, b: MatchInput): number {
 }
 
 /** Lowercase, non-alphanumerics collapsed to "-". */
-function slugify(value: string): string {
+export function slugify(value: string): string {
   return value
     .toLowerCase()
     .normalize("NFKD")
@@ -469,9 +599,7 @@ function buildOrder(group: OrderGroup): { order: NormalizedOrder; reasons: strin
 
   const merchantSlug = group.merchantKey;
   const orderRef = firstValue(byPrecedence, (input) => fieldsOf(input).orderRef);
-  const id = group.refKey
-    ? `order:${merchantSlug}:${group.refKey}`
-    : `order:${merchantSlug}:${slugify(sorted[0].email.id)}`;
+  const id = group.id;
 
   const merchantName =
     firstValue(byPrecedence, (input) => fieldsOf(input).merchant) ??
@@ -498,6 +626,7 @@ function buildOrder(group: OrderGroup): { order: NormalizedOrder; reasons: strin
     ...sorted
       .filter(hasNonIsoDate)
       .map((input) => `date "${input.extraction.fields.date}" in email ${input.email.id} is not ISO 8601; used the email date`),
+    ...group.warnings,
   ];
 
   const currency = firstValue(byPrecedence, (input) => fieldsOf(input).currency);
@@ -506,11 +635,22 @@ function buildOrder(group: OrderGroup): { order: NormalizedOrder; reasons: strin
   const needsReview =
     confMin < REVIEW_CONFIDENCE_THRESHOLD || primary === null || currency === null || reasons.length > 0;
 
-  const messageIds = primary
-    ? [primary.email.id, ...sorted.filter((input) => input !== primary).map((input) => input.email.id)]
-    : sorted.map((input) => input.email.id);
+  const copies = sorted.flatMap((input) => input.copies ?? []);
+  const messageIds = [
+    ...new Set([
+      ...(primary
+        ? [primary.email.id, ...sorted.filter((input) => input !== primary).map((input) => input.email.id)]
+        : sorted.map((input) => input.email.id)),
+      ...copies.map((copy) => copy.id),
+    ]),
+  ];
 
-  const sources = [...new Set(sorted.map((input) => input.email.sourceAccount).filter((source): source is string => Boolean(source)))].sort();
+  const sources = [
+    ...new Set(
+      [...sorted.map((input) => input.email.sourceAccount), ...copies.map((copy) => copy.sourceAccount)].filter((source): source is string => Boolean(source)),
+    ),
+  ].sort();
+  const keys = [...new Set(sorted.flatMap(inputKeys))].sort();
   const order = NormalizedOrderSchema.parse({
     id,
     merchant: { name: merchantName, domain, policy: buildPolicy(byPrecedence) },
@@ -530,6 +670,9 @@ function buildOrder(group: OrderGroup): { order: NormalizedOrder; reasons: strin
     events: builtEvents.map(({ event }) => event),
     messageIds,
     ...(sources.length > 0 ? { sources } : {}),
+    ...(group.aliasIds.length > 0 ? { aliasIds: group.aliasIds } : {}),
+    ...(keys.length > 0 ? { emailKeys: keys } : {}),
+    ...(group.possibleDuplicateOf ? { possibleDuplicateOf: group.possibleDuplicateOf } : {}),
     confMin,
     needsReview,
   });

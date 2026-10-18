@@ -19,6 +19,7 @@ describe("parseEml", () => {
     );
     expect(email).toEqual({
       id: "abc123@northwind.example",
+      messageId: "abc123@northwind.example",
       from: '"Northwind Outfitters" <orders@northwind.example>',
       to: "sam@mail.example",
       subject: "Your order — NW-1001",

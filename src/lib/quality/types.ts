@@ -1,5 +1,6 @@
 import type { EmailClass, ExtractedFields } from "@/lib/contracts";
 import type { PipelineEmailOutcome } from "@/lib/pipeline/run";
+import type { MergeReason } from "@/lib/orders/dedup/score";
 
 /**
  * Quality tracking (#117). Everything here is derived data: counts, safe metadata (sender name + domain, subject) and
@@ -31,6 +32,12 @@ export interface SyncQualityReport {
   /** Extraction attempts that failed or never validated (they sit in the review queue). */
   extractionFailures: number;
   matchedOrders: number;
+  /** Emails collapsed into an identical earlier email before extraction (#126); no LLM call was spent on them. */
+  duplicatesCollapsed?: number;
+  /** Purchases joined by dedup (#126), by the evidence: message_id, fingerprint, shared_ref, thread, items_amount. */
+  mergesByReason?: Partial<Record<MergeReason, number>>;
+  /** Orders flagged as a possible duplicate of another (not merged). */
+  possibleDuplicates?: number;
   findings: number;
   /** LLM requests that left the machine (cache hits are not counted). */
   llmCalls: number;

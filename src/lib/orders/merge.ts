@@ -17,6 +17,8 @@ import {
  *   matcher's own rule); returned quantities take the larger value.
  * - Policy facts the base lacks are filled from the other copies; `nonReturnable` is set when any copy says so.
  * - Totals, currency and placed-at come from the base only, so amounts are never mixed across copies.
+ * - Orders with different ids (the same purchase matched by reference or email key, #126) are re-keyed to the base id; the
+ *   other ids are kept in `aliasIds` so Review corrections saved under them still apply.
  * - `sources` and `messageIds` are unions; `confMin` is the lowest; the human review state is dropped (the store
  *   assigns a new revision when the merged order is published).
  */
@@ -26,21 +28,46 @@ export function mergeSameOrder(orders: readonly NormalizedOrder[]): NormalizedOr
   const [base, ...others] = ranked;
   if (others.length === 0) return base;
   const confMin = Math.min(...ranked.map((order) => order.confMin));
+  // Copies of one order that carry another id (matched by reference or email key, #126) are re-keyed to the base's id.
+  const rebased = ranked.map((order) => rebaseOrder(order, base.id));
+  const aliasIds = [...new Set(ranked.flatMap((order) => [order.id, ...(order.aliasIds ?? [])]))].filter((id) => id !== base.id).sort();
+  const emailKeys = [...new Set(ranked.flatMap((order) => order.emailKeys ?? []))].sort();
+  const possibleDuplicateOf = ranked.map((order) => order.possibleDuplicateOf).find((flag) => flag !== undefined && flag.orderId !== base.id && !aliasIds.includes(flag.orderId));
   const merged = NormalizedOrderSchema.parse({
     ...base,
+    ...(aliasIds.length > 0 ? { aliasIds } : {}),
+    ...(emailKeys.length > 0 ? { emailKeys } : {}),
+    ...(possibleDuplicateOf ? { possibleDuplicateOf } : {}),
     merchant: { ...base.merchant, policy: mergePolicy(ranked.map((order) => order.merchant.policy)) },
     orderRef: firstNonNull(ranked.map((order) => order.orderRef)),
     last4: firstNonNull(ranked.map((order) => order.last4)),
     customerName: firstNonNull(ranked.map((order) => order.customerName)),
-    lineItems: mergeLineItems(ranked),
-    events: mergeEvents(ranked),
+    lineItems: mergeLineItems(rebased),
+    events: mergeEvents(rebased),
     messageIds: [...new Set(ranked.flatMap((order) => order.messageIds))],
     sources: [...new Set(ranked.flatMap((order) => order.sources ?? []))].sort(),
     confMin,
     needsReview: base.needsReview || confMin < REVIEW_CONFIDENCE_THRESHOLD,
   });
+  if (!possibleDuplicateOf) delete merged.possibleDuplicateOf;
   delete merged.review;
   return merged;
+}
+
+/** The order with its id, line item ids and event ids moved under `baseId` (same order when the ids already agree). */
+function rebaseOrder(order: NormalizedOrder, baseId: string): NormalizedOrder {
+  if (order.id === baseId) return order;
+  const rekey = (id: string) => (id.startsWith(`${order.id}:`) ? `${baseId}:${id.slice(order.id.length + 1)}` : id);
+  return {
+    ...order,
+    id: baseId,
+    lineItems: order.lineItems.map((item) => ({ ...item, id: rekey(item.id) })),
+    events: order.events.map((event) => ({
+      ...event,
+      id: rekey(event.id),
+      ...(event.lineItemIds ? { lineItemIds: event.lineItemIds.map(rekey) } : {}),
+    })),
+  };
 }
 
 function compareTrust(a: NormalizedOrder, b: NormalizedOrder): number {
