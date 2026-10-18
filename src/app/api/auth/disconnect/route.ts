@@ -1,3 +1,4 @@
+import { sameOriginAllowed } from "@/lib/http/same-origin";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { DisconnectResponse } from "@/lib/api/types";
@@ -21,8 +22,7 @@ export const dynamic = "force-dynamic";
 async function handlePOST(request: Request): Promise<Response> {
   const req = new NextRequest(request);
   const headers = { "Cache-Control": "no-store" };
-  const origin = req.headers.get("origin");
-  if ((origin && origin !== req.nextUrl.origin) || req.headers.get("sec-fetch-site") === "cross-site") {
+  if (!sameOriginAllowed(req)) {
     return NextResponse.json({ error: "Disconnect Gmail must be requested from this app." }, { status: 403, headers });
   }
   let config: ReturnType<typeof authConfig>;
