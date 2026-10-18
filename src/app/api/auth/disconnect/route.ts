@@ -4,6 +4,7 @@ import type { DisconnectResponse } from "@/lib/api/types";
 import { authConfig } from "@/lib/auth/config";
 import { disconnectUserAuthorization } from "@/lib/auth/revoke";
 import { clearAuthCookies, resolveSessionUser } from "@/lib/auth/session";
+import { listAccountGrants } from "@/lib/auth/account";
 import { authStore } from "@/lib/auth/store";
 import { withAccountStore } from "@/lib/gmail/context";
 import { appendAudit } from "@/lib/store";
@@ -40,8 +41,11 @@ async function handlePOST(request: Request): Promise<Response> {
   const revokedToken = await disconnectUserAuthorization(userId, config, authStore(), fetch, accountId);
   appendAudit({ at: new Date().toISOString(), type: "approval",
     detail: `Gmail ${accountId === undefined ? "disconnected" : "account disconnected"}; ${revokedToken ? "Google grant revoked" : "Google revocation not confirmed"}; ledger kept` });
-  const body: DisconnectResponse = { disconnected: true, revokedToken };
-  return NextResponse.json(body, { headers });
+  // No connected mailbox left: end the signed-in session too, so middleware sends the visitor back to /welcome.
+  const signedOut = !listAccountGrants(userId, config, authStore()).some((account) => account.connected);
+  const body: DisconnectResponse = { disconnected: true, revokedToken, signedOut };
+  const response = NextResponse.json(body, { headers });
+  return signedOut ? clearAuthCookies(response, request) : response;
 }
 
 export const POST = withAccountStore(handlePOST);

@@ -19,6 +19,8 @@ function routeRedirect(request: NextRequest): NextResponse | null {
   const { pathname } = request.nextUrl;
   if (pathname.startsWith("/api/")) return null;
   const inApp = Boolean(request.cookies.get(SESSION_COOKIE)?.value || request.cookies.get(DEMO_COOKIE)?.value);
+  // /connect is retired: signed-out visitors land on /welcome; signed-in ones (demo, expired Gmail) go straight to Google.
+  if (pathname === "/connect") return NextResponse.redirect(new URL(inApp ? "/api/auth/google" : "/welcome", request.url));
   const isPublic = PUBLIC_PAGES.includes(pathname);
   if (!inApp && !isPublic) return NextResponse.redirect(new URL("/welcome", request.url));
   if (inApp && pathname === "/welcome") return NextResponse.redirect(new URL("/", request.url));

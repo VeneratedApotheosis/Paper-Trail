@@ -206,6 +206,8 @@ export interface DisconnectResponse {
   disconnected: true;
   /** Google confirmed the revocation. False when no grant existed or Google was unreachable (credentials are cleared anyway). */
   revokedToken: boolean;
+  /** No connected mailbox remains, so the session cookie was cleared and the visitor is signed out. */
+  signedOut?: boolean;
 }
 
 /**

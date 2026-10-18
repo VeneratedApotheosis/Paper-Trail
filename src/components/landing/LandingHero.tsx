@@ -107,7 +107,7 @@ export function LandingHero({ onOpenApp }: { onOpenApp: () => void }) {
           </p>
         </div>
 
-        <div className="relative">
+        <div className="relative" inert>
           <div className="absolute -top-3 right-4 z-10">
             <Chip tone="neutral">Sample data</Chip>
           </div>

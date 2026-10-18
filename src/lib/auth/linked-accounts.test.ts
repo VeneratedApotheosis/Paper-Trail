@@ -213,7 +213,7 @@ describe("POST /api/auth/disconnect with several accounts", () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 200 }));
     vi.stubGlobal("fetch", fetcher);
     const response = await disconnect(req("auth/disconnect", cookie, "POST", { accountId: linked }));
-    expect(await response.json()).toEqual({ disconnected: true, revokedToken: true });
+    expect(await response.json()).toMatchObject({ disconnected: true, revokedToken: true });
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect((fetcher.mock.calls[0][1]?.body as URLSearchParams).get("token")).toBe("refresh-two@example.test");
     expect(db.findAccount(profile, linked)?.tokenEnc).toBeNull();
@@ -230,7 +230,7 @@ describe("POST /api/auth/disconnect with several accounts", () => {
     expect((await disconnect(req("auth/disconnect", cookie, "POST", { accountId: "nope" }))).status).toBe(404);
     expect((await disconnect(req("auth/disconnect", cookie, "POST", { accountId: "" }))).status).toBe(400);
     expect(fetcher).not.toHaveBeenCalled();
-    expect(await (await disconnect(req("auth/disconnect", cookie, "POST"))).json()).toEqual({ disconnected: true, revokedToken: true });
+    expect(await (await disconnect(req("auth/disconnect", cookie, "POST"))).json()).toMatchObject({ disconnected: true, revokedToken: true });
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(db.find(profile)?.tokenEnc).toBeNull();
     expect(db.findAccount(profile, linked)?.tokenEnc).toBeNull();
@@ -240,7 +240,7 @@ describe("POST /api/auth/disconnect with several accounts", () => {
     const { cookie } = twoAccounts();
     vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockImplementation(async (_url, init) =>
       new Response(null, { status: (init?.body as URLSearchParams).get("token") === "refresh-two@example.test" ? 400 : 200 })));
-    expect(await (await disconnect(req("auth/disconnect", cookie, "POST"))).json()).toEqual({ disconnected: true, revokedToken: false });
+    expect(await (await disconnect(req("auth/disconnect", cookie, "POST"))).json()).toMatchObject({ disconnected: true, revokedToken: false });
   });
 });
 

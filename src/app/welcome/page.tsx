@@ -25,6 +25,6 @@ export default function WelcomePage() {
   }
 
   return (
-    <LandingView onOpenApp={() => router.push("/")} onConnectGmail={handleConnectGmail} onTryDemo={handleTryDemo} />
+    <LandingView onOpenApp={handleTryDemo} onConnectGmail={handleConnectGmail} onTryDemo={handleTryDemo} />
   );
 }

@@ -90,7 +90,7 @@ export function FindingsShowcase({ onOpenApp }: { onOpenApp: () => void }) {
         Every card opens to the exact line from your email and the math behind the number.
         Nothing here is a guess from the model: the amount always comes from a rule.
       </p>
-      <div className="mt-10 space-y-4">
+      <div className="mt-10 space-y-4" inert>
         {SHOWCASE.map(({ merchant, finding }) => (
           <FindingCard
             key={finding.id}

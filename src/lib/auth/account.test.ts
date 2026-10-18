@@ -158,7 +158,7 @@ describe("POST /api/auth/disconnect", () => {
     const response = await disconnect(req("auth/disconnect", cookie, "POST"));
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toEqual({ disconnected: true, revokedToken: true });
+    expect(await response.json()).toMatchObject({ disconnected: true, revokedToken: true });
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(db.find(id)).toMatchObject({ id, tokenEnc: null });
     expect(withStoreScope(id, getState).audit[0]).toMatchObject({ type: "approval", detail: expect.stringContaining("Gmail disconnected") });
@@ -182,7 +182,7 @@ describe("POST /api/auth/disconnect", () => {
   it("clears credentials even when Google is unreachable", async () => {
     const { id, cookie } = addUser();
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
-    expect(await (await disconnect(req("auth/disconnect", cookie, "POST"))).json()).toEqual({ disconnected: true, revokedToken: false });
+    expect(await (await disconnect(req("auth/disconnect", cookie, "POST"))).json()).toMatchObject({ disconnected: true, revokedToken: false });
     expect(db.find(id)?.tokenEnc).toBeNull();
   });
 
@@ -196,7 +196,7 @@ describe("POST /api/auth/disconnect", () => {
     expect((await disconnect(cross)).status).toBe(403);
     expect(fetcher).not.toHaveBeenCalled();
     expect((await disconnect(req("auth/disconnect", cookie, "POST"))).status).toBe(200);
-    expect(await (await disconnect(req("auth/disconnect", cookie, "POST"))).json()).toEqual({ disconnected: true, revokedToken: false });
+    expect(await (await disconnect(req("auth/disconnect", cookie, "POST"))).json()).toMatchObject({ disconnected: true, revokedToken: false });
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 

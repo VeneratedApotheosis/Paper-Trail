@@ -43,7 +43,7 @@ it("uses Secure cookies on HTTPS and returns a safe error when unconfigured", as
 it("clears invalid transaction cookies without contacting Google", async () => {
   const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
   const response = await callback(new NextRequest("http://localhost:3000/api/auth/callback?code=synthetic"));
-  expect(response.headers.get("location")).toBe("http://localhost:3000/connect?error=invalid_state");
+  expect(response.headers.get("location")).toBe("http://localhost:3000/welcome?error=invalid_state");
   expect(response.cookies.get(TRANSACTION_COOKIE)?.maxAge).toBe(0);
   expect(fetcher).not.toHaveBeenCalled();
 });
@@ -53,7 +53,7 @@ it("redirects denied users to the existing consent error state", async () => {
   const response = await callback(new NextRequest(`http://localhost:3000/api/auth/callback?error=access_denied&state=${state}`, {
     headers: { cookie: `${TRANSACTION_COOKIE}=${flow.cookie}` },
   }));
-  expect(response.headers.get("location")).toBe("http://localhost:3000/connect?error=access_denied");
+  expect(response.headers.get("location")).toBe("http://localhost:3000/welcome?error=access_denied");
 });
 it("establishes a session and exposes only connection status, never tokens", async () => {
   const flow = beginAuthorization(authConfig());

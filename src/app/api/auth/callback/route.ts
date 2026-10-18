@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const reason = error instanceof AuthError ? error.reason : "oauth_failed";
     // The existing UI supports token_expired. Other errors return to the consent
     // screen; do not falsely describe every denial as a missing test user.
-    response = NextResponse.redirect(new URL(`/connect?error=${reason}`, config.origin));
+    response = NextResponse.redirect(new URL(`/welcome?error=${reason}`, config.origin));
   }
   response.cookies.set(TRANSACTION_COOKIE, "", { httpOnly: true, secure: config.secure,
     sameSite: "lax", path: "/api/auth", maxAge: 0 });

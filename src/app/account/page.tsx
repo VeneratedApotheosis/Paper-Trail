@@ -33,7 +33,8 @@ export default function AccountPage() {
   async function handleConfirmDisconnect() {
     // Success: the refreshed account shows the new state. Failure: the confirm closes and the error shows.
     const accountId = disconnectTarget?.accountId ?? null;
-    await disconnect.run(accountId === null ? {} : { accountId });
+    const result = await disconnect.run(accountId === null ? {} : { accountId });
+    if (result?.signedOut) { router.push("/welcome"); return; }
     setDisconnectTarget(null);
   }
 
