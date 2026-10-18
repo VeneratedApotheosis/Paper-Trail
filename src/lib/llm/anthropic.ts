@@ -59,6 +59,8 @@ export class AnthropicLlmClient implements LlmClient {
   private readonly apiKey: string | undefined;
   private readonly fetchImpl: typeof fetch;
   private readonly timeoutMs: number;
+  /** Some models (e.g. claude-sonnet-5-5) reject a forced tool_choice; once seen, use "auto" and rely on the prompt. */
+  private forceTool = true;
 
   constructor(options: AnthropicClientOptions = {}) {
     this.apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY;
@@ -73,34 +75,40 @@ export class AnthropicLlmClient implements LlmClient {
       throw new LlmUnavailableError("ANTHROPIC_API_KEY is not set; use cached or fixture extractions instead");
     }
 
-    const body = {
+    const makeBody = () => ({
       model: this.model,
       max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
       system: request.system,
       messages: [{ role: "user", content: request.user }],
       tools: [request.tool],
-      tool_choice: { type: "tool", name: request.tool.name },
-    };
+      tool_choice: this.forceTool ? { type: "tool", name: request.tool.name } : { type: "auto" },
+    });
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let json: unknown;
     try {
-      let response: Response;
-      try {
-        response = await this.fetchImpl(ANTHROPIC_MESSAGES_URL, {
-          method: "POST",
-          headers: {
-            "x-api-key": this.apiKey,
-            "anthropic-version": ANTHROPIC_VERSION,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
-      } catch (error) {
-        if (controller.signal.aborted) throw new LlmTimeoutError(this.timeoutMs);
-        throw new LlmError("LLM request failed: network error", { cause: error });
+ const send = async (): Promise<Response> => {
+        try {
+          return await this.fetchImpl(ANTHROPIC_MESSAGES_URL, {
+            method: "POST",
+            headers: {
+              "x-api-key": this.apiKey as string,
+              "anthropic-version": ANTHROPIC_VERSION,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(makeBody()),
+            signal: controller.signal,
+          });
+        } catch (error) {
+          if (controller.signal.aborted) throw new LlmTimeoutError(this.timeoutMs);
+          throw new LlmError("LLM request failed: network error", { cause: error });
+        }
+      };
+      let response = await send();
+      if (response.status === 400 && this.forceTool && /tool_choice/i.test(await response.clone().text().catch(() => ""))) {
+        this.forceTool = false;
+        response = await send();
       }
 
       if (!response.ok) {
