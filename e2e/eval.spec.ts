@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-test("evaluation loads real API scores and retries a failed request", async ({ page, request }) => {
+test("evaluation loads real API scores and retries a failed request", async ({ page }) => {
+  // Shares the page's cookies, so API calls and the page use the same anonymous store scope (#90).
+  const request = page.request;
   const report = await (await request.get("/api/eval")).json();
   let fail = true;
   await page.route("**/api/eval", route => fail

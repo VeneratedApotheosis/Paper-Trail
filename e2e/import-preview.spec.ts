@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-test("anonymous import preview displays the Gmail query once", async ({ page, request }) => {
+test("anonymous import preview displays the Gmail query once", async ({ page }) => {
+  // Shares the page's cookies, so API calls and the page use the same anonymous store scope (#90).
+  const request = page.request;
   const response = await request.get("/api/prefilter");
   const { query } = await response.json() as { query: string };
   await page.goto("/sync");

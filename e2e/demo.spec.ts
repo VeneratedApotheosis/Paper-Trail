@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 
-test("synthetic demo: findings, evidence, claim approval, purchases and delete", async ({ page, context, request }, testInfo) => {
+test("synthetic demo: findings, evidence, claim approval, purchases and delete", async ({ page, context }, testInfo) => {
+  // Shares the page's cookies, so API calls and the page use the same anonymous store scope (#90).
+  const request = page.request;
   const external: string[] = [];
   await context.route("https://**/*", route => { external.push(route.request().url()); return route.abort(); });
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -22,7 +24,7 @@ test("synthetic demo: findings, evidence, claim approval, purchases and delete",
   await card.getByRole("button", { name: "Draft a claim", exact: true }).click();
   await expect(page).toHaveURL(/\/claim\//);
   await page.getByRole("button", { name: "Approve and copy", exact: true }).click();
-  await expect(page.getByText("Approved and copied to clipboard", { exact: true })).toBeVisible();
+  await expect(page.getByText("Approved and copied.", { exact: true })).toBeVisible();
   await page.goto("/");
   await expect(headline).toHaveAttribute("aria-label", before ?? "");
   const approvedLedger = await (await request.get("/api/ledger")).json();

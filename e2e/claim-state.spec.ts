@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-test("server-approved claim handoff survives reload and deletion reports the real receipt", async ({ page, context, request }) => {
+test("server-approved claim handoff survives reload and deletion reports the real receipt", async ({ page, context }) => {
+  // Shares the page's cookies, so API calls and the page use the same anonymous store scope (#90).
+  const request = page.request;
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await context.route("https://**/*", route => route.abort());
   await request.post("/api/delete-all");
@@ -11,7 +13,7 @@ test("server-approved claim handoff survives reload and deletion reports the rea
   await page.getByRole("button", { name: "Approve and copy", exact: true }).click();
   await expect(page.getByRole("link", { name: "Open in email", exact: true })).toHaveAttribute("href", /^mailto:/);
   await page.reload();
-  await expect(page.getByText("Claim approved", { exact: true })).toBeVisible();
+  await expect(page.getByText("Claim approved.", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Open in email", exact: true })).toHaveAttribute("href", /^mailto:/);
   await page.getByLabel("Subject", { exact: true }).fill("Unsaved synthetic edit");
   await expect(page.getByRole("link", { name: "Open in email", exact: true })).toHaveCount(0);

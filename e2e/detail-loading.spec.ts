@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-test("detail loading boundaries preserve real 404s and known synthetic details", async ({ page, request }) => {
+test("detail loading boundaries preserve real 404s and known synthetic details", async ({ page }) => {
+  // Shares the page's cookies, so API calls and the page use the same anonymous store scope (#90).
+  const request = page.request;
   await request.post("/api/demo");
   for (const path of ["/ledger/unknown-synthetic-id", "/claim/unknown-synthetic-id"]) {
     const response = await page.goto(path);
