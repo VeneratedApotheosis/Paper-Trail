@@ -344,3 +344,21 @@ Redacted texts of the latest run are kept in memory only (max 400 emails, skippe
 no re-fetch; delete-all and a demo reset clear them. Typed client: `getQualityReports`, `getSkippedEmails`,
 `markSkippedAsReceipt`, `markNotReceipt`, `getQualityEval`, `runQualityExperiment`. UI: the "Quality" section of `/eval`
 (`QualitySection`, data via `useQuality`).
+
+## Dispute draft stub (`#20`)
+
+`POST /api/disputes/:orderId` creates a deterministic merchant-support draft for an existing visible purchase in the request's account scope. This is a draft-only stub: it stores nothing, changes no findings or owed total, makes no LLM/provider call, approves nothing, and never sends email. Excluded/deleted/other-account orders are not accessible.
+
+Confirm the situation yourself; missing delivery events do not establish nonreceipt. The supported strict JSON bodies are:
+
+```json
+{"reason":"item_not_received","confirmed":true}
+```
+
+```json
+{"reason":"wrong_item","confirmed":true,"lineItemId":"li-jacket","receivedItem":"A blue mug instead of the ordered jacket"}
+```
+
+`lineItemId` must belong to this order; `receivedItem` is user-supplied plain text (1–500 characters). Additional fields are rejected. A 200 response is `{draft:{orderId,reason,subject,body,signedName,evidence,warnings,requiresApproval:true}}`. Evidence contains existing lifecycle email quotes, **not proof of the user's reported scenario**. A delivery notice adds a warning for nonreceipt; uncertain order data also adds a warning. Missing/tokenized customer names use “Customer”. The response has no recipient guess, `mailtoUrl`, clipboard operation or approval state. The future UI must let the user check/edit details, choose a recipient and explicitly approve before any copy/email handoff.
+
+Errors follow `{error,details?}`: 400 for invalid id/JSON/scenario or absent confirmation; 404 for a purchase not visible in the current scope; 422 when the selected line item does not belong to the purchase. Account/session errors follow the existing account-scoped route wrapper. No chargeback eligibility, legal deadline, refund amount or bank action is inferred.
