@@ -80,17 +80,17 @@ e2e/                # Playwright specs
 | Kenan | `VeneratedApotheosis` | Repo owner, scope decisions. **Data + routing:** pages (thin wrappers), middleware, hooks, backend (via `kenan-pi-*` agents) |
 | Alex | `ptatoo` | **How it looks:** design system, styles, visual components and views (Paper) |
 | Ethan Lowe | `ethanwlowe7-cmyk` | **On the team but inactive (no time to code, 2026-10-17).** All his claims are stale; don't wait on them or assign him work |
-| Chelsea | `chelsearwang` | Auth, Gmail, DB: `src/lib/auth/**`, `src/app/api/auth/**`, Gmail sync, `src/db/**`; session helper for guards |
+| Chelsea | `chelsearwang` | **On the team but inactive (left the hackathon, 2026-10-17).** All her claims are stale; her area (auth, Gmail, review, DB) is now Kenan's. Don't assign her work |
 
 ## Ownership: the frontend is split by file (decided 2026-10-17)
-**Alex = how it looks. Kenan = where data comes from and where users go. Chelsea = auth, Gmail, DB.**
+**Alex = how it looks. Kenan = where data comes from and where users go, plus auth, Gmail, review and DB while Chelsea is inactive.**
 Every file has exactly one owner; never edit a file you don't own, even to fix a build error. Tell the owner.
 
 | Owner | Files |
 |---|---|
 | **Alex** (`ui-design`) | `tailwind.config.*`, `src/app/globals.css`, `src/styles/**`, `public/**`, Paper files, `docs/design-system.md`, `src/components/**` (visual components + `src/components/views/**`), `src/lib/format.ts` |
 | **Kenan** (`ui-wiring` + backend) | `src/app/**/page.tsx`, `loading.tsx`, `error.tsx`, `not-found.tsx`, route groups/redirects, `middleware.ts`, `src/hooks/**`, `src/app/layout.tsx` (providers/metadata/mode only; renders Alex's `<AppShell>`), `src/lib/{api,store,pipeline,demo,claims,rules,ingestion,orders,prices,eval,llm,contracts}/**`, `src/app/api/**` except auth/gmail/review, legacy `src/lib/types.ts` + `view.ts` (moving into contracts/backend), `tools/**`, `seed/**`, `scripts/**`, `e2e/**` |
-| **Chelsea** | `src/lib/auth/**`, `src/app/api/auth/**`, `src/lib/gmail/**`, `src/app/api/gmail/**`, `src/lib/review/**`, `src/app/api/review/**`, `src/db/**` |
+| **Kenan** (from Chelsea, inactive) | `src/lib/auth/**`, `src/app/api/auth/**`, `src/lib/gmail/**`, `src/app/api/gmail/**`, `src/lib/review/**`, `src/app/api/review/**`, `src/db/**` (Chelsea's code: change carefully, keep her tests passing) |
 
 `src/lib/contracts/**` is shared ground: post an `INTERFACE` comment and get Kenan's OK before changing it. Editing another
 owner's file (even a small scoping change) needs an INTERFACE comment on their issue and their OK first.
@@ -122,7 +122,7 @@ Full rules: COORDINATION.md section 0.
 - Never paste real personal emails into fixtures, prompts, issues, or commits.
 - **Never post account passwords or credentials** in issues, comments, commits, or agent prompts. The app uses
   Gmail OAuth only; no agent ever needs the test account's password. If one is exposed, tell Kenan so it gets rotated.
-- Don't touch another owner's area (e.g. `src/lib/auth/**` is Chelsea's); see COORDINATION.md section 10.
+- Don't touch another owner's area (e.g. `src/components/**` is Alex's); see COORDINATION.md section 10.
 
 ## How to work (summary — full process in COORDINATION.md)
 GitHub Issues is the **only** live status board. Never coordinate through repo files.

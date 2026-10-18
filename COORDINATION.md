@@ -16,10 +16,10 @@ Repo: `VeneratedApotheosis/Paper-Trail`
 | **Kenan** | `VeneratedApotheosis` | Repo owner, final say on scope. **Data + routing:** thin pages, middleware, hooks, backend. Orchestrated `kenan-pi-*` agents (section 5) |
 | **Alex** | `ptatoo` | **How it looks:** design system, styles, visual components and views (Paper) |
 | Ethan Lowe | `ethanwlowe7-cmyk` | **On the team but inactive (no time to code, 2026-10-17).** Any claim by him is stale and may be taken over immediately (comment that it's stale, then claim). Don't assign him work |
-| **Chelsea** | `chelsearwang` | **Auth, Gmail, DB:** `src/lib/auth/**`, `src/app/api/auth/**`, Gmail sync, `src/db/**`; session helper used by guards |
+| Chelsea | `chelsearwang` | **On the team but inactive (left the hackathon, 2026-10-17).** Any claim by her is stale and may be taken over immediately. Her area (auth, Gmail, review, DB) is now Kenan's. Don't assign her work |
 
 ### The frontend is split by file (decided 2026-10-17)
-**Alex = how it looks. Kenan = where data comes from and where users go. Chelsea = auth, Gmail, DB.**
+**Alex = how it looks. Kenan = where data comes from and where users go, plus auth, Gmail, review and DB while Chelsea is inactive.**
 Every file has exactly one owner. Never edit, refactor, reformat, or "fix" a file you don't own, even if a build error
 points there: tell the owner (issue comment + tag).
 
@@ -27,7 +27,7 @@ points there: tell the owner (issue comment + tag).
 |---|---|---|
 | **Alex** | `ui-design` | `tailwind.config.*`, `src/app/globals.css`, `src/styles/**`, `public/**`, Paper files, `docs/design-system.md`, `src/components/**` (visual components + views in `src/components/views/**`), `src/lib/format.ts` |
 | **Kenan** | `ui-wiring`, `backend` | `src/app/**/page.tsx`, `loading.tsx`, `error.tsx`, `not-found.tsx`, route groups/redirects, `middleware.ts`, `src/hooks/**`, `src/app/layout.tsx` (providers/metadata/mode only; renders Alex's `<AppShell>`), `src/lib/{api,store,pipeline,demo,claims,rules,ingestion,orders,prices,eval,llm,contracts}/**`, `src/app/api/**` except auth/gmail/review, `src/app/api/debug/**`, legacy `src/lib/types.ts` + `src/lib/view.ts` (being moved into contracts/backend), `seed/**`, `scripts/**`, `tools/**`, `e2e/**` |
-| **Chelsea** | `backend` | `src/lib/auth/**`, `src/app/api/auth/**`, `src/lib/gmail/**`, `src/app/api/gmail/**`, `src/lib/review/**`, `src/app/api/review/**`, `src/db/**` |
+| **Kenan** (from Chelsea, inactive) | `backend` | `src/lib/auth/**`, `src/app/api/auth/**`, `src/lib/gmail/**`, `src/app/api/gmail/**`, `src/lib/review/**`, `src/app/api/review/**`, `src/db/**` (Chelsea's code: change carefully, keep her tests passing) |
 
 **Shared contracts:** `src/lib/contracts/**` is Kenan's, but everyone builds on it: post an `INTERFACE` comment and wait
 for an OK from Kenan before changing it. Changes to another owner's files (e.g. store scoping in `src/lib/store`) need the
@@ -100,7 +100,6 @@ gh search issues "<your-agent-id>" --repo VeneratedApotheosis/Paper-Trail --stat
 # 2. Who is doing what? (one line per teammate)
 gh issue list --assignee ptatoo
 gh issue list --assignee VeneratedApotheosis
-gh issue list --assignee chelsearwang
 
 # 3. What's available, blocked, finished?
 gh issue list --search "no:assignee -label:blocked"
@@ -292,7 +291,7 @@ Format: `#<issue> <imperative summary>`, under ~72 chars, present tense.
 | Styles, tokens, `src/components/**` (views) | **Alex (section 0).** Open a `ui-design` issue to request changes. |
 | `src/app/**/page.tsx`, `middleware.ts`, `src/hooks/**` | **Kenan (section 0).** Open a `ui-wiring` issue to request data/routing changes. |
 | `.env.example` | Append only; placeholder values only. (`LLM_API_KEY` was replaced by `ANTHROPIC_API_KEY` + `LLM_MODEL` in #7.) |
-| `src/app/api/auth/**`, `src/lib/auth/**`, DB client/init | **Chelsea (#3).** Others don't touch; delete-all calls her revoke function through a hook. |
+| `src/app/api/auth/**`, `src/lib/auth/**`, DB client/init | **Kenan** (written by Chelsea, now inactive). Security-sensitive: keep her tests passing; delete-all uses `resolveSessionUser` + per-user revoke (#84). |
 | `src/app/api/claims/**`, `src/lib/claims/**` | #32 (claim drafts backend). |
 | `src/app/api/eval/**`, `src/lib/eval/**` | #21 (eval backend). |
 | Other `src/app/api/**`, `src/lib/store/**`, `src/lib/api/**`, `src/lib/demo/**`, `src/lib/pipeline/run.ts` | #4 / #31 (demo pipeline, store, JSON API, typed client). |
