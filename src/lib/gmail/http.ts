@@ -1,17 +1,15 @@
-import { NextRequest } from "next/server";
-import { authConfig, SESSION_COOKIE } from "@/lib/auth/config";
+import { authConfig } from "@/lib/auth/config";
 import { AuthError } from "@/lib/auth/google";
-import { getAccessToken, sessionUser } from "@/lib/auth/service";
+import { getAccessToken } from "@/lib/auth/service";
+import { resolveSessionUser } from "@/lib/auth/session";
 import { authStore } from "@/lib/auth/store";
 import { appendAudit } from "@/lib/store";
 import { GmailError, type GmailDeps } from "./client";
 
 export function gmailRequest(request: Request): { userId: string; deps: GmailDeps; active: () => boolean } {
-  const cookie = new NextRequest(request.url, { headers: request.headers }).cookies.get(SESSION_COOKIE)?.value;
-  if (!cookie) throw new AuthError("token_expired");
+  const userId = resolveSessionUser(request, { requireToken: true });
+  if (!userId) throw new AuthError("token_expired");
   const config = authConfig();
-  const userId = sessionUser(cookie, config);
-  if (!userId || !authStore().find(userId)?.tokenEnc) throw new AuthError("token_expired");
   return {
     userId,
     active: () => Boolean(authStore().find(userId)?.tokenEnc),

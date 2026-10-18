@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE } from "./config";
 import { seal } from "./crypto";
-import { getSession } from "./session";
+import { getSession, resolveSessionUser } from "./session";
 import { authStore, createAuthStore, type AuthStore } from "./store";
 
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
@@ -73,6 +73,10 @@ describe("server session helper", () => {
     const id = db.save("one@example.test", tokens());
     db.update(id, null);
     expect(await getSession(request(session(id)))).toEqual({ userId: id, gmailConnected: false });
+    expect(resolveSessionUser(request(session(id)), { requireToken: false })).toBe(id);
+    expect(resolveSessionUser(request(session(id)), { requireToken: true })).toBeNull();
+    db.remove(id);
+    expect(resolveSessionUser(request(session(id)), { requireToken: false })).toBeNull();
   });
   it.each(["invalid", tokens({ refreshExpiresAt: now }),
     seal({ accessToken: "synthetic" }, key, "tokens")])(
