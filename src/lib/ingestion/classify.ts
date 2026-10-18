@@ -69,7 +69,7 @@ const STRONG_SHIPPING_EVIDENCE =
 
 /** Order-confirmation wording; with an order number and an order total or items list it outranks transit wording. */
 const ORDER_CONFIRMATION_WORDING =
-  /\border (?:(?:is |has been )?confirmed|confirmation|received|placed)\b|\bthanks? (?:you )?for (?:your )?(?:order|purchase)\b|\bwe(?:'ve| have) received your order\b|\byour order (?:has been |was |is )?(?:placed|confirmed)\b|\bconfirmacion (?:de|del) (?:(?:tu|su) )?(?:pedido|compra)\b|\bpedido (?:confirmado|recibido)\b|\bgracias por tu (?:pedido|compra)\b/;
+  /\border (?:(?:is |has been |was )?(?:confirmed|received|placed)|confirmation)\b|\bthanks? (?:you )?for (?:your )?(?:order|purchase)\b|\bwe(?:'ve| have) received your order\b|\byour (?:[a-z]+ ){0,3}order (?:has been |was |is )?(?:placed|confirmed|received)\b|\bconfirmacion (?:de|del) (?:(?:tu|su) )?(?:pedido|compra)\b|\bpedido (?:confirmado|recibido)\b|\bgracias por tu (?:pedido|compra)\b/;
 const ORDER_TOTAL_OR_ITEMS = /\border total\b|\bsubtotal\b|\bgrand total\b|^[ \t]*items\b|\bresumen del pedido\b/m;
 
 /** Concrete purchase details, not promotional headings such as "Items you might like". */
@@ -128,6 +128,9 @@ const COMMERCE_PLATFORM_DOMAINS = [
   "toasttab.com", "stripe.com", "clover.com", "lightspeedhq.com", "sumup.com", "zettle.com", "izettle.com",
   "wix.com", "wixemails.com", "squarespace.com", "bigcommerce.com", "ecwid.com", "etsy.com", "gumroad.com",
   "paypal.com", "eventbrite.com", "loyverse.com", "odoo.com", "weebly.com", "shopee.tw", "91app.com", "cyberbiz.co",
+  // Campus card / dining systems and restaurant POS that send receipts as the venue.
+  "transactcampus.com", "cbord.com", "atriumcampus.com", "touchnet.com", "nutrislice.com", "spoton.com",
+  "revelsystems.com", "heartland.us", "upserve.com", "grubhub.com", "ritual.co",
 ];
 
 function isCommercePlatform(domain: string): boolean {
