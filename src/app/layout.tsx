@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Spectral, Hanken_Grotesk } from "next/font/google";
 import { ShellStateProvider } from "@/hooks/shellState";
+import { THEME_COLOR } from "./manifest";
 import "./globals.css";
 
 // Display serif for headings and the money figures (calm, bookish — Spectral).
@@ -23,6 +24,16 @@ const ui = Hanken_Grotesk({
 export const metadata: Metadata = {
   title: "PaperTrail",
   description: "Find the money your inbox says you're owed.",
+  applicationName: "PaperTrail",
+  appleWebApp: { capable: true, title: "PaperTrail", statusBarStyle: "default" },
+  icons: { apple: "/icons/apple-touch-icon.png" },
+};
+
+export const viewport: Viewport = {
+  themeColor: THEME_COLOR,
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -7,7 +7,9 @@ export default defineConfig({
   expect: { timeout: 15000 },
   reporter: [["list"], ["html", { open: "never" }]],
   use: { baseURL: "http://localhost:3107", browserName: "chromium",
-    screenshot: "only-on-failure", trace: "retain-on-failure" },
+    screenshot: "only-on-failure", trace: "retain-on-failure",
+    // The production build registers the PWA service worker (#44); keep it out so page.route mocks see every request.
+    serviceWorkers: "block" },
   webServer: {
     command: "npm run start -- --hostname localhost --port 3107",
     url: "http://localhost:3107",
