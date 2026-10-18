@@ -23,6 +23,9 @@ Repo: `VeneratedApotheosis/Paper-Trail`
 Every file has exactly one owner. Never edit, refactor, reformat, or "fix" a file you don't own, even if a build error
 points there: tell the owner (issue comment + tag).
 
+> **Temporary (2026-10-17):** Alex's computer crashed. While he's down, Kenan's agents may make the view fixes listed in
+> **#101** in `src/components/**` (only those, keeping Alex's visual style; each change posted on #101 for his review).
+
 | Owner | Label | Files |
 |---|---|---|
 | **Alex** | `ui-design` | `tailwind.config.*`, `src/app/globals.css`, `src/styles/**`, `public/**`, Paper files, `docs/design-system.md`, `src/components/**` (visual components + views in `src/components/views/**`), `src/lib/format.ts` |
